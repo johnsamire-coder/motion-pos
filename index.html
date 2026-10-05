@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -207,19 +207,178 @@
             </div>
         </div>
 
-        <!-- TAB 2,3,4,5,6 (تظل موجودة برمجيا) -->
-        <div id="view-kds-workspace" class="hidden"></div>
-        <div id="view-inventory-workspace" class="hidden"></div>
-        <div id="view-purchase-workspace" class="hidden"></div>
-        <div id="view-cost-workspace" class="hidden"></div>
-        <div id="view-reports-workspace" class="hidden"></div>
-        <div id="view-settings-workspace" class="hidden"></div>
+<!-- TAB 2: KDS WORKSPACE -->
+        <div id="view-kds-workspace" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <h2 class="font-black text-slate-800 text-sm">👨🍳 شاشة تحضير الطلبات الحية (Realtime ⚡)</h2>
+                <button onclick="loadKDSOrders()" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold">تحديث 🔄</button>
+            </div>
+            <div id="kds-cards-grid" class="grid grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- TAB 3: INVENTORY WORKSPACE -->
+        <div id="view-inventory-workspace" class="hidden grid grid-cols-12 gap-4">
+            <div class="col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                    <h2 class="font-black text-slate-800 text-sm">📦 أرصدة المخازن</h2>
+                    <select id="inventory-warehouse-select" onchange="loadInventoryStock()" class="bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
+                </div>
+                <table class="w-full text-right"><tbody id="inventory-table-body"></tbody></table>
+            </div>
+            <div class="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div class="border-b pb-2"><h3 class="font-black text-xs text-red-600">تسجيل هالك / تالف</h3></div>
+                <select id="waste-ingredient-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
+                <input type="number" id="waste-qty" placeholder="الكمية" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
+                <select id="waste-reason" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"><option value="انكباب/دلق">انكباب/دلق</option><option value="انتهاء صلاحية">انتهاء صلاحية</option></select>
+                <button onclick="submitWasteLog()" class="w-full bg-red-600 text-white py-2.5 rounded-xl font-bold text-xs">تسجيل الهالك</button>
+
+                <div class="border-t pt-4 border-b pb-2"><h3 class="font-black text-xs text-blue-600">الجرد الفعلي الموزون</h3></div>
+                <select id="stocktake-ingredient-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
+                <input type="number" id="stocktake-qty" placeholder="الكمية الفعليه" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
+                <button onclick="submitStockTake()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">حفظ الجرد</button>
+            </div>
+        </div>
+
+        <!-- TAB 4: PURCHASING WORKSPACE -->
+        <div id="view-purchase-workspace" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-3">
+                <h2 class="font-black text-slate-800 text-sm border-b pb-2">🛒 إضافة فاتورة توريد/مشتريات</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <select id="purchase-supplier" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold"></select>
+                    <select id="purchase-warehouse" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold text-blue-600"></select>
+                </div>
+                <select id="purchase-ingredient" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold"></select>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" id="purchase-qty" placeholder="الكمية" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold">
+                    <input type="number" id="purchase-unit-price" step="0.0001" placeholder="سعر الوحدة" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold">
+                </div>
+                <button onclick="submitPurchaseInvoice()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-xs">حفظ التوريد وتحديث التكاليف</button>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="font-black text-slate-800 text-sm border-b pb-2 mb-3">📋 أرشيف المشتريات</h2>
+                <table class="w-full text-right"><tbody id="purchase-history-body"></tbody></table>
+            </div>
+        </div>
+
+        <!-- TAB 5: COST CONTROL WORKSPACE -->
+        <div id="view-cost-workspace" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="font-black text-slate-800 text-sm border-b pb-2 mb-3">📊 تحليل ربحية الأصناف (Food Cost %)</h2>
+                <table class="w-full text-right"><tbody id="cost-table-body"></tbody></table>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3 border-b pb-2">
+                    <h2 class="font-black text-red-600 text-sm">📉 سجل الخسائر والمواد التالفة</h2>
+                    <span id="total-loss-badge" class="font-bold text-red-700 text-xs"></span>
+                </div>
+                <table class="w-full text-right"><tbody id="waste-report-body"></tbody></table>
+            </div>
+        </div>
+
+        <!-- TAB 6: FINANCIAL REPORTS (P&L) -->
+        <div id="view-reports-workspace" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="font-black text-slate-800 text-sm border-b pb-4 mb-6 flex justify-between items-center">
+                    <span>👑 لوحة تحكم المالك وتقرير الأرباح والصافي (P&L Report)</span>
+                    <button onclick="loadFinancialDashboard()" class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-xs font-bold border">تحديث 🔄</button>
+                </h2>
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-200">
+                        <p class="text-[11px] font-bold text-emerald-700 mb-1">إجمالي المبيعات</p>
+                        <h3 id="stat-sales" class="text-xl font-black text-emerald-800">0.00 ج.م</h3>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-2xl border border-amber-200">
+                        <p class="text-[11px] font-bold text-amber-700 mb-1">تكلفة الخامات (COGS)</p>
+                        <h3 id="stat-cogs" class="text-xl font-black text-amber-800">0.00 ج.م</h3>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-2xl border border-red-200">
+                        <p class="text-[11px] font-bold text-red-700 mb-1">خسائر الهالك</p>
+                        <h3 id="stat-waste" class="text-xl font-black text-red-800">0.00 ج.م</h3>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-2xl border border-blue-200">
+                        <p class="text-[11px] font-bold text-blue-700 mb-1">الربح الصافي النهائي</p>
+                        <h3 id="stat-net" class="text-xl font-black text-blue-800">0.00 ج.م</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 7: SETTINGS WORKSPACE (الإعدادات بـ Sidebar ⚙️) -->
+        <div id="view-settings-workspace" class="hidden flex items-start gap-4">
+            
+            <div class="w-1/4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
+                <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ أقسام الإعدادات</h3>
+                <div class="flex flex-col">
+                    <button onclick="switchSettingsSection('pos')" id="btn-set-pos" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 transition mb-2 shadow-sm">🖥️ إعدادات الكاشير والصالة</button>
+                    <button onclick="switchSettingsSection('inventory')" id="btn-set-inventory" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition mb-2">🏢 الفروع والمخازن</button>
+                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition mb-2">🍔 إدارة المنيو والأصناف 🛠️</button>
+                </div>
+            </div>
+
+            <div class="w-3/4">
+                <div id="set-section-pos" class="set-section space-y-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ إعدادات الضرائب والخدمة</h3>
+                        <div id="settings-tax-container"></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">🍽️ إدارة الطاولات والمناطق</h3>
+                        <div id="settings-tables-container"></div>
+                    </div>
+                </div>
+                
+                <div id="set-section-inventory" class="set-section hidden space-y-4">
+                    <div id="settings-branches-container"></div>
+                    <div id="settings-warehouses-container"></div>
+                </div>
+
+                <!-- Section 3: Menu Settings (محرر المنيو الكامل) -->
+                <div id="set-section-menu" class="set-section hidden space-y-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 class="font-black text-sm text-slate-800">📂 أقسام المنيو الحالية</h3>
+                            <button onclick="addNewCategoryPrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة قسم جديد ➕</button>
+                        </div>
+                        <div id="settings-categories-list" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 class="font-black text-sm text-slate-800">🍔 قائمة الأصناف والأسعار في المنيو</h3>
+                            <button onclick="addNewProductPrompt()" class="bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-emerald-700">إضافة صنف جديد ➕</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b text-slate-600 text-xs font-black">
+                                        <th class="p-3">اسم الصنف</th>
+                                        <th class="p-3">القسم التابع</th>
+                                        <th class="p-3">سعر البيع</th>
+                                        <th class="p-3">حالة الإتاحة</th>
+                                        <th class="p-3 text-left">العمليات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="settings-products-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 
     <!-- Imports -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/pos.js"></script>
+    <script src="js/kds.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/purchasing.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/settings.js"></script>
+
 
     <script>
         let pendingTabTarget = null;
@@ -242,7 +401,18 @@
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
                 btn.className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200";
             });
-            document.getElementById('tab-btn-' + targetTab).className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow";
+            const activeBtn = document.getElementById('tab-btn-' + targetTab);
+            if (activeBtn) activeBtn.className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow";
+
+            if (targetTab === 'kds' && typeof loadKDSOrders === 'function') loadKDSOrders();
+            if (targetTab === 'inventory' && typeof loadInventoryStock === 'function') loadInventoryStock();
+            if (targetTab === 'purchase' && typeof loadPurchaseHistory === 'function') loadPurchaseHistory();
+            if (targetTab === 'cost') {
+                if (typeof loadCostAnalysis === 'function') loadCostAnalysis();
+                if (typeof loadWasteReport === 'function') loadWasteReport();
+            }
+            if (targetTab === 'reports' && typeof loadFinancialDashboard === 'function') loadFinancialDashboard();
+            if (targetTab === 'settings' && typeof initSettingsModule === 'function') initSettingsModule();
         }
 
         function verifyManagerModalPIN() {
