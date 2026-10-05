@@ -1,4 +1,4 @@
-﻿// js/auth.js - نظام تسجيل الدخول بالـ PIN والصلاحيات الحقيقية
+﻿// js/auth.js - نظام تسجيل الدخول بالـ PIN المرن والمحصن
 
 function appendPin(num) {
     const input = document.getElementById('login-pin');
@@ -23,23 +23,41 @@ async function loginWithPin() {
     }
 
     try {
-        const { data, error } = await _supabase
+        // 1. جلب بيانات الموظف برقم الـ PIN
+        const { data: staffMember, error } = await _supabase
             .from('staff')
-            .select('*, roles(name), branches(name, has_tables)')
+            .select('*')
             .eq('pin_code', pin)
-            .eq('is_active', true)
             .maybeSingle();
 
-        if (error || !data) {
-            showToast('رقم PIN غير صحيح أو الموظف غير مفعل', 'error');
+        if (error || !staffMember) {
+            showToast('رقم PIN غير صحيح أو غير موجود بالداتا بيز', 'error');
             clearPin();
             return;
         }
 
-        currentUser = data;
-        currentBranch = data.branches;
+        // 2. جلب اسم الدور
+        let roleName = 'كاشير';
+        if (staffMember.role_id) {
+            const { data: roleData } = await _supabase.from('roles').select('name').eq('id', staffMember.role_id).maybeSingle();
+            if (roleData) roleName = roleData.name;
+        }
 
-        // جلب إعدادات الضرائب والخدمة الخاصة بالفرع من الداتا بيز
+        // 3. جلب بيانات الفرع
+        let branchData = { name: 'الفرع الرئيسي', has_tables: true };
+        if (staffMember.branch_id) {
+            const { data: bData } = await _supabase.from('branches').select('*').eq('id', staffMember.branch_id).maybeSingle();
+            if (bData) branchData = bData;
+        }
+
+        currentUser = {
+            ...staffMember,
+            roles: { name: roleName },
+            branches: branchData
+        };
+        currentBranch = branchData;
+
+        // 4. جلب إعدادات الضرائب والخدمة للفرع
         if (currentUser.branch_id) {
             const { data: taxData } = await _supabase
                 .from('branch_tax_settings')
@@ -55,21 +73,17 @@ async function loginWithPin() {
             }
         }
 
+        // 5. فتح الواجهة الرئيسية
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
 
-        const nameDisp = document.getElementById('staff-name-display');
-        const roleDisp = document.getElementById('staff-role-display');
-        const branchBadge = document.getElementById('branch-badge');
+        document.getElementById('staff-name-display').innerText = `الموظف: ${currentUser.name}`;
+        document.getElementById('staff-role-display').innerText = `الدور: ${roleName}`;
+        document.getElementById('branch-badge').innerText = branchData.name;
 
-        if (nameDisp) nameDisp.innerText = الموظف: ;
-        if (roleDisp) roleDisp.innerText = الدور: ;
-        if (branchBadge) branchBadge.innerText = currentBranch ? currentBranch.name : 'الفرع الرئيسي';
-
-        showToast(أهلا بك );
+        showToast(`أهلا بك ${currentUser.name}`);
         clearPin();
 
-        // تشغيل موديول الكاشير
         if (typeof initPOSModule === 'function') initPOSModule();
 
     } catch (err) {
