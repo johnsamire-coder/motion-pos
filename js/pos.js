@@ -1,4 +1,4 @@
-﻿// js/pos.js - موديول الكاشير الكامل (Sprint 3 & 4 Advanced Features)
+﻿// js/pos.js - موديول الكاشير الكامل - Motion POS
 
 let posState = {
     selectedOrderType: 'dine_in',
@@ -17,7 +17,6 @@ let posState = {
     pendingModifierProduct: null,
     selectedModifiers: [],
     
-    // الفاتورة والطلب الحالي
     cart: {
         id: null,
         order_number: 'طلب جديد',
@@ -33,11 +32,9 @@ let posState = {
         enable_service: true
     },
 
-    // المدفوعات المتعددة للفاتورة الحالية
-    paymentsList: [] // { method: 'cash'|'card'|'instapay'|'wallet'|'on_account', amount: 0 }
+    paymentsList: []
 };
 
-// تهيئة موديول الكاشير
 async function initPOSModule() {
     if (!currentUser || !currentUser.branch_id) return;
     
@@ -48,7 +45,6 @@ async function initPOSModule() {
     renderPOSTerminal();
 }
 
-// جلب البيانات المرجعية
 async function loadPOSMasterData() {
     const branchId = currentUser.branch_id;
 
@@ -90,7 +86,6 @@ async function fetchBranchTables() {
     posState.tables = tablesData || [];
 }
 
-// رسم واجهة الكاشير
 function renderPOSTerminal() {
     renderAreaAndTables();
     renderCategoriesPills();
@@ -149,7 +144,6 @@ async function selectPosTable(tableId) {
     posState.selectedTable = posState.tables.find(t => t.id === tableId);
     renderAreaAndTables();
 
-    // جلب أوردر مفتوح على الطاولة إذا وجد
     const { data: openOrders } = await _supabase
         .from('orders')
         .select('*, order_items(*, products(name), order_item_modifiers(*))')
@@ -218,7 +212,6 @@ function renderProductsGrid() {
     `).join('');
 }
 
-// فحص وجود Modifiers
 async function checkAndAddProduct(productId) {
     const product = posState.products.find(p => p.id === productId);
     if (!product) return;
@@ -239,7 +232,6 @@ async function checkAndAddProduct(productId) {
     addItemToCart(product, []);
 }
 
-// نافذة اختيار الإضافات Modifiers Modal
 function openModifiersModal(product, groups) {
     posState.pendingModifierProduct = product;
     posState.selectedModifiers = [];
@@ -332,7 +324,6 @@ function addItemToCart(product, selectedModifiers = []) {
     renderOrderCartTicket();
 }
 
-// حساب المجاميع
 function calculateCartTotals() {
     let subtotal = 0;
     let itemDiscounts = 0;
@@ -396,7 +387,6 @@ function renderOrderCartTicket() {
     document.getElementById('summary-total').innerText = formatCurrency(totals.finalTotal);
 }
 
-// تطبيق الخصم
 function applyDiscountPrompt() {
     const amountStr = prompt('أدخل قيمة الخصم (بالجنيه):', '0');
     if (amountStr) {
@@ -407,7 +397,6 @@ function applyDiscountPrompt() {
     }
 }
 
-// إلغاء/Void صنف حقيقي المربوط بالداتا بيز
 async function voidCartItem(idx) {
     const item = posState.cart.items[idx];
     if (!item) return;
@@ -495,11 +484,38 @@ function renderWaitersAndCustomersDropdowns() {
     }
     const cSel = document.getElementById('select-customer');
     if (cSel) {
-        cSel.innerHTML = posState.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        cSel.innerHTML = posState.customers.map(c => `<option value="${c.id}">${c.name} (${c.phone||'بدون تليفون'})</option>`).join('');
     }
 }
 
-// حفظ وإرسال للمطبخ
+// دالة إضافة عميل جديد سريعا من شاشة الكاشير
+async function quickAddCustomer() {
+    const name = prompt('أدخل اسم العميل الجديد:');
+    if (!name) return;
+    const phone = prompt('أدخل رقم التليفون:');
+
+    try {
+        const { data, error } = await _supabase.from('customers').insert([{
+            company_id: currentUser ? currentUser.company_id : 'c0000000-0000-0000-0000-000000000000',
+            name: name,
+            phone: phone || '',
+            customer_type: 'cash'
+        }]).select().single();
+
+        if (error) {
+            showToast('خطأ في إضافة العميل: ' + error.message, 'error');
+        } else {
+            showToast('تمت إضافة العميل بنجاح');
+            posState.customers.push(data);
+            renderWaitersAndCustomersDropdowns();
+            const cSel = document.getElementById('select-customer');
+            if (cSel) cSel.value = data.id;
+        }
+    } catch (err) {
+        console.error('Quick customer error:', err);
+    }
+}
+
 async function sendOrderToKitchen() {
     if (posState.cart.items.length === 0) {
         showToast('الفاتورة فارغة!', 'error');
@@ -625,9 +641,6 @@ async function sendOrderToKitchen() {
     }
 }
 
-// ----------------------------------------------------
-// نافذة الدفع المتعدد وتسهيلات السداد (Multiple Payments & On Account)
-// ----------------------------------------------------
 function openMultiplePaymentsModal() {
     if (posState.cart.items.length === 0) return alert('الفاتورة فارغة!');
 
@@ -702,7 +715,6 @@ async function confirmMultiplePaymentsAndClose() {
         return;
     }
 
-    // التحقق من سداد On Account
     const onAccountLine = posState.paymentsList.find(p => p.method === 'on_account');
     if (onAccountLine) {
         const custId = document.getElementById('select-customer') ? document.getElementById('select-customer').value : null;
@@ -719,7 +731,6 @@ async function confirmMultiplePaymentsAndClose() {
             return;
         }
 
-        // تحديث رصيد العميل الآجل
         await _supabase.from('customers').update({ current_balance: newBalance }).eq('id', cust.id);
     }
 
@@ -727,7 +738,6 @@ async function confirmMultiplePaymentsAndClose() {
         await sendOrderToKitchen();
     }
 
-    // حفظ جميع إسطر المدفوعات
     for (const p of posState.paymentsList) {
         await _supabase.from('payments').insert([{
             order_id: posState.cart.id,
@@ -736,7 +746,6 @@ async function confirmMultiplePaymentsAndClose() {
         }]);
     }
 
-    // إغلاق الطلب وإتاحة الطاولة
     await _supabase.from('orders').update({ status: 'closed', kitchen_status: 'ready' }).eq('id', posState.cart.id);
 
     if (posState.selectedTable) {
@@ -751,9 +760,6 @@ async function confirmMultiplePaymentsAndClose() {
     renderOrderCartTicket();
 }
 
-// ----------------------------------------------------
-// نقل الطاولة ودمج الطلبات (Transfer Table & Merge Orders)
-// ----------------------------------------------------
 function openTransferTableModal() {
     if (!posState.cart.id) return alert('الطلب الحالي ليس محفوظا بالداتا بيز لنقله!');
     
