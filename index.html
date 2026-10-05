@@ -319,20 +319,16 @@
         <!-- TAB 7: SETTINGS WORKSPACE (الإعدادات بـ Sidebar ⚙️) -->
         <div id="view-settings-workspace" class="hidden flex items-start gap-4">
             
-            <!-- Sidebar Navigation -->
             <div class="w-1/4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
                 <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ أقسام الإعدادات</h3>
                 <div class="flex flex-col">
                     <button onclick="switchSettingsSection('pos')" id="btn-set-pos" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 transition mb-2 shadow-sm">🖥️ إعدادات الكاشير والصالة</button>
                     <button onclick="switchSettingsSection('inventory')" id="btn-set-inventory" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition mb-2">🏢 الفروع والمخازن</button>
-                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition mb-2">🍔 المنيو والأصناف (قريبا)</button>
+                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition mb-2">🍔 إدارة المنيو والأصناف 🛠️</button>
                 </div>
             </div>
 
-            <!-- Main Content Area -->
             <div class="w-3/4">
-                
-                <!-- Section 1: POS Settings (Taxes & Tables) -->
                 <div id="set-section-pos" class="set-section space-y-4">
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                         <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ إعدادات الضرائب والخدمة</h3>
@@ -344,17 +340,41 @@
                     </div>
                 </div>
                 
-                <!-- Section 2: Inventory Settings (Branches & Warehouses) -->
                 <div id="set-section-inventory" class="set-section hidden space-y-4">
                     <div id="settings-branches-container"></div>
                     <div id="settings-warehouses-container"></div>
                 </div>
 
-                <!-- Section 3: Menu Settings (Placeholder) -->
-                <div id="set-section-menu" class="set-section hidden bg-white p-12 rounded-2xl shadow-sm border border-slate-200 text-center">
-                    <span class="text-5xl block mb-4">🚧</span>
-                    <h3 class="font-black text-xl text-slate-700 mb-2">جاري تطوير إدارة المنيو</h3>
-                    <p class="text-sm text-slate-500 font-bold">ستتمكن هنا قريبا من إضافة الأقسام والمنتجات وتعديل أسعار المنيو.</p>
+                <!-- Section 3: Menu Settings (محرر المنيو الكامل) -->
+                <div id="set-section-menu" class="set-section hidden space-y-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 class="font-black text-sm text-slate-800">📂 أقسام المنيو الحالية</h3>
+                            <button onclick="addNewCategoryPrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة قسم جديد ➕</button>
+                        </div>
+                        <div id="settings-categories-list" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 class="font-black text-sm text-slate-800">🍔 قائمة الأصناف والأسعار في المنيو</h3>
+                            <button onclick="addNewProductPrompt()" class="bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-emerald-700">إضافة صنف جديد ➕</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b text-slate-600 text-xs font-black">
+                                        <th class="p-3">اسم الصنف</th>
+                                        <th class="p-3">القسم التابع</th>
+                                        <th class="p-3">سعر البيع</th>
+                                        <th class="p-3">حالة الإتاحة</th>
+                                        <th class="p-3 text-left">العمليات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="settings-products-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
             </div>
