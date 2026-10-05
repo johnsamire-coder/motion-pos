@@ -92,7 +92,6 @@
     <!-- 4. التطبيق والواجهة الرئيسية -->
     <div id="app" class="hidden max-w-[1600px] mx-auto p-4 space-y-4">
 
-        <!-- الهيدر التنفيذي -->
         <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
             <div class="flex items-center gap-4">
                 <div class="bg-blue-600 text-white px-3.5 py-2 rounded-xl font-black text-sm tracking-wide" id="main-brand-logo">Motion POS</div>
@@ -156,7 +155,7 @@
                 </div>
             </div>
 
-            <!-- Right Side: Order Ticket (4 cols) -->
+            <!-- Right Side: Order Ticket -->
             <div class="col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between min-h-[580px]">
                 <div>
                     <div class="border-b pb-3 mb-3">
@@ -317,20 +316,18 @@
             </div>
         </div>
 
-        <!-- TAB 7: SETTINGS WORKSPACE (الإعدادات الجديدة ⚙️) -->
+        <!-- TAB 7: SETTINGS WORKSPACE (الإعدادات الشاملة ⚙️) -->
         <div id="view-settings-workspace" class="hidden space-y-4">
             <div class="grid grid-cols-12 gap-4">
-                <div class="col-span-5 space-y-4">
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ إعدادات الضرائب والخدمة للفروع</h3>
-                        <div id="settings-tax-container"></div>
-                    </div>
+                <!-- قسم إدارة الفروع والمخازن والضرائب (6 cols) -->
+                <div class="col-span-6 space-y-4">
+                    <div id="settings-branches-container"></div>
+                    <div id="settings-warehouses-container"></div>
+                    <div id="settings-tax-container"></div>
                 </div>
-                <div class="col-span-7 space-y-4">
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">🍽️ إدارة الطاولات والمناطق (الصالة / التراس)</h3>
-                        <div id="settings-tables-container"></div>
-                    </div>
+                <!-- قسم إدارة الطاولات والمناطق والتعديل (6 cols) -->
+                <div class="col-span-6 space-y-4">
+                    <div id="settings-tables-container"></div>
                 </div>
             </div>
         </div>
