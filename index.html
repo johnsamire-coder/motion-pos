@@ -13,6 +13,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-right select-none border-t-4 border-blue-600">
 
+    <!-- شاشة الدخول بالـ PIN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-slate-100">
             <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl font-black">☕</div>
@@ -37,7 +38,7 @@
         </div>
     </div>
 
-    <!-- نافذة طلب PIN للحماية -->
+    <!-- نافذة طلب PIN الحماية -->
     <div id="pin-auth-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-slate-100">
             <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 font-bold text-xl">🔒</div>
@@ -51,7 +52,7 @@
         </div>
     </div>
 
-    <!-- نافذة المدفوعات المتعددة والـ Tips (المحدثة) -->
+    <!-- نافذة المدفوعات المتعددة و الـ Tips -->
     <div id="payments-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -59,14 +60,12 @@
                 <button onclick="closeMultiplePaymentsModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
             </div>
 
-            <!-- عرض الإجماليات والمتبقي -->
             <div class="grid grid-cols-3 gap-2 mb-4 bg-slate-50 p-3 rounded-2xl border text-center">
                 <div><span class="block text-[9px] font-bold text-slate-400">إجمالي الطلب:</span><span id="modal-pay-total-due" class="font-black text-sm text-slate-800">0.00</span></div>
                 <div><span class="block text-[9px] font-bold text-slate-400">مجموع التحصيل:</span><span id="modal-pay-collected" class="font-black text-sm text-blue-600">0.00</span></div>
                 <div><span class="block text-[9px] font-bold text-slate-400">المتبقي للطلب:</span><span id="modal-pay-remaining" class="font-black text-sm text-red-600">0.00</span></div>
             </div>
 
-            <!-- قسم الـ Tips المنفصل محاسبيا -->
             <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 mb-4">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-xs font-bold text-amber-800">إكرامية (Tip) - غير ملزمة:</span>
@@ -76,7 +75,6 @@
                     <span class="text-[10px] font-bold text-amber-700">تخصيص الإكرامية لـ:</span>
                     <select id="tip-waiter-select" class="w-32 bg-white border p-1 rounded-md text-[10px] font-bold"></select>
                 </div>
-                <p class="text-[9px] text-amber-600 mt-1 font-bold">ملاحظة: الإكرامية تنفصل تلقائيا عن إيرادات المبيعات (Sales Revenue).</p>
             </div>
 
             <div id="payment-lines-list" class="space-y-2 mb-4"></div>
@@ -87,12 +85,30 @@
         </div>
     </div>
 
-    <!-- نافذة تقسيم الفاتورة (Split Bill) -->
+    <!-- نافذة تقسيم الفاتورة المكتملة (Split Bill Modal) -->
     <div id="split-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-lg w-full border border-slate-100 text-center">
-            <h3 class="font-black text-lg text-slate-800 mb-2">تقسيم الفاتورة (Split Bill)</h3>
-            <p class="text-xs text-slate-500 font-bold mb-6">قريبا في التحديث القادم.. يتم هندسة الهيكل لضمان تطابق الإجماليات بنسبة 100%.</p>
-            <button onclick="closeSplitModal()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold text-sm">موافق إغلاق</button>
+        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-xl w-full border border-slate-100">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <div>
+                    <h3 class="font-black text-base text-slate-800">تقسيم الفاتورة (Split Bill)</h3>
+                    <span class="text-xs text-slate-400 font-bold">إجمالي الفاتورة الأصلية: <b id="split-orig-total" class="text-blue-600">0.00</b></span>
+                </div>
+                <button onclick="closeSplitModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+
+            <!-- أزرار نوع التقسيم -->
+            <div class="flex gap-2 border-b pb-3 mb-4">
+                <button onclick="setSplitType('items')" class="flex-1 py-2 font-black text-xs rounded-xl bg-blue-50 text-blue-600 border border-blue-200">بالأصناف (Items)</button>
+                <button onclick="setSplitType('amount')" class="flex-1 py-2 font-black text-xs rounded-xl bg-slate-100 text-slate-600 border">المبلغ (Amount)</button>
+                <button onclick="setSplitType('guests')" class="flex-1 py-2 font-black text-xs rounded-xl bg-slate-100 text-slate-600 border">الضيوف (Guests)</button>
+            </div>
+
+            <div id="split-workspace-content" class="mb-4 min-h-[220px]"></div>
+
+            <div class="flex gap-2 pt-2 border-t">
+                <button onclick="processAndPaySplit(1)" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وطباعة Split 2 🖨️</button>
+                <button onclick="closeSplitModal()" class="bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-bold text-xs">إلغاء</button>
+            </div>
         </div>
     </div>
 
@@ -191,7 +207,7 @@
             </div>
         </div>
 
-        <!-- TAB 2,3,4,5,6 (المخازن والمشتريات والتقارير والإعدادات تبقى مخفية ويتم تبديلها) -->
+        <!-- TAB 2,3,4,5,6 (تظل موجودة برمجيا) -->
         <div id="view-kds-workspace" class="hidden"></div>
         <div id="view-inventory-workspace" class="hidden"></div>
         <div id="view-purchase-workspace" class="hidden"></div>
@@ -200,11 +216,11 @@
         <div id="view-settings-workspace" class="hidden"></div>
     </div>
 
-    <!-- JavaScript Module Imports -->
+    <!-- Imports -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/pos.js"></script>
-    
+
     <script>
         let pendingTabTarget = null;
         let isManagerUnlocked = false;
@@ -217,15 +233,12 @@
                 document.getElementById('modal-pin-input').focus();
                 return;
             }
-            
             ['pos', 'kds', 'inventory', 'purchase', 'cost', 'reports', 'settings'].forEach(tab => {
                 const el = document.getElementById('view-' + tab + '-workspace');
                 if (el) el.classList.add('hidden');
             });
-
             const activeEl = document.getElementById('view-' + targetTab + '-workspace');
             if (activeEl) activeEl.classList.remove('hidden');
-
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
                 btn.className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200";
             });
@@ -234,9 +247,8 @@
 
         function verifyManagerModalPIN() {
             const pin = document.getElementById('modal-pin-input').value;
-            if (pin === '9999') {
-                isManagerUnlocked = true; closeManagerModal(); if (pendingTabTarget) switchMainTab(pendingTabTarget);
-            } else { alert('رمز PIN غير صحيح'); }
+            if (pin === '9999') { isManagerUnlocked = true; closeManagerModal(); if (pendingTabTarget) switchMainTab(pendingTabTarget); } 
+            else { alert('رمز PIN غير صحيح'); }
         }
         function closeManagerModal() { document.getElementById('pin-auth-modal').classList.add('hidden'); document.getElementById('modal-pin-input').value = ''; }
     </script>
