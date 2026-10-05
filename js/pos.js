@@ -1,4 +1,4 @@
-﻿// js/pos.js - موديول الكاشير المتقدم (Sprint 3)
+﻿// js/pos.js - موديول الكاشير الكامل (Sprint 3 & 4 Advanced Features)
 
 let posState = {
     selectedOrderType: 'dine_in',
@@ -14,7 +14,6 @@ let posState = {
     discounts: [],
     activeCategory: null,
     
-    // بيانات الصنف الجاري اختيار إضافاته في المودال
     pendingModifierProduct: null,
     selectedModifiers: [],
     
@@ -24,7 +23,7 @@ let posState = {
         order_number: 'طلب جديد',
         status: 'draft',
         kitchen_status: 'pending',
-        items: [], // { db_item_id, product_id, name, price, qty, modifiers: [], discount: 0, notes: '' }
+        items: [], 
         guest_count: 1,
         waiter_id: null,
         customer_id: null,
@@ -32,7 +31,10 @@ let posState = {
         discount_type: 'fixed',
         enable_vat: true,
         enable_service: true
-    }
+    },
+
+    // المدفوعات المتعددة للفاتورة الحالية
+    paymentsList: [] // { method: 'cash'|'card'|'instapay'|'wallet'|'on_account', amount: 0 }
 };
 
 // تهيئة موديول الكاشير
@@ -410,21 +412,18 @@ async function voidCartItem(idx) {
     const item = posState.cart.items[idx];
     if (!item) return;
 
-    // إذا كان الصنف لم يرفع للداتا بيز بعد (Draft)
     if (!item.db_item_id) {
         posState.cart.items.splice(idx, 1);
         renderOrderCartTicket();
         return;
     }
 
-    // إذا كان الصنف محفوظ بالداتا بيز -> تنفيذ Void حقيقي بدالة void_order_item
     let reasonId = posState.cancelReasons.length > 0 ? posState.cancelReasons[0].id : null;
     const reasonPrompt = prompt('أدخل سبب مسح الصنف المكتوب بالمطبخ:\n' + posState.cancelReasons.map((r, i) => `${i+1}. ${r.reason}`).join('\n'));
 
     if (!reasonPrompt) return;
 
-    // الحصول على المخزن المناسب لإرجاع المكونات
-    let warehouseId = 'd0000000-0000-0000-0000-000000000001'; // المخزن التجريبي الرئيسي
+    let warehouseId = 'd0000000-0000-0000-0000-000000000001';
 
     try {
         const { error } = await _supabase.rpc('void_order_item', {
@@ -441,7 +440,6 @@ async function voidCartItem(idx) {
 
         posState.cart.items.splice(idx, 1);
         
-        // إعادة حساب الفاتورة بالداتا بيز
         const totals = calculateCartTotals();
         await _supabase.rpc('update_order_financials', {
             p_order_id: posState.cart.id,
@@ -487,6 +485,7 @@ function resetActiveCart() {
         enable_vat: taxSettings.enable_vat,
         enable_service: taxSettings.enable_service
     };
+    posState.paymentsList = [];
 }
 
 function renderWaitersAndCustomersDropdowns() {
@@ -500,7 +499,7 @@ function renderWaitersAndCustomersDropdowns() {
     }
 }
 
-// حفظ وإرسال للمطبخ (دعم الإنشاء أو التعديل على طلب قائم)
+// حفظ وإرسال للمطبخ
 async function sendOrderToKitchen() {
     if (posState.cart.items.length === 0) {
         showToast('الفاتورة فارغة!', 'error');
@@ -516,7 +515,6 @@ async function sendOrderToKitchen() {
 
     try {
         if (!posState.cart.id) {
-            // إنشاء أوردر جديد
             const { data: newOrd, error } = await _supabase.from('orders').insert([{
                 company_id: currentUser.company_id,
                 brand_id: currentUser.brand_id,
@@ -545,7 +543,6 @@ async function sendOrderToKitchen() {
             posState.cart.order_number = newOrd.order_number;
             posState.cart.status = 'sent';
 
-            // إدخال الأصناف والإضافات وخصم المكونات
             for (const item of posState.cart.items) {
                 const { data: insertedItem } = await _supabase.from('order_items').insert([{
                     order_id: newOrd.id,
@@ -557,7 +554,6 @@ async function sendOrderToKitchen() {
 
                 if (insertedItem) {
                     item.db_item_id = insertedItem.id;
-                    // إدخال الـ Modifiers
                     for (const m of item.modifiers) {
                         await _supabase.from('order_item_modifiers').insert([{
                             order_item_id: insertedItem.id,
@@ -566,7 +562,6 @@ async function sendOrderToKitchen() {
                             unit_price: m.price
                         }]);
 
-                        // خصم مكون الخامة المربوط بالـ Modifier من المخزن
                         if (m.ingredient_id && m.ingredient_quantity > 0) {
                             await _supabase.rpc('log_waste', {
                                 p_warehouse_id: warehouseId,
@@ -578,7 +573,6 @@ async function sendOrderToKitchen() {
                     }
                 }
 
-                // خصم مكونات الصنف الأساسي بالريسبي
                 await _supabase.rpc('deduct_recipe_on_sale', {
                     p_warehouse_id: warehouseId,
                     p_product_id: item.product_id,
@@ -593,7 +587,6 @@ async function sendOrderToKitchen() {
             }
 
         } else {
-            // أوردر قائم (تعديل إضافة أصناف)
             await _supabase.rpc('update_order_financials', {
                 p_order_id: posState.cart.id,
                 p_sub_total: totals.subtotal,
@@ -603,7 +596,6 @@ async function sendOrderToKitchen() {
                 p_total_amount: totals.finalTotal
             });
 
-            // إضافة الأصناف الجديدة التي لم تحفظ بعد
             for (const item of posState.cart.items) {
                 if (!item.db_item_id) {
                     const { data: insertedItem } = await _supabase.from('order_items').insert([{
@@ -633,36 +625,168 @@ async function sendOrderToKitchen() {
     }
 }
 
-// دفع وإغلاق الفاتورة
-async function payAndCloseOrder() {
-    if (posState.cart.items.length === 0) return;
+// ----------------------------------------------------
+// نافذة الدفع المتعدد وتسهيلات السداد (Multiple Payments & On Account)
+// ----------------------------------------------------
+function openMultiplePaymentsModal() {
+    if (posState.cart.items.length === 0) return alert('الفاتورة فارغة!');
+
+    const totals = calculateCartTotals();
+    const modal = document.getElementById('payments-modal');
+    if (!modal) return;
+
+    document.getElementById('modal-pay-total-due').innerText = formatCurrency(totals.finalTotal);
+    posState.paymentsList = [{ method: 'cash', amount: totals.finalTotal }];
+    renderPaymentLines();
+
+    modal.classList.remove('hidden');
+}
+
+function renderPaymentLines() {
+    const container = document.getElementById('payment-lines-list');
+    if (!container) return;
+
+    const totals = calculateCartTotals();
+    const paidSum = posState.paymentsList.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+    const remaining = totals.finalTotal - paidSum;
+
+    document.getElementById('modal-pay-remaining').innerText = formatCurrency(remaining);
+
+    container.innerHTML = posState.paymentsList.map((p, idx) => `
+        <div class="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-200">
+            <select onchange="updatePaymentMethod(${idx}, this.value)" class="bg-white border text-xs font-bold p-2 rounded-lg flex-1">
+                <option value="cash" ${p.method==='cash'?'selected':''}>نقدي (Cash)</option>
+                <option value="card" ${p.method==='card'?'selected':''}>بطاقة (Card)</option>
+                <option value="instapay" ${p.method==='instapay'?'selected':''}>انستا باي (InstaPay)</option>
+                <option value="wallet" ${p.method==='wallet'?'selected':''}>محفظة إلكترونية (Wallet)</option>
+                <option value="on_account" ${p.method==='on_account'?'selected':''}>على الحساب (On Account)</option>
+            </select>
+            <input type="number" step="0.01" value="${p.amount}" onchange="updatePaymentAmount(${idx}, this.value)" 
+                   class="w-28 bg-white border p-2 rounded-lg text-xs font-bold text-center">
+            <button onclick="removePaymentLine(${idx})" class="text-red-500 font-bold px-2 hover:bg-red-50 p-1 rounded">✕</button>
+        </div>
+    `).join('');
+}
+
+function addPaymentLine() {
+    posState.paymentsList.push({ method: 'card', amount: 0 });
+    renderPaymentLines();
+}
+
+function removePaymentLine(idx) {
+    posState.paymentsList.splice(idx, 1);
+    renderPaymentLines();
+}
+
+function updatePaymentMethod(idx, val) {
+    posState.paymentsList[idx].method = val;
+    renderPaymentLines();
+}
+
+function updatePaymentAmount(idx, val) {
+    posState.paymentsList[idx].amount = parseFloat(val) || 0;
+    renderPaymentLines();
+}
+
+function closeMultiplePaymentsModal() {
+    const modal = document.getElementById('payments-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function confirmMultiplePaymentsAndClose() {
+    const totals = calculateCartTotals();
+    const paidSum = posState.paymentsList.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+    if (Math.abs(paidSum - totals.finalTotal) > 0.01) {
+        showToast('مجموع المدفوعات لا يطابق إجمالي الفاتورة المطلوب!', 'error');
+        return;
+    }
+
+    // التحقق من سداد On Account
+    const onAccountLine = posState.paymentsList.find(p => p.method === 'on_account');
+    if (onAccountLine) {
+        const custId = document.getElementById('select-customer') ? document.getElementById('select-customer').value : null;
+        const cust = posState.customers.find(c => c.id === custId);
+
+        if (!cust || cust.customer_type !== 'on_account') {
+            showToast('العميل المختار غير مسموح له بالسداد الآجل (On Account)!', 'error');
+            return;
+        }
+
+        const newBalance = (parseFloat(cust.current_balance) || 0) + onAccountLine.amount;
+        if (newBalance > (parseFloat(cust.credit_limit) || 0)) {
+            showToast(`تجاوز الحد الائتماني للعميل! الحد: ${cust.credit_limit} ج.م`, 'error');
+            return;
+        }
+
+        // تحديث رصيد العميل الآجل
+        await _supabase.from('customers').update({ current_balance: newBalance }).eq('id', cust.id);
+    }
 
     if (!posState.cart.id) {
         await sendOrderToKitchen();
     }
 
-    const totals = calculateCartTotals();
+    // حفظ جميع إسطر المدفوعات
+    for (const p of posState.paymentsList) {
+        await _supabase.from('payments').insert([{
+            order_id: posState.cart.id,
+            payment_method: p.method,
+            amount: p.amount
+        }]);
+    }
 
-    // تسجيل العملية في جدول payments
-    await _supabase.from('payments').insert([{
-        order_id: posState.cart.id,
-        payment_method: 'cash',
-        amount: totals.finalTotal
-    }]);
-
-    // إغلاق الطلب
+    // إغلاق الطلب وإتاحة الطاولة
     await _supabase.from('orders').update({ status: 'closed', kitchen_status: 'ready' }).eq('id', posState.cart.id);
 
-    // إتاحة الطاولة
     if (posState.selectedTable) {
         await _supabase.from('tables').update({ status: 'available' }).eq('id', posState.selectedTable.id);
         await fetchBranchTables();
         renderAreaAndTables();
     }
 
+    closeMultiplePaymentsModal();
     showToast(`💳 تم دفع وإغلاق الطلب ${posState.cart.order_number} بنجاح!`);
     resetActiveCart();
     renderOrderCartTicket();
+}
+
+// ----------------------------------------------------
+// نقل الطاولة ودمج الطلبات (Transfer Table & Merge Orders)
+// ----------------------------------------------------
+function openTransferTableModal() {
+    if (!posState.cart.id) return alert('الطلب الحالي ليس محفوظا بالداتا بيز لنقله!');
+    
+    const availableTables = posState.tables.filter(t => t.id !== (posState.selectedTable ? posState.selectedTable.id : null));
+    const newTableId = prompt('أدخل رقم الطاولة الجديدة لنقل الطلب إليها:\n' + availableTables.map(t => `${t.table_number}`).join(', '));
+
+    if (!newTableId) return;
+
+    const targetTable = posState.tables.find(t => t.table_number.trim() === newTableId.trim());
+    if (!targetTable) return alert('الطاولة غير موجودة!');
+
+    executeTransferTable(targetTable.id);
+}
+
+async function executeTransferTable(newTableId) {
+    try {
+        const { error } = await _supabase.rpc('transfer_table_order', {
+            p_order_id: posState.cart.id,
+            p_new_table_id: newTableId,
+            p_user_id: currentUser ? currentUser.id : null
+        });
+
+        if (error) return showToast(error.message, 'error');
+
+        showToast('تم نقل الطلب للطاولة الجديدة بنجاح وتحديث السجلات');
+        await fetchBranchTables();
+        renderAreaAndTables();
+        resetActiveCart();
+        renderOrderCartTicket();
+
+    } catch (err) {
+        console.error('Transfer error:', err);
+    }
 }
 
 function setOrderType(type) {
