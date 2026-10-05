@@ -1,4 +1,4 @@
-// js/pos.js - موديول الكاشير المكتمل بالكامل 100% (Split Bill, Tips, Modifiers, Multiple Payments, Void)
+﻿// js/pos.js - موديول الكاشير المكتمل بالكامل 100% (Split Bill, Tips, Modifiers, Multiple Payments, Void)
 
 let posState = {
     selectedOrderType: 'dine_in',
@@ -25,7 +25,7 @@ let posState = {
 };
 
 async function initPOSModule() {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.branch_id) return;
     posState.cart.enable_vat = taxSettings.enable_vat;
     posState.cart.enable_service = taxSettings.enable_service;
     await loadPOSMasterData();
@@ -33,62 +33,33 @@ async function initPOSModule() {
 }
 
 async function loadPOSMasterData() {
-    if (!currentUser) return;
-    const branchId = currentUser.branch_id || null;
-    const loadErrors = [];
+    const branchId = currentUser.branch_id;
     try {
         const [waitersRes, custRes, catRes, prodRes, reasonRes, discRes] = await Promise.all([
-            branchId ? _supabase.from('staff').select('*').eq('branch_id', branchId) : Promise.resolve({ data: [], error: null }),
+            _supabase.from('staff').select('*').eq('branch_id', branchId),
             _supabase.from('customers').select('*'),
             _supabase.from('categories').select('*'),
             _supabase.from('products').select('*'),
             _supabase.from('cancel_reasons').select('*'),
             _supabase.from('discounts').select('*')
         ]);
-        const queryResults = [
-            ['الموظفين', waitersRes], ['العملاء', custRes], ['الأقسام', catRes],
-            ['الأصناف', prodRes], ['أسباب الإلغاء', reasonRes], ['الخصومات', discRes]
-        ];
-        queryResults.forEach(([label, result]) => {
-            if (result && result.error) loadErrors.push(label + ': ' + result.error.message);
-        });
+        
         posState.waiters = waitersRes.data || [];
         posState.customers = custRes.data || [];
         posState.categories = catRes.data || [];
         posState.products = prodRes.data || [];
         posState.cancelReasons = reasonRes.data || [];
         posState.discounts = discRes.data || [];
-        if (!branchId) loadErrors.push('حساب الموظف غير مرتبط بفرع؛ لا يمكن تحميل الموظفين ومناطق الصالة.');
-        if (branchId && currentBranch && currentBranch.has_tables) {
-            const { data: areasData, error: areasError } = await _supabase.from('areas').select('*').eq('branch_id', branchId);
-            if (areasError) {
-                loadErrors.push('مناطق الصالة: ' + areasError.message);
-                posState.areas = [];
-                posState.tables = [];
-            } else {
-                posState.areas = areasData || [];
-                if (posState.areas.length > 0) {
-                    if (!posState.selectedAreaId || !posState.areas.some(area => String(area.id) === String(posState.selectedAreaId))) {
-                        posState.selectedAreaId = posState.areas[0].id;
-                    }
-                    await fetchBranchTables();
-                } else {
-                    posState.selectedAreaId = null;
-                    posState.tables = [];
-                }
+
+        if (currentBranch && currentBranch.has_tables) {
+            const { data: areasData } = await _supabase.from('areas').select('*').eq('branch_id', branchId);
+            posState.areas = areasData || [];
+            if (posState.areas.length > 0) {
+                posState.selectedAreaId = posState.areas[0].id;
+                await fetchBranchTables();
             }
-        } else {
-            posState.areas = [];
-            posState.tables = [];
         }
-        if (loadErrors.length > 0) {
-            console.error('POS master data load errors:', loadErrors);
-            showToast('تعذر تحميل بعض قوائم الكاشير:\n' + loadErrors.join('\n'), 'error');
-        }
-    } catch (err) {
-        console.error('POS master data exception:', err);
-        showToast('تعذر تحميل قوائم الكاشير من قاعدة البيانات: ' + (err.message || 'خطأ غير معروف'), 'error');
-    }
+    } catch (err) { console.error(err); }
 }
 
 async function fetchBranchTables() {
@@ -115,8 +86,7 @@ function renderAreaAndTables() {
 
     const areaSelect = document.getElementById('area-select');
     if (areaSelect) {
-        populateSelectOptions('area-select', posState.areas, 'اختر المنطقة', 'لا توجد مناطق لهذا الفرع', area => area.name);
-        if (posState.selectedAreaId) areaSelect.value = String(posState.selectedAreaId);
+        areaSelect.innerHTML = posState.areas.map(a => `<option value="${a.id}" ${a.id === posState.selectedAreaId ? 'selected' : ''}>${a.name}</option>`).join('');
     }
 
     const grid = document.getElementById('tables-grid');
@@ -303,8 +273,8 @@ function resetActiveCart() {
     posState.paymentsList = []; posState.currentTip = 0; posState.tipStaffId = null; posState.splitState = { activeTab: 'items', splits: [], activeSplitIndex: 0 };
 }
 function renderWaitersAndCustomersDropdowns() {
-    populateSelectOptions('select-waiter', posState.waiters, 'اختر الموظف', 'لا يوجد موظفون لهذا الفرع', waiter => waiter.name);
-    populateSelectOptions('select-customer', posState.customers, 'اختر العميل', 'لا يوجد عملاء مسجلون', customer => customer.name);
+    const wSel = document.getElementById('select-waiter'); if (wSel) wSel.innerHTML = posState.waiters.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+    const cSel = document.getElementById('select-customer'); if (cSel) cSel.innerHTML = posState.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 }
 function setOrderType(type) {
     posState.selectedOrderType = type;
@@ -362,9 +332,8 @@ function openMultiplePaymentsModal() {
     
     const tipWaiterSelect = document.getElementById('tip-waiter-select');
     if (tipWaiterSelect) {
-        populateSelectOptions('tip-waiter-select', posState.waiters, 'اختر موظف الإكرامية', 'لا يوجد موظفون لهذا الفرع', waiter => waiter.name);
-        const defaultWaiterId = posState.cart.waiter_id || posState.waiters[0]?.id;
-        if (defaultWaiterId) tipWaiterSelect.value = String(defaultWaiterId);
+        tipWaiterSelect.innerHTML = posState.waiters.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+        if (posState.cart.waiter_id) tipWaiterSelect.value = posState.cart.waiter_id;
     }
     
     renderPaymentLines();

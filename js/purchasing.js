@@ -1,38 +1,4 @@
-// js/purchasing.js - موديول المشتريات وفواتير الموردين - Motion POS
-
-let purchaseOptionsLoaded = false;
-
-async function loadPurchaseOptions() {
-    if (purchaseOptionsLoaded) return true;
-    try {
-        const [suppliersRes, warehousesRes, ingredientsRes] = await Promise.all([
-            _supabase.from('suppliers').select('id, name').order('name'),
-            _supabase.from('warehouses').select('id, name').order('name'),
-            _supabase.from('ingredients').select('id, name, unit').order('name')
-        ]);
-        const errors = [];
-        if (suppliersRes.error) errors.push('الموردون: ' + suppliersRes.error.message);
-        if (warehousesRes.error) errors.push('المخازن: ' + warehousesRes.error.message);
-        if (ingredientsRes.error) errors.push('الخامات: ' + ingredientsRes.error.message);
-        const suppliers = suppliersRes.data || [];
-        const warehouses = warehousesRes.data || [];
-        const ingredients = ingredientsRes.data || [];
-        populateSelectOptions('purchase-supplier', suppliers, 'اختر المورد', errors.length ? 'تعذر تحميل الموردين' : 'لا يوجد موردون مسجلون');
-        populateSelectOptions('purchase-warehouse', warehouses, 'اختر المخزن', errors.length ? 'تعذر تحميل المخازن' : 'لا توجد مخازن مسجلة');
-        populateSelectOptions('purchase-ingredient', ingredients, 'اختر الخامة', errors.length ? 'تعذر تحميل الخامات' : 'لا توجد خامات مسجلة', item => item.unit ? item.name + ' (' + item.unit + ')' : item.name);
-        if (errors.length) {
-            console.error('Purchase dropdown load errors:', errors);
-            showToast('تعذر تحميل قوائم المشتريات: ' + errors.join(' | '), 'error');
-            return false;
-        }
-        purchaseOptionsLoaded = true;
-        return true;
-    } catch (err) {
-        console.error('Purchase options exception:', err);
-        showToast('تعذر تحميل قوائم المشتريات من قاعدة البيانات: ' + (err.message || 'خطأ غير معروف'), 'error');
-        return false;
-    }
-}
+﻿// js/purchasing.js - موديول المشتريات وفواتير الموردين - Motion POS
 
 async function submitPurchaseInvoice() {
     const supplierId = document.getElementById('purchase-supplier').value;
@@ -40,11 +6,6 @@ async function submitPurchaseInvoice() {
     const ingredientId = document.getElementById('purchase-ingredient').value;
     const qty = parseFloat(document.getElementById('purchase-qty').value);
     const price = parseFloat(document.getElementById('purchase-unit-price').value);
-
-    if (!supplierId || !warehouseId || !ingredientId) {
-        showToast('اختر المورد والمخزن والخامة أولًا', 'error');
-        return;
-    }
 
     if (!qty || qty <= 0 || !price || price <= 0) {
         showToast('أدخل الكمية وسعر الوحدة بشكل صحيح', 'error');
@@ -102,7 +63,6 @@ async function submitPurchaseInvoice() {
 }
 
 async function loadPurchaseHistory() {
-    await loadPurchaseOptions();
     try {
         const { data, error } = await _supabase
             .from('purchase_order_items')
