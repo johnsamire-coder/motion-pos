@@ -1,13 +1,39 @@
-﻿// js/purchasing.js - موديول المشتريات وفواتير الموردين - Motion POS
+// js/purchasing.js - موديول المشتريات وفواتير الموردين - Motion POS
+
+async function loadPurchaseOptions() {
+    try {
+        const [suppliersRes, warehousesRes, ingredientsRes] = await Promise.all([
+            _supabase.from('suppliers').select('id, name').order('name'),
+            _supabase.from('warehouses').select('id, name').order('name'),
+            _supabase.from('ingredients').select('id, name, unit').order('name')
+        ]);
+        if (suppliersRes.error) throw suppliersRes.error;
+        if (warehousesRes.error) throw warehousesRes.error;
+        if (ingredientsRes.error) throw ingredientsRes.error;
+
+        populateSelectOptions('purchase-supplier', suppliersRes.data, 'اختر المورد', 'لا يوجد موردون مسجلون');
+        populateSelectOptions('purchase-warehouse', warehousesRes.data, 'اختر المخزن', 'لا توجد مخازن مسجلة');
+        populateSelectOptions('purchase-ingredient', ingredientsRes.data, 'اختر الخامة', 'لا توجد خامات مسجلة', item => item.unit ? `${item.name} (${item.unit})` : item.name);
+        return true;
+    } catch (err) {
+        console.error('Purchase options error:', err);
+        showToast('تعذر تحميل قوائم المشتريات: ' + (err.message || 'خطأ غير معروف'), 'error');
+        return false;
+    }
+}
 
 async function submitPurchaseInvoice() {
-    const supplierId = document.getElementById('purchase-supplier').value;
-    const warehouseId = document.getElementById('purchase-warehouse').value;
-    const ingredientId = document.getElementById('purchase-ingredient').value;
-    const qty = parseFloat(document.getElementById('purchase-qty').value);
-    const price = parseFloat(document.getElementById('purchase-unit-price').value);
+    const supplierId = document.getElementById('purchase-supplier')?.value;
+    const warehouseId = document.getElementById('purchase-warehouse')?.value;
+    const ingredientId = document.getElementById('purchase-ingredient')?.value;
+    const qty = parseFloat(document.getElementById('purchase-qty')?.value);
+    const price = parseFloat(document.getElementById('purchase-unit-price')?.value);
 
-    if (!qty || qty <= 0 || !price || price <= 0) {
+    if (!supplierId || !warehouseId || !ingredientId) {
+        showToast('اختر المورد والمخزن والخامة أولًا', 'error');
+        return;
+    }
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) {
         showToast('أدخل الكمية وسعر الوحدة بشكل صحيح', 'error');
         return;
     }
@@ -33,21 +59,23 @@ async function submitPurchaseInvoice() {
         }
 
         // 2. إدخال عنصر الفاتورة
-        await _supabase.from('purchase_order_items').insert([{
+        const { error: itemError } = await _supabase.from('purchase_order_items').insert([{
             purchase_order_id: po.id,
             ingredient_id: ingredientId,
             quantity: qty,
             unit_price: price,
             total_price: totalPrice
         }]);
+        if (itemError) throw itemError;
 
         // 3. زيادة الكمية وتحديث التكلفة من خلال الدالة
-        await _supabase.rpc('process_purchase_item', {
+        const { error: processError } = await _supabase.rpc('process_purchase_item', {
             p_warehouse_id: warehouseId,
             p_ingredient_id: ingredientId,
             p_quantity: qty,
             p_unit_price: price
         });
+        if (processError) throw processError;
 
         showToast('تم استلام الشحنة وتحديث المخزون وسعر التكلفة بنجاح');
         document.getElementById('purchase-qty').value = '';
@@ -58,7 +86,7 @@ async function submitPurchaseInvoice() {
 
     } catch (err) {
         console.error('Purchase error:', err);
-        showToast('حدث خطأ أثناء حفظ الفاتورة', 'error');
+        showToast('لم تكتمل عملية حفظ الفاتورة والمخزون: ' + (err.message || 'خطأ غير معروف'), 'error');
     }
 }
 
@@ -72,7 +100,13 @@ async function loadPurchaseHistory() {
         const tbody = document.getElementById('purchase-history-body');
         if (!tbody) return;
 
-        if (error || !data || data.length === 0) {
+        if (error) {
+            console.error('Purchase history query error:', error);
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500 font-bold">تعذر تحميل سجل المشتريات: ${error.message}</td></tr>`;
+            showToast('تعذر تحميل سجل المشتريات: ' + error.message, 'error');
+            return;
+        }
+        if (!data || data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-slate-400 font-bold">لا توجد فواتير مشتريات مسجلة</td></tr>`;
             return;
         }

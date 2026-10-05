@@ -1,10 +1,12 @@
-﻿// js/kds.js - موديول شاشة المطبخ KDS والتحديث اللحظي Realtime
+// js/kds.js - موديول شاشة المطبخ KDS والتحديث اللحظي Realtime
 
 let kdsOrders = [];
+let kdsRealtimeChannel = null;
 
 // الاشتراك اللحظي في جدول الطلبات بدعم WebSockets
 function subscribeToKDSRealtime() {
-    _supabase
+    if (kdsRealtimeChannel) return;
+    kdsRealtimeChannel = _supabase
         .channel('kds-realtime-channel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
             loadKDSOrders();
@@ -13,10 +15,16 @@ function subscribeToKDSRealtime() {
 }
 
 async function loadKDSOrders() {
+    if (!currentUser?.branch_id) {
+        kdsOrders = [];
+        renderKDSCards();
+        return;
+    }
     try {
         const { data: orders, error } = await _supabase
             .from('orders')
             .select('*, order_items(*, products(name), order_item_modifiers(*))')
+            .eq('branch_id', currentUser.branch_id)
             .not('kitchen_status', 'eq', 'ready')
             .not('status', 'in', '("closed","cancelled")')
             .order('created_at', { ascending: true });

@@ -1,4 +1,4 @@
-﻿// js/auth.js - نظام تسجيل الدخول بالـ PIN المرن والمحصن
+// js/auth.js - نظام تسجيل الدخول بالـ PIN المرن والمحصن
 
 function appendPin(num) {
     const input = document.getElementById('login-pin');
@@ -55,6 +55,8 @@ async function loginWithPin() {
             roles: { name: roleName },
             branches: branchData
         };
+        if (typeof isManagerUnlocked !== 'undefined') isManagerUnlocked = false;
+        if (typeof pendingTabTarget !== 'undefined') pendingTabTarget = null;
         currentBranch = branchData;
 
         // 4. جلب إعدادات الضرائب والخدمة للفرع
@@ -93,8 +95,40 @@ async function loginWithPin() {
 }
 
 function logout() {
+    if (typeof paymentSubmissionInProgress !== 'undefined' && paymentSubmissionInProgress) {
+        showToast('جارٍ تسجيل الدفعة، انتظر حتى تظهر نتيجة العملية قبل تسجيل الخروج.', 'error');
+        return;
+    }
+    if (typeof orderSubmissionInProgress !== 'undefined' && orderSubmissionInProgress) {
+        showToast('جارٍ حفظ الطلب، انتظر حتى تظهر نتيجة العملية قبل تسجيل الخروج.', 'error');
+        return;
+    }
     currentUser = null;
     currentBranch = null;
+    if (typeof isManagerUnlocked !== 'undefined') isManagerUnlocked = false;
+    if (typeof pendingTabTarget !== 'undefined') pendingTabTarget = null;
+    if (typeof resetActiveCart === 'function') resetActiveCart();
+    if (typeof posState !== 'undefined') {
+        posState.selectedOrderType = 'dine_in';
+        posState.activeCategory = null;
+        posState.pendingModifierProduct = null;
+        posState.selectedModifiers = [];
+        posState.selectedTable = null;
+        posState.selectedAreaId = null;
+        posState.areas = [];
+        posState.tables = [];
+        posState.categories = [];
+        posState.products = [];
+        posState.waiters = [];
+        posState.customers = [];
+        posState.cancelReasons = [];
+        posState.discounts = [];
+    }
+    if (typeof kdsOrders !== 'undefined') kdsOrders = [];
+    ['pin-auth-modal', 'payments-modal', 'split-modal', 'modifiers-modal'].forEach(id => {
+        document.getElementById(id)?.classList.add('hidden');
+    });
+    if (typeof switchMainTab === 'function') switchMainTab('pos');
     clearPin();
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');

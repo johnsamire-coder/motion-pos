@@ -1,11 +1,42 @@
-﻿// js/inventory.js - موديول المخازن الهالك والجرد الفعلي - Motion POS
+// js/inventory.js - موديول المخازن الهالك والجرد الفعلي - Motion POS
+
+async function loadInventoryOptions() {
+    const warehouseSelect = document.getElementById('inventory-warehouse-select');
+    if (!warehouseSelect) return false;
+
+    try {
+        const [warehousesRes, ingredientsRes] = await Promise.all([
+            _supabase.from('warehouses').select('id, name').order('name'),
+            _supabase.from('ingredients').select('id, name, unit').order('name')
+        ]);
+        if (warehousesRes.error) throw warehousesRes.error;
+        if (ingredientsRes.error) throw ingredientsRes.error;
+
+        populateSelectOptions('inventory-warehouse-select', warehousesRes.data, 'اختر المخزن', 'لا توجد مخازن مسجلة');
+        populateSelectOptions('waste-ingredient-select', ingredientsRes.data, 'اختر الخامة', 'لا توجد خامات مسجلة', item => item.unit ? `${item.name} (${item.unit})` : item.name);
+        populateSelectOptions('stocktake-ingredient-select', ingredientsRes.data, 'اختر الخامة', 'لا توجد خامات مسجلة', item => item.unit ? `${item.name} (${item.unit})` : item.name);
+
+        if (!warehouseSelect.value && warehouseSelect.options.length > 1) {
+            warehouseSelect.selectedIndex = 1;
+        }
+        return true;
+    } catch (err) {
+        console.error('Inventory options error:', err);
+        showToast('تعذر تحميل قوائم المخزون: ' + (err.message || 'خطأ غير معروف'), 'error');
+        return false;
+    }
+}
 
 async function loadInventoryStock() {
     const warehouseSelect = document.getElementById('inventory-warehouse-select');
     if (!warehouseSelect) return;
 
     const wId = warehouseSelect.value;
-    if (!wId) return;
+    const tbody = document.getElementById('inventory-table-body');
+    if (!wId) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-slate-400 font-bold">اختر مخزنًا لعرض الرصيد</td></tr>`;
+        return;
+    }
 
     try {
         const { data, error } = await _supabase
@@ -15,10 +46,11 @@ async function loadInventoryStock() {
 
         if (error) {
             console.error('Error fetching stock:', error);
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500 font-bold">تعذر تحميل رصيد المخزن: ${error.message}</td></tr>`;
+            showToast('تعذر تحميل رصيد المخزن: ' + error.message, 'error');
             return;
         }
 
-        const tbody = document.getElementById('inventory-table-body');
         if (!tbody) return;
 
         if (!data || data.length === 0) {
@@ -45,15 +77,20 @@ async function loadInventoryStock() {
 
     } catch (err) {
         console.error('Inventory exception:', err);
+        showToast('تعذر تحميل رصيد المخزن: ' + (err.message || 'خطأ غير معروف'), 'error');
     }
 }
 
 async function submitWasteLog() {
-    const wId = document.getElementById('inventory-warehouse-select').value;
-    const ingId = document.getElementById('waste-ingredient-select').value;
-    const qty = parseFloat(document.getElementById('waste-qty').value);
-    const reason = document.getElementById('waste-reason').value;
+    const wId = document.getElementById('inventory-warehouse-select')?.value;
+    const ingId = document.getElementById('waste-ingredient-select')?.value;
+    const qty = parseFloat(document.getElementById('waste-qty')?.value);
+    const reason = document.getElementById('waste-reason')?.value;
 
+    if (!wId || !ingId) {
+        showToast('اختر المخزن والخامة أولًا', 'error');
+        return;
+    }
     if (!qty || qty <= 0) {
         showToast('أدخل كمية هالك صحيحة', 'error');
         return;
@@ -76,14 +113,19 @@ async function submitWasteLog() {
         }
     } catch (err) {
         console.error('Waste log error:', err);
+        showToast('تعذر تسجيل الهالك: ' + (err.message || 'خطأ غير معروف'), 'error');
     }
 }
 
 async function submitStockTake() {
-    const wId = document.getElementById('inventory-warehouse-select').value;
-    const ingId = document.getElementById('stocktake-ingredient-select').value;
-    const actualQty = parseFloat(document.getElementById('stocktake-qty').value);
+    const wId = document.getElementById('inventory-warehouse-select')?.value;
+    const ingId = document.getElementById('stocktake-ingredient-select')?.value;
+    const actualQty = parseFloat(document.getElementById('stocktake-qty')?.value);
 
+    if (!wId || !ingId) {
+        showToast('اختر المخزن والخامة أولًا', 'error');
+        return;
+    }
     if (isNaN(actualQty) || actualQty < 0) {
         showToast('أدخل الكمية الفعلية الموزونة', 'error');
         return;
@@ -105,5 +147,6 @@ async function submitStockTake() {
         }
     } catch (err) {
         console.error('Stock take error:', err);
+        showToast('تعذر حفظ الجرد: ' + (err.message || 'خطأ غير معروف'), 'error');
     }
 }

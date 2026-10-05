@@ -1,4 +1,4 @@
-﻿// js/accounting.js - موديول الحسابات العامة والقيود والتقارير المالية - Motion POS
+// js/accounting.js - موديول الحسابات العامة والقيود والتقارير المالية - Motion POS
 
 let accountingState = {
     accounts: [],
@@ -13,8 +13,22 @@ async function initAccountingModule() {
 }
 
 async function loadChartOfAccountsData() {
-    const { data } = await _supabase.from('accounts').select('*').order('code', { ascending: true });
+    const { data, error } = await _supabase.from('accounts').select('*').order('code', { ascending: true });
+    if (error) {
+        console.error('Chart of accounts query error:', error);
+        showToast('تعذر تحميل دليل الحسابات: ' + error.message, 'error');
+        accountingState.accounts = [];
+        populateSelectOptions('exp-account-select', [], 'اختر حساب المصروف', 'تعذر تحميل الحسابات');
+        return;
+    }
     accountingState.accounts = data || [];
+    populateSelectOptions(
+        'exp-account-select',
+        accountingState.accounts.filter(account => account.account_type === 'expense'),
+        'اختر حساب المصروف',
+        'لا توجد حسابات مصروفات',
+        account => `${account.code} - ${account.name_ar}`
+    );
 }
 
 // 1. عرض دليل الحسابات الشجري (Chart of Accounts Tree)
@@ -63,8 +77,8 @@ async function submitExpenseAction() {
 
     try {
         const { data, error } = await _supabase.rpc('record_expense', {
-            p_company_id: 'c0000000-0000-0000-0000-000000000000',
-            p_branch_id: null,
+            p_company_id: currentUser?.company_id || 'c0000000-0000-0000-0000-000000000000',
+            p_branch_id: currentUser?.branch_id || null,
             p_expense_account_id: accId,
             p_amount: amount,
             p_payment_method: method,
@@ -101,7 +115,12 @@ async function loadTrialBalanceReportUI() {
         const tbody = document.getElementById('acc-tb-tbody');
         if (!tbody) return;
 
-        if (error || !data || data.length === 0) {
+        if (error) {
+            console.error('Trial balance query error:', error);
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-red-500 font-bold">تعذر تحميل ميزان المراجعة: ${error.message}</td></tr>`;
+            return;
+        }
+        if (!data || data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-slate-400 font-bold">لا يوجد قيود مرحلة للدفتر حتى الآن</td></tr>`;
             return;
         }
