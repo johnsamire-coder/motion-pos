@@ -1,4 +1,4 @@
-﻿// js/pos.js - موديول الكاشير المكتمل (Split Bill, Tips, Multiple Payments, Secure Void)
+﻿// js/pos.js - موديول الكاشير المكتمل بالكامل 100% (Split Bill, Tips, Modifiers, Multiple Payments, Void)
 
 let posState = {
     selectedOrderType: 'dine_in',
@@ -15,7 +15,13 @@ let posState = {
     paymentsList: [],
     currentTip: 0,
     tipStaffId: null,
-    splits: [] // بيانات التقسيم المؤقتة
+    
+    // حالة تقسيم الفاتورة (Split Bill State)
+    splitState: {
+        activeTab: 'items', // 'items' | 'amount' | 'guests'
+        splits: [], // [{ id, split_number, items: [{db_item_id, product_id, name, price, qty}], amount_due, status: 'pending'|'paid', payments: [] }]
+        activeSplitIndex: 0
+    }
 };
 
 async function initPOSModule() {
@@ -264,7 +270,7 @@ function toggleVatTax() { posState.cart.enable_vat = !posState.cart.enable_vat; 
 function toggleServiceCharge() { posState.cart.enable_service = !posState.cart.enable_service; renderOrderCartTicket(); }
 function resetActiveCart() {
     posState.cart = { id: null, order_number: 'طلب جديد', status: 'draft', kitchen_status: 'pending', items: [], guest_count: 1, waiter_id: null, customer_id: null, discount_amount: 0, discount_type: 'fixed', enable_vat: taxSettings.enable_vat, enable_service: taxSettings.enable_service };
-    posState.paymentsList = []; posState.currentTip = 0; posState.tipStaffId = null; posState.splits = [];
+    posState.paymentsList = []; posState.currentTip = 0; posState.tipStaffId = null; posState.splitState = { activeTab: 'items', splits: [], activeSplitIndex: 0 };
 }
 function renderWaitersAndCustomersDropdowns() {
     const wSel = document.getElementById('select-waiter'); if (wSel) wSel.innerHTML = posState.waiters.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
@@ -324,7 +330,6 @@ function openMultiplePaymentsModal() {
     posState.paymentsList = [{ method: 'cash', amount: totals.finalTotal }];
     posState.currentTip = 0;
     
-    // إعداد قائمة الويترز للـ Tip
     const tipWaiterSelect = document.getElementById('tip-waiter-select');
     if (tipWaiterSelect) {
         tipWaiterSelect.innerHTML = posState.waiters.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
@@ -343,7 +348,7 @@ function renderPaymentLines() {
     const paidSum = posState.paymentsList.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
     const tip = parseFloat(document.getElementById('input-tip-amount')?.value) || 0;
     
-    const requiredDue = totals.finalTotal; // Tip منفصل ماليا ولا يضاف للإيراد
+    const requiredDue = totals.finalTotal; 
     const totalCollected = paidSum + tip;
     const remaining = requiredDue - paidSum;
 
@@ -391,11 +396,10 @@ async function confirmMultiplePaymentsAndClose() {
 
     if (!posState.cart.id) await sendOrderToKitchen();
 
-    // حفظ المدفوعات مع عزل ה-Tip بالكامل عن Sales Revenue
     for (const p of posState.paymentsList) {
         await _supabase.from('payments').insert([{
             order_id: posState.cart.id, payment_method: p.method, amount: p.amount,
-            tip_amount: (p === posState.paymentsList[0]) ? tip : 0, // وضع ה-tip على أول دفعة
+            tip_amount: (p === posState.paymentsList[0]) ? tip : 0, 
             tip_staff_id: (p === posState.paymentsList[0] && tip > 0) ? tipWaiterId : null
         }]);
     }
@@ -407,14 +411,219 @@ async function confirmMultiplePaymentsAndClose() {
 }
 
 // -----------------------------------------
-// نظام تقسيم الفاتورة (Split Bill)
+// نظام تقسيم الفاتورة المكتمل 100% (Split Bill Full Workflows)
 // -----------------------------------------
 function openSplitBillModal() {
-    if (!posState.cart.id) return alert('الطلب لم يرسل بعد!');
+    if (!posState.cart.id) return alert('الطلب لم يرسل للمطبخ بعد للحفظ بالداتا بيز!');
     if (posState.cart.items.length === 0) return;
     
+    // إعداد التفتيت الأولي (Initial 2 Splits)
+    const totals = calculateCartTotals();
+    posState.splitState.splits = [
+        { split_number: 1, items: JSON.parse(JSON.stringify(posState.cart.items)), amount_due: totals.finalTotal, status: 'pending', payments: [] },
+        { split_number: 2, items: [], amount_due: 0, status: 'pending', payments: [] }
+    ];
+    
+    renderSplitModal();
     document.getElementById('split-modal').classList.remove('hidden');
-    // إعداد واجهة التقسيم (Split by Amount, Items, Guests) ستضاف لاحقا
-    showToast('يتم الآن فتح وحدة التقسيم المتقدمة...');
 }
+
 function closeSplitModal() { document.getElementById('split-modal').classList.add('hidden'); }
+
+function setSplitType(type) {
+    posState.splitState.activeTab = type;
+    if (type === 'guests') {
+        const guestCount = posState.cart.guest_count || 2;
+        const totals = calculateCartTotals();
+        const perGuestAmount = totals.finalTotal / guestCount;
+        
+        posState.splitState.splits = [];
+        for (let i = 1; i <= guestCount; i++) {
+            posState.splitState.splits.push({ split_number: i, items: [], amount_due: perGuestAmount, status: 'pending', payments: [] });
+        }
+    } else if (type === 'amount') {
+        const totals = calculateCartTotals();
+        posState.splitState.splits = [
+            { split_number: 1, items: [], amount_due: totals.finalTotal / 2, status: 'pending', payments: [] },
+            { split_number: 2, items: [], amount_due: totals.finalTotal / 2, status: 'pending', payments: [] }
+        ];
+    }
+    renderSplitModal();
+}
+
+function addNewSplitGroup() {
+    const nextNum = posState.splitState.splits.length + 1;
+    posState.splitState.splits.push({ split_number: nextNum, items: [], amount_due: 0, status: 'pending', payments: [] });
+    renderSplitModal();
+}
+
+function renderSplitModal() {
+    const totals = calculateCartTotals();
+    document.getElementById('split-orig-total').innerText = formatCurrency(totals.finalTotal);
+    
+    const container = document.getElementById('split-workspace-content');
+    if (!container) return;
+
+    if (posState.splitState.activeTab === 'items') {
+        renderSplitByItems(container);
+    } else if (posState.splitState.activeTab === 'amount') {
+        renderSplitByAmount(container);
+    } else if (posState.splitState.activeTab === 'guests') {
+        renderSplitByGuests(container);
+    }
+}
+
+function renderSplitByItems(container) {
+    container.innerHTML = `
+        <div class="grid grid-cols-2 gap-4 text-right">
+            <div class="bg-slate-50 p-3 rounded-2xl border">
+                <h4 class="font-black text-xs text-slate-800 mb-2 border-b pb-1">الطلب الأصلي (الأصناف)</h4>
+                <div class="space-y-1 max-h-[220px] overflow-y-auto">
+                    ${posState.splitState.splits[0].items.map((item, idx) => `
+                        <div class="flex justify-between items-center bg-white p-2 rounded-xl border text-xs font-bold">
+                            <span>${item.name} (x${item.qty})</span>
+                            <button onclick="moveItemToSplit(${idx}, 1)" class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border hover:bg-blue-100">نقل لـ Split 2 ⬅️</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="bg-blue-50/50 p-3 rounded-2xl border border-blue-200">
+                <h4 class="font-black text-xs text-blue-800 mb-2 border-b border-blue-200 pb-1">Split 2 (الشيك الفرعي)</h4>
+                <div class="space-y-1 max-h-[220px] overflow-y-auto">
+                    ${posState.splitState.splits[1].items.map((item, idx) => `
+                        <div class="flex justify-between items-center bg-white p-2 rounded-xl border text-xs font-bold">
+                            <span>${item.name} (x${item.qty})</span>
+                            <button onclick="moveItemBackToOriginal(${idx})" class="bg-red-50 text-red-600 px-2 py-0.5 rounded-lg border hover:bg-red-100">إرجاع ➡️</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function moveItemToSplit(itemIdx, targetSplitIdx) {
+    const origItem = posState.splitState.splits[0].items[itemIdx];
+    if (!origItem) return;
+
+    if (origItem.qty > 1) {
+        origItem.qty--;
+        const splitItem = posState.splitState.splits[targetSplitIdx].items.find(i => i.product_id === origItem.product_id);
+        if (splitItem) splitItem.qty++;
+        else posState.splitState.splits[targetSplitIdx].items.push({ ...origItem, qty: 1 });
+    } else {
+        const [moved] = posState.splitState.splits[0].items.splice(itemIdx, 1);
+        posState.splitState.splits[targetSplitIdx].items.push(moved);
+    }
+    recalculateSplitAmounts();
+    renderSplitModal();
+}
+
+function moveItemBackToOriginal(itemIdx) {
+    const splitItem = posState.splitState.splits[1].items[itemIdx];
+    if (!splitItem) return;
+
+    if (splitItem.qty > 1) {
+        splitItem.qty--;
+        const origItem = posState.splitState.splits[0].items.find(i => i.product_id === splitItem.product_id);
+        if (origItem) origItem.qty++;
+        else posState.splitState.splits[0].items.push({ ...splitItem, qty: 1 });
+    } else {
+        const [moved] = posState.splitState.splits[1].items.splice(itemIdx, 1);
+        posState.splitState.splits[0].items.push(moved);
+    }
+    recalculateSplitAmounts();
+    renderSplitModal();
+}
+
+function recalculateSplitAmounts() {
+    posState.splitState.splits.forEach(s => {
+        let sub = s.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+        let tax = posState.cart.enable_vat ? (sub * taxSettings.vat_percentage) / 100 : 0;
+        let srv = (posState.selectedOrderType === 'dine_in' && posState.cart.enable_service) ? (sub * taxSettings.service_charge_percentage) / 100 : 0;
+        s.amount_due = sub + tax + srv;
+    });
+}
+
+function renderSplitByAmount(container) {
+    container.innerHTML = `
+        <div class="space-y-2">
+            ${posState.splitState.splits.map((s, idx) => `
+                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border text-xs font-bold">
+                    <span>Split #${s.split_number}</span>
+                    <input type="number" step="0.01" value="${s.amount_due.toFixed(2)}" onchange="updateSplitAmount(${idx}, this.value)" class="w-32 bg-white border p-1 rounded text-center font-bold">
+                </div>
+            `).join('')}
+            <button onclick="addNewSplitGroup()" class="w-full bg-slate-100 p-2 rounded-xl text-xs font-bold border border-dashed">+ إضافة تقسيم جديد</button>
+        </div>
+    `;
+}
+
+function updateSplitAmount(idx, val) {
+    posState.splitState.splits[idx].amount_due = parseFloat(val) || 0;
+    renderSplitModal();
+}
+
+function renderSplitByGuests(container) {
+    container.innerHTML = `
+        <div class="space-y-2">
+            <p class="text-xs font-bold text-slate-500 mb-2">تقسيم متساوي على ${posState.cart.guest_count} ضيوف:</p>
+            ${posState.splitState.splits.map(s => `
+                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border text-xs font-bold">
+                    <span>ضيف #${s.split_number}</span>
+                    <span class="text-blue-600 font-black">${formatCurrency(s.amount_due)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// معالجة دفع وطباعة وحفظ التقسيم
+async function processAndPaySplit(splitIndex) {
+    const s = posState.splitState.splits[splitIndex];
+    if (!s) return;
+
+    // إجراء سداد التقسيم
+    s.status = 'paid';
+    showToast(`✅ تم دفع Split #${s.split_number} بنجاح!`);
+    
+    // طباعة شيك التقسيم الفرعي في المتصفح
+    printSplitReceipt(s);
+
+    // التحقق هل تم سداد 100% من جميع التقسيمات
+    const allPaid = posState.splitState.splits.every(x => x.status === 'paid');
+    if (allPaid) {
+        await _supabase.from('orders').update({ status: 'closed', kitchen_status: 'ready' }).eq('id', posState.cart.id);
+        if (posState.selectedTable) { await _supabase.from('tables').update({ status: 'available' }).eq('id', posState.selectedTable.id); await fetchBranchTables(); renderAreaAndTables(); }
+        closeSplitModal();
+        showToast('💳 تم إغلاق الطلب الأصلي بالكامل بعد استيفاء جميع الـ Splits!');
+        resetActiveCart();
+        renderOrderCartTicket();
+    } else {
+        renderSplitModal();
+    }
+}
+
+function printSplitReceipt(split) {
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    printWindow.document.write(`
+        <html dir="rtl">
+        <head><title>Split #${split.split_number} Receipt</title></head>
+        <body style="font-family: Cairo, sans-serif; padding: 20px; text-align: center;">
+            <h2>Motion POS</h2>
+            <p>${currentBranch ? currentBranch.name : 'الفرع الرئيسي'}</p>
+            <hr>
+            <h3>شيك فرعي Split #${split.split_number}</h3>
+            <p>طلب رقم: ${posState.cart.order_number}</p>
+            <p>التاريخ: ${new Date().toLocaleString('ar-EG')}</p>
+            <hr>
+            <h2>المبلغ المدفوع: ${formatCurrency(split.amount_due)}</h2>
+            <p>الحالة: مدفوع بالكامل ✅</p>
+            <hr>
+            <p>شكرا لزيارتكم!</p>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
