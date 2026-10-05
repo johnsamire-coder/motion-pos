@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motion POS Cafe and Resturant</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
@@ -15,7 +13,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-right select-none border-t-4 border-blue-600">
 
-    <!-- ==================== 1. شاشة الدخول المعتمدة بالـ PIN ==================== -->
+    <!-- 1. شاشة الدخول المعتمدة بالـ PIN -->
     <div id="login-screen" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-slate-100">
             <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl font-black">☕</div>
@@ -46,7 +44,7 @@
         </div>
     </div>
 
-    <!-- ==================== 2. نافذة طلب PIN الحماية للتبويبات الحساسة ==================== -->
+    <!-- 2. نافذة طلب PIN الحماية للتبويبات الحساسة -->
     <div id="pin-auth-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-slate-100">
             <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 font-bold text-xl">🔒</div>
@@ -61,7 +59,7 @@
         </div>
     </div>
 
-    <!-- ==================== 3. نافذة المدفوعات المتعددة (Multiple Payments Modal) ==================== -->
+    <!-- 3. نافذة المدفوعات المتعددة -->
     <div id="payments-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -80,7 +78,6 @@
                 </div>
             </div>
 
-            <!-- قائمة طرق الدفع المضافة -->
             <div id="payment-lines-list" class="space-y-2 max-h-[220px] overflow-y-auto mb-4"></div>
 
             <button onclick="addPaymentLine()" class="w-full bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border border-dashed border-slate-300 hover:bg-slate-200 mb-4">إضافة طريقة دفع أخرى ➕</button>
@@ -92,7 +89,7 @@
         </div>
     </div>
 
-    <!-- ==================== 4. التطبيق والواجهة الرئيسية ==================== -->
+    <!-- 4. التطبيق والواجهة الرئيسية -->
     <div id="app" class="hidden max-w-[1600px] mx-auto p-4 space-y-4">
 
         <!-- الهيدر التنفيذي -->
@@ -105,7 +102,6 @@
                 </div>
             </div>
 
-            <!-- تبويبات النظام الستة -->
             <nav class="flex gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
                 <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
                 <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨🍳</button>
@@ -113,6 +109,7 @@
                 <button onclick="switchMainTab('purchase')" id="tab-btn-purchase" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المشتريات 🛒🔒</button>
                 <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول 🔒</button>
                 <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊🔒</button>
+                <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200 border-l border-slate-200 pr-2">الإعدادات ⚙️🔒</button>
             </nav>
 
             <div class="flex items-center gap-2">
@@ -121,11 +118,9 @@
             </div>
         </header>
 
-        <!-- ==================== TAB 1: WORKSPACE POS ==================== -->
+        <!-- TAB 1: WORKSPACE POS -->
         <div id="view-pos-workspace" class="grid grid-cols-12 gap-4">
-            <!-- Left Side: Floor & Products (8 cols) -->
             <div class="col-span-8 space-y-4">
-                <!-- Order Type Bar -->
                 <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
                     <div class="flex gap-2">
                         <button onclick="setOrderType('dine_in')" id="type-dine_in" class="type-btn px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow">صالة (Dine In)</button>
@@ -140,7 +135,6 @@
                     </div>
                 </div>
 
-                <!-- Tables Floor Map -->
                 <div id="tables-floor-section" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <div class="flex justify-between items-center mb-3 pb-2 border-b">
                         <h3 class="font-black text-slate-800 text-xs">خريطة الصالة والطاولات</h3>
@@ -153,10 +147,9 @@
                     <div id="tables-grid" class="grid grid-cols-4 gap-3 min-h-[140px]"></div>
                 </div>
 
-                <!-- Products Grid -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                        <h3 class="font-black text-slate-800 text-xs">منيو الأصناف</h3>
+                        <h3 class="font-black text-slate-800 text-xs">منيو الأصناف (يتضمن الشيشة)</h3>
                         <div id="category-pills" class="flex gap-2 overflow-x-auto pb-1"></div>
                     </div>
                     <div id="products-grid" class="grid grid-cols-3 gap-3 min-h-[260px]"></div>
@@ -183,7 +176,10 @@
                             <select id="select-waiter" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
                         </div>
                         <div>
-                            <label class="block text-[10px] text-slate-400 font-bold mb-0.5">العميل:</label>
+                            <div class="flex justify-between items-center mb-0.5">
+                                <label class="block text-[10px] text-slate-400 font-bold">العميل:</label>
+                                <button onclick="quickAddCustomer()" class="text-[10px] text-blue-600 font-bold hover:underline">+ سريع</button>
+                            </div>
                             <select id="select-customer" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
                         </div>
                         <div>
@@ -195,7 +191,6 @@
                     <div id="cart-items-list" class="space-y-2 overflow-y-auto max-h-[240px] border-t border-b py-3 my-2"></div>
                 </div>
 
-                <!-- Totals & Taxes Controls -->
                 <div class="border-t pt-3 space-y-2">
                     <div class="space-y-1 text-xs font-bold text-slate-600">
                         <div class="flex justify-between"><span>المجموع الفرعي:</span><span id="summary-subtotal">0.00 ج.م</span></div>
@@ -213,7 +208,6 @@
                         <div class="flex justify-between text-base font-black text-slate-900 pt-1 border-t"><span>الإجمالي النهائي:</span><span id="summary-total" class="text-blue-600">0.00 ج.م</span></div>
                     </div>
 
-                    <!-- أزرار العمليات والتنفيذ -->
                     <div class="grid grid-cols-2 gap-2 pt-1">
                         <button onclick="applyDiscountPrompt()" class="bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border hover:bg-slate-200">خصم 🏷️</button>
                         <button onclick="openTransferTableModal()" class="bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border hover:bg-slate-200">نقل الطاولة 🔀</button>
@@ -227,7 +221,7 @@
             </div>
         </div>
 
-        <!-- ==================== TAB 2: KDS WORKSPACE ==================== -->
+        <!-- TAB 2: KDS WORKSPACE -->
         <div id="view-kds-workspace" class="hidden space-y-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
                 <h2 class="font-black text-slate-800 text-sm">👨🍳 شاشة تحضير الطلبات الحية (Realtime ⚡)</h2>
@@ -236,7 +230,7 @@
             <div id="kds-cards-grid" class="grid grid-cols-3 gap-4"></div>
         </div>
 
-        <!-- ==================== TAB 3: INVENTORY WORKSPACE ==================== -->
+        <!-- TAB 3: INVENTORY WORKSPACE -->
         <div id="view-inventory-workspace" class="hidden grid grid-cols-12 gap-4">
             <div class="col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <div class="flex justify-between items-center mb-4 pb-2 border-b">
@@ -259,7 +253,7 @@
             </div>
         </div>
 
-        <!-- ==================== TAB 4: PURCHASING WORKSPACE ==================== -->
+        <!-- TAB 4: PURCHASING WORKSPACE -->
         <div id="view-purchase-workspace" class="hidden space-y-4">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-3">
                 <h2 class="font-black text-slate-800 text-sm border-b pb-2">🛒 إضافة فاتورة توريد/مشتريات</h2>
@@ -280,7 +274,7 @@
             </div>
         </div>
 
-        <!-- ==================== TAB 5: COST CONTROL WORKSPACE ==================== -->
+        <!-- TAB 5: COST CONTROL WORKSPACE -->
         <div id="view-cost-workspace" class="hidden space-y-4">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="font-black text-slate-800 text-sm border-b pb-2 mb-3">📊 تحليل ربحية الأصناف (Food Cost %)</h2>
@@ -295,7 +289,7 @@
             </div>
         </div>
 
-        <!-- ==================== TAB 6: FINANCIAL REPORTS (P&L) ==================== -->
+        <!-- TAB 6: FINANCIAL REPORTS (P&L) -->
         <div id="view-reports-workspace" class="hidden space-y-4">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="font-black text-slate-800 text-sm border-b pb-4 mb-6 flex justify-between items-center">
@@ -323,6 +317,24 @@
             </div>
         </div>
 
+        <!-- TAB 7: SETTINGS WORKSPACE (الإعدادات الجديدة ⚙️) -->
+        <div id="view-settings-workspace" class="hidden space-y-4">
+            <div class="grid grid-cols-12 gap-4">
+                <div class="col-span-5 space-y-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ إعدادات الضرائب والخدمة للفروع</h3>
+                        <div id="settings-tax-container"></div>
+                    </div>
+                </div>
+                <div class="col-span-7 space-y-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">🍽️ إدارة الطاولات والمناطق (الصالة / التراس)</h3>
+                        <div id="settings-tables-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- JavaScript Module Imports -->
@@ -333,13 +345,14 @@
     <script src="js/inventory.js"></script>
     <script src="js/purchasing.js"></script>
     <script src="js/reports.js"></script>
+    <script src="js/settings.js"></script>
 
     <script>
         let pendingTabTarget = null;
         let isManagerUnlocked = false;
 
         function switchMainTab(targetTab) {
-            const protectedTabs = ['inventory', 'purchase', 'cost', 'reports'];
+            const protectedTabs = ['inventory', 'purchase', 'cost', 'reports', 'settings'];
 
             if (protectedTabs.includes(targetTab) && !isManagerUnlocked) {
                 pendingTabTarget = targetTab;
@@ -348,7 +361,7 @@
                 return;
             }
 
-            ['pos', 'kds', 'inventory', 'purchase', 'cost', 'reports'].forEach(tab => {
+            ['pos', 'kds', 'inventory', 'purchase', 'cost', 'reports', 'settings'].forEach(tab => {
                 const el = document.getElementById('view-' + tab + '-workspace');
                 if (el) el.classList.add('hidden');
             });
@@ -367,6 +380,7 @@
             if (targetTab === 'purchase') loadPurchaseHistory();
             if (targetTab === 'cost') { loadCostAnalysis(); loadWasteReport(); }
             if (targetTab === 'reports') loadFinancialDashboard();
+            if (targetTab === 'settings') initSettingsModule();
         }
 
         function verifyManagerModalPIN() {
