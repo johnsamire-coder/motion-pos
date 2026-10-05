@@ -1,7 +1,8 @@
-﻿// js/settings.js - لوحة الإعدادات والتحكم للإدارة (Backoffice)
+﻿// js/settings.js - لوحة الإعدادات والتحكم الشاملة - Motion POS
 
 let settingsState = {
     branches: [],
+    warehouses: [],
     areas: [],
     tables: []
 };
@@ -9,21 +10,159 @@ let settingsState = {
 async function initSettingsModule() {
     await loadSettingsData();
     renderTaxSettings();
+    renderBranchesSettings();
+    renderWarehousesSettings();
     renderTablesSettings();
 }
 
 async function loadSettingsData() {
-    // جلب الفروع وإعدادات الضرائب الخاصة بها
-    const { data: bData } = await _supabase.from('branches').select('*, branch_tax_settings(*)');
-    settingsState.branches = bData || [];
+    try {
+        // 1. جلب الفروع وإعدادات ضرائبها
+        const { data: bData } = await _supabase.from('branches').select('*, branch_tax_settings(*)');
+        settingsState.branches = bData || [];
 
-    // جلب المناطق والطاولات
-    const { data: aData } = await _supabase.from('areas').select('*, tables(*)');
-    settingsState.areas = aData || [];
+        // 2. جلب المخازن وربطها بالفروع
+        const { data: wData } = await _supabase.from('warehouses').select('*, branches(name)');
+        settingsState.warehouses = wData || [];
+
+        // 3. جلب المناطق والطاولات
+        const { data: aData } = await _supabase.from('areas').select('*, tables(*)');
+        settingsState.areas = aData || [];
+    } catch (err) {
+        console.error('Error loading settings data:', err);
+    }
 }
 
 // -----------------------------------------
-// 1. إعدادات الضرائب والخدمة لكل فرع
+// 1. إدارة وإضافة الفروع (Branch Management)
+// -----------------------------------------
+function renderBranchesSettings() {
+    const container = document.getElementById('settings-branches-container');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h4 class="font-black text-sm text-slate-800">🏢 الفروع الحالية (${settingsState.branches.length})</h4>
+                <button onclick="addNewBranchPrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة فرع جديد 🏢➕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                ${settingsState.branches.map(b => `
+                    <div class="bg-slate-50 border p-3 rounded-2xl flex justify-between items-center text-xs font-bold">
+                        <div>
+                            <p class="text-slate-800 font-black">${b.name}</p>
+                            <p class="text-[10px] text-slate-400">${b.address || 'بدون عنوان'}</p>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] ${b.has_tables ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">
+                            ${b.has_tables ? 'يدعم طاولات' : 'تيك أواي بس'}
+                        </span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+async function addNewBranchPrompt() {
+    const name = prompt('أدخل اسم الفرع الجديد (مثال: فرع مدينة نصر):');
+    if (!name) return;
+    const address = prompt('أدخل عنوان الفرع:');
+    const hasTablesConfirm = confirm('هل يدعم هذا الفرع طاولات وقعدة صالة\n(موافق = نعم إلغاء = تيك أواي فقط)');
+
+    try {
+        const brandId = currentUser ? currentUser.brand_id : 'b0000000-0000-0000-0000-000000000000';
+        const { error } = await _supabase.from('branches').insert([{
+            brand_id: brandId,
+            name: name,
+            address: address || '',
+            has_tables: hasTablesConfirm
+        }]);
+
+        if (error) {
+            showToast('خطأ في إضافة الفرع: ' + error.message, 'error');
+        } else {
+            showToast('تم إضافة الفرع الجديد بنجاح');
+            await loadSettingsData();
+            renderBranchesSettings();
+            renderTaxSettings();
+        }
+    } catch (err) {
+        console.error('Add branch error:', err);
+    }
+}
+
+// -----------------------------------------
+// 2. إدارة وإضافة المخازن (Warehouse Management)
+// -----------------------------------------
+function renderWarehousesSettings() {
+    const container = document.getElementById('settings-warehouses-container');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h4 class="font-black text-sm text-slate-800">📦 المخازن الحالية (${settingsState.warehouses.length})</h4>
+                <button onclick="addNewWarehousePrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة مخزن جديد 📦➕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                ${settingsState.warehouses.map(w => `
+                    <div class="bg-slate-50 border p-3 rounded-2xl flex justify-between items-center text-xs font-bold">
+                        <div>
+                            <p class="text-slate-800 font-black">${w.name}</p>
+                            <p class="text-[10px] text-blue-600">${w.branches ? 'تابعة لـ: ' + w.branches.name : 'مخزن رئيسي مشترك'}</p>
+                        </div>
+                        ${w.is_main ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">رئيسي</span>' : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+async function addNewWarehousePrompt() {
+    const name = prompt('أدخل اسم المخزن الجديد (مثال: مخزن بار التجمع):');
+    if (!name) return;
+
+    let branchOptions = "0. مخزن رئيسي مشترك (غير تتبع لفرع معين)\n";
+    settingsState.branches.forEach((b, idx) => {
+        branchOptions += `${idx + 1}. ${b.name}\n`;
+    });
+
+    const choiceStr = prompt('اختر رقم الفرع التابع له المخزن:\n' + branchOptions, '0');
+    if (choiceStr === null) return;
+
+    const choiceIdx = parseInt(choiceStr) || 0;
+    let selectedBranchId = null;
+    let isMain = true;
+
+    if (choiceIdx > 0 && choiceIdx <= settingsState.branches.length) {
+        selectedBranchId = settingsState.branches[choiceIdx - 1].id;
+        isMain = false;
+    }
+
+    try {
+        const { error } = await _supabase.from('warehouses').insert([{
+            branch_id: selectedBranchId,
+            name: name,
+            is_main: isMain
+        }]);
+
+        if (error) {
+            showToast('خطأ في إضافة المخزن: ' + error.message, 'error');
+        } else {
+            showToast('تم إضافة المخزن الجديد بنجاح');
+            await loadSettingsData();
+            renderWarehousesSettings();
+            // تحديث القوائم المنسدلة في الكاشير والمشتريات
+            if (typeof loadWarehouses === 'function') loadWarehouses();
+        }
+    } catch (err) {
+        console.error('Add warehouse error:', err);
+    }
+}
+
+// -----------------------------------------
+// 3. إعدادات الضرائب والخدمة
 // -----------------------------------------
 function renderTaxSettings() {
     const container = document.getElementById('settings-tax-container');
@@ -47,7 +186,7 @@ function renderTaxSettings() {
                         <input type="number" id="tax-srv-${b.id}" value="${tax.service_charge_percentage}" class="w-full border p-2.5 rounded-xl text-sm font-black bg-slate-50 focus:border-blue-500 focus:outline-none">
                     </div>
                 </div>
-                <button onclick="saveTaxSettings('${b.id}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold w-full shadow-md hover:bg-emerald-700">حفظ وتحديث الضرائب للفرع ✅</button>
+                <button onclick="saveTaxSettings('${b.id}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold w-full shadow-md hover:bg-emerald-700">حفظ وتحديث الضرائب والخدمة ✅</button>
             </div>
         `;
     }).join('');
@@ -67,7 +206,6 @@ async function saveTaxSettings(branchId) {
         showToast('خطأ في حفظ الضرائب', 'error');
     } else {
         showToast('تم تحديث الضرائب والخدمة للفرع بنجاح');
-        // لو المالك بيعدل الفرع اللي هو شغال عليه حاليا نحدث المتغيرات في الرامات
         if (currentUser && currentUser.branch_id === branchId) {
             taxSettings.vat_percentage = vat;
             taxSettings.service_charge_percentage = srv;
@@ -76,7 +214,7 @@ async function saveTaxSettings(branchId) {
 }
 
 // -----------------------------------------
-// 2. إعدادات وإدارة الطاولات
+// 4. إدارة وإضافة وتعديل سعة الطاولات
 // -----------------------------------------
 function renderTablesSettings() {
     const container = document.getElementById('settings-tables-container');
@@ -86,19 +224,49 @@ function renderTablesSettings() {
         <div class="bg-white p-5 rounded-2xl border border-slate-200 mb-4 shadow-sm">
             <div class="flex justify-between items-center mb-4 border-b pb-3">
                 <h4 class="font-black text-sm text-slate-800">منطقة: ${area.name}</h4>
-                <button onclick="addNewTable('${area.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة طاولة جديدة ➕</button>
+                <button onclick="addNewTable('${area.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة طاولة ➕</button>
             </div>
             <div class="grid grid-cols-4 gap-3">
                 ${(area.tables || []).map(t => `
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col justify-between text-center relative group">
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col justify-between text-center">
                         <span class="font-black text-sm text-slate-800">${t.table_number}</span>
-                        <span class="text-[10px] font-bold text-slate-500 mb-3 bg-white border rounded-full px-2 py-0.5 mx-auto mt-1">سعة: ${t.capacity} ضيوف</span>
-                        <button onclick="deleteTable('${t.id}')" class="bg-red-50 text-red-600 text-[11px] font-bold py-1.5 rounded-lg hover:bg-red-100 border border-red-100 transition">حذف الطاولة 🗑️</button>
+                        
+                        <div class="my-2 bg-white border rounded-xl p-1 flex justify-between items-center">
+                            <span class="text-[10px] font-bold text-slate-500">سعة: ${t.capacity} ضيوف</span>
+                            <button onclick="editTableCapacity('${t.id}', ${t.capacity})" class="text-[10px] text-blue-600 font-bold px-1 rounded hover:bg-blue-50">تعديل ✏️</button>
+                        </div>
+
+                        <button onclick="deleteTable('${t.id}')" class="bg-red-50 text-red-600 text-[10px] font-bold py-1 rounded-lg hover:bg-red-100 border border-red-100 transition">حذف 🗑️</button>
                     </div>
                 `).join('')}
             </div>
         </div>
     `).join('');
+}
+
+async function editTableCapacity(tableId, currentCapacity) {
+    const newCap = prompt('أدخل عدد الضيوف/الكراسي الجديد للطاولة:', currentCapacity);
+    if (!newCap) return;
+
+    const val = parseInt(newCap);
+    if (isNaN(val) || val <= 0) return alert('أدخل سعة صحيحة');
+
+    try {
+        const { error } = await _supabase.from('tables').update({ capacity: val }).eq('id', tableId);
+        if (error) {
+            showToast('خطأ في التعديل: ' + error.message, 'error');
+        } else {
+            showToast('تم تعديل سعة الطاولة بنجاح');
+            await loadSettingsData();
+            renderTablesSettings();
+            if (typeof fetchBranchTables === 'function') {
+                await fetchBranchTables();
+                if (typeof renderAreaAndTables === 'function') renderAreaAndTables();
+            }
+        }
+    } catch (err) {
+        console.error('Edit capacity error:', err);
+    }
 }
 
 async function addNewTable(areaId) {
@@ -119,7 +287,6 @@ async function addNewTable(areaId) {
         showToast('تمت إضافة الطاولة بنجاح');
         await loadSettingsData();
         renderTablesSettings();
-        // تحديث شاشة الكاشير لو مفتوحة
         if (typeof fetchBranchTables === 'function') {
             await fetchBranchTables();
             if (typeof renderAreaAndTables === 'function') renderAreaAndTables();
