@@ -61,7 +61,38 @@
         </div>
     </div>
 
-    <!-- ==================== 3. التطبيق والواجهة الرئيسية ==================== -->
+    <!-- ==================== 3. نافذة المدفوعات المتعددة (Multiple Payments Modal) ==================== -->
+    <div id="payments-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="font-black text-base text-slate-800">دفع الفاتورة - مدفوعات متعددة</h3>
+                <button onclick="closeMultiplePaymentsModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4 bg-slate-50 p-3 rounded-2xl border text-center">
+                <div>
+                    <span class="block text-[10px] font-bold text-slate-400">الإجمالي المطلوب:</span>
+                    <span id="modal-pay-total-due" class="font-black text-sm text-blue-600">0.00 ج.م</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] font-bold text-slate-400">المتبقي:</span>
+                    <span id="modal-pay-remaining" class="font-black text-sm text-red-600">0.00 ج.م</span>
+                </div>
+            </div>
+
+            <!-- قائمة طرق الدفع المضافة -->
+            <div id="payment-lines-list" class="space-y-2 max-h-[220px] overflow-y-auto mb-4"></div>
+
+            <button onclick="addPaymentLine()" class="w-full bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border border-dashed border-slate-300 hover:bg-slate-200 mb-4">إضافة طريقة دفع أخرى ➕</button>
+
+            <div class="flex gap-2">
+                <button onclick="confirmMultiplePaymentsAndClose()" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">تأكيد السداد وإغلاق الطلب 💳</button>
+                <button onclick="closeMultiplePaymentsModal()" class="bg-slate-100 text-slate-600 px-4 py-3 rounded-xl font-bold text-xs hover:bg-slate-200">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 4. التطبيق والواجهة الرئيسية ==================== -->
     <div id="app" class="hidden max-w-[1600px] mx-auto p-4 space-y-4">
 
         <!-- الهيدر التنفيذي -->
@@ -161,7 +192,7 @@
                         </div>
                     </div>
 
-                    <div id="cart-items-list" class="space-y-2 overflow-y-auto max-h-[260px] border-t border-b py-3 my-2"></div>
+                    <div id="cart-items-list" class="space-y-2 overflow-y-auto max-h-[240px] border-t border-b py-3 my-2"></div>
                 </div>
 
                 <!-- Totals & Taxes Controls -->
@@ -169,13 +200,11 @@
                     <div class="space-y-1 text-xs font-bold text-slate-600">
                         <div class="flex justify-between"><span>المجموع الفرعي:</span><span id="summary-subtotal">0.00 ج.م</span></div>
                         
-                        <!-- الضريبة اختيارية زر مفتاح -->
                         <div class="flex justify-between items-center">
                             <button onclick="toggleVatTax()" class="text-[10px] bg-slate-100 px-2 py-0.5 rounded-lg border hover:bg-slate-200">الضريبة (14% VAT) ⚙️</button>
                             <span id="summary-tax">0.00 ج.م</span>
                         </div>
                         
-                        <!-- الخدمة اختيارية زر مفتاح -->
                         <div class="flex justify-between items-center">
                             <button onclick="toggleServiceCharge()" class="text-[10px] bg-slate-100 px-2 py-0.5 rounded-lg border hover:bg-slate-200">الخدمة (12% Service) ⚙️</button>
                             <span id="summary-service">0.00 ج.م</span>
@@ -184,9 +213,15 @@
                         <div class="flex justify-between text-base font-black text-slate-900 pt-1 border-t"><span>الإجمالي النهائي:</span><span id="summary-total" class="text-blue-600">0.00 ج.م</span></div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 pt-2">
+                    <!-- أزرار العمليات والتنفيذ -->
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <button onclick="applyDiscountPrompt()" class="bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border hover:bg-slate-200">خصم 🏷️</button>
+                        <button onclick="openTransferTableModal()" class="bg-slate-100 text-slate-700 py-2 rounded-xl font-bold text-xs border hover:bg-slate-200">نقل الطاولة 🔀</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
                         <button onclick="sendOrderToKitchen()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-amber-600">إرسال للمطبخ 👨🍳</button>
-                        <button onclick="payAndCloseOrder()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وإغلاق 💳</button>
+                        <button onclick="openMultiplePaymentsModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وإغلاق 💳</button>
                     </div>
                 </div>
             </div>
