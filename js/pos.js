@@ -1,4 +1,4 @@
-﻿// js/pos.js - موديول الكاشير ونقاط البيع المتقدم
+﻿// js/pos.js - موديول الكاشير المتقدم (Sprint 3)
 
 let posState = {
     selectedOrderType: 'dine_in',
@@ -14,31 +14,31 @@ let posState = {
     discounts: [],
     activeCategory: null,
     
+    // بيانات الصنف الجاري اختيار إضافاته في المودال
+    pendingModifierProduct: null,
+    selectedModifiers: [],
+    
     // الفاتورة والطلب الحالي
     cart: {
         id: null,
         order_number: 'طلب جديد',
         status: 'draft',
         kitchen_status: 'pending',
-        items: [], // { product_id, name, price, qty, modifiers: [], discount: 0, notes: '' }
+        items: [], // { db_item_id, product_id, name, price, qty, modifiers: [], discount: 0, notes: '' }
         guest_count: 1,
         waiter_id: null,
         customer_id: null,
         discount_amount: 0,
-        discount_type: 'fixed', // 'fixed' or 'percentage'
+        discount_type: 'fixed',
         enable_vat: true,
         enable_service: true
-    },
-    
-    // المدفوعات المتعددة
-    payments: [] // { method: 'cash'|'card'|'instapay'|'wallet'|'on_account', amount: 0 }
+    }
 };
 
-// تهيئة موديول الكاشير عند تسجيل الدخول
+// تهيئة موديول الكاشير
 async function initPOSModule() {
     if (!currentUser || !currentUser.branch_id) return;
     
-    // ضبط الخيارات الأولية للضريبة والخدمة
     posState.cart.enable_vat = taxSettings.enable_vat;
     posState.cart.enable_service = taxSettings.enable_service;
     
@@ -46,34 +46,29 @@ async function initPOSModule() {
     renderPOSTerminal();
 }
 
-// جلب جميع البيانات المرجعية من الداتا بيز للفرع والبراند الحالي
+// جلب البيانات المرجعية
 async function loadPOSMasterData() {
     const branchId = currentUser.branch_id;
-    const brandId = currentUser.brand_id;
 
     try {
-        // 1. الموظفين (الويترز) والعملاء
         const { data: waitersData } = await _supabase.from('staff').select('*').eq('branch_id', branchId);
         posState.waiters = waitersData || [];
 
         const { data: customersData } = await _supabase.from('customers').select('*');
         posState.customers = customersData || [];
 
-        // 2. المنيو والأقسام
         const { data: categoriesData } = await _supabase.from('categories').select('*');
         posState.categories = categoriesData || [];
 
         const { data: productsData } = await _supabase.from('products').select('*');
         posState.products = productsData || [];
 
-        // 3. أسباب الإلغاء والخصومات المتاحة
         const { data: reasonsData } = await _supabase.from('cancel_reasons').select('*');
         posState.cancelReasons = reasonsData || [];
 
         const { data: discountsData } = await _supabase.from('discounts').select('*');
         posState.discounts = discountsData || [];
 
-        // 4. المناطق والطاولات
         if (currentBranch && currentBranch.has_tables) {
             const { data: areasData } = await _supabase.from('areas').select('*').eq('branch_id', branchId);
             posState.areas = areasData || [];
@@ -84,7 +79,6 @@ async function loadPOSMasterData() {
         }
     } catch (err) {
         console.error('Error loading master data:', err);
-        showToast('خطأ في تحميل بيانات الكاشير', 'error');
     }
 }
 
@@ -94,7 +88,7 @@ async function fetchBranchTables() {
     posState.tables = tablesData || [];
 }
 
-// رسم واجهة الكاشير التفاعلية
+// رسم واجهة الكاشير
 function renderPOSTerminal() {
     renderAreaAndTables();
     renderCategoriesPills();
@@ -153,7 +147,7 @@ async function selectPosTable(tableId) {
     posState.selectedTable = posState.tables.find(t => t.id === tableId);
     renderAreaAndTables();
 
-    // فحص ما إذا كان يوجد أوردر مفتوح حاليا على الطاولة
+    // جلب أوردر مفتوح على الطاولة إذا وجد
     const { data: openOrders } = await _supabase
         .from('orders')
         .select('*, order_items(*, products(name), order_item_modifiers(*))')
@@ -167,7 +161,8 @@ async function selectPosTable(tableId) {
             order_number: ord.order_number,
             status: ord.status,
             kitchen_status: ord.kitchen_status,
-            items: ord.order_items.map(i => ({
+            items: ord.order_items.filter(i => i.status !== 'voided').map(i => ({
+                db_item_id: i.id,
                 product_id: i.product_id,
                 name: i.products ? i.products.name : 'صنف',
                 price: parseFloat(i.unit_price),
@@ -221,24 +216,93 @@ function renderProductsGrid() {
     `).join('');
 }
 
-// فحص وجود Modifiers للمنتج قبل الإضافة
+// فحص وجود Modifiers
 async function checkAndAddProduct(productId) {
     const product = posState.products.find(p => p.id === productId);
     if (!product) return;
 
-    // جلب مجموعات الإضافات المربوطة بهذا المنتج
     const { data: modGroupLinks } = await _supabase
         .from('product_modifier_groups')
         .select('group_id, modifier_groups(*, modifiers(*))')
         .eq('product_id', productId);
 
     if (modGroupLinks && modGroupLinks.length > 0) {
-        // توجد إضافات -> فتح نافذة خيارات المنتج (Modifiers Modal)
-        openModifiersModal(product, modGroupLinks.map(l => l.modifier_groups));
-    } else {
-        // لا توجد إضافات -> إضافته أوتوماتيكيا للفاتورة
-        addItemToCart(product, []);
+        const groups = modGroupLinks.map(l => l.modifier_groups).filter(g => g !== null);
+        if (groups.length > 0) {
+            openModifiersModal(product, groups);
+            return;
+        }
     }
+
+    addItemToCart(product, []);
+}
+
+// نافذة اختيار الإضافات Modifiers Modal
+function openModifiersModal(product, groups) {
+    posState.pendingModifierProduct = product;
+    posState.selectedModifiers = [];
+
+    let modal = document.getElementById('modifiers-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modifiers-modal';
+        modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        document.body.appendChild(modal);
+    }
+
+    const groupsHtml = groups.map(g => `
+        <div class="mb-4 text-right">
+            <h4 class="font-black text-xs text-slate-800 mb-2 border-b pb-1">${g.name}</h4>
+            <div class="grid grid-cols-2 gap-2">
+                ${g.modifiers.map(m => `
+                    <button onclick="toggleModifierSelection('${m.id}', '${m.name}', ${m.price}, '${m.ingredient_id||''}', ${m.ingredient_quantity||0}, this)" 
+                            class="mod-option-btn p-2 border rounded-xl text-xs font-bold bg-slate-50 text-slate-700 flex justify-between items-center hover:border-blue-500">
+                        <span>${m.name}</span>
+                        <span class="text-blue-600">${m.price > 0 ? '+' + formatCurrency(m.price) : 'مجاني'}</span>
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    modal.innerHTML = `
+        <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
+            <h3 class="font-black text-base text-slate-800 mb-1 text-center">إضافات: ${product.name}</h3>
+            <p class="text-[11px] text-slate-400 font-bold mb-4 text-center">اختر الإضافات المطلوبة للصنف</p>
+            <div class="max-h-[300px] overflow-y-auto mb-4">${groupsHtml}</div>
+            <div class="flex gap-2">
+                <button onclick="confirmModifiersSelection()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-xs hover:bg-blue-700 shadow">إضافة للفاتورة</button>
+                <button onclick="closeModifiersModal()" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-xs hover:bg-slate-200">إلغاء</button>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+function toggleModifierSelection(id, name, price, ingredient_id, ingredient_quantity, btn) {
+    const idx = posState.selectedModifiers.findIndex(m => m.id === id);
+    if (idx >= 0) {
+        posState.selectedModifiers.splice(idx, 1);
+        btn.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700');
+    } else {
+        posState.selectedModifiers.push({ id, name, price, ingredient_id, ingredient_quantity });
+        btn.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700');
+    }
+}
+
+function confirmModifiersSelection() {
+    if (posState.pendingModifierProduct) {
+        addItemToCart(posState.pendingModifierProduct, [...posState.selectedModifiers]);
+    }
+    closeModifiersModal();
+}
+
+function closeModifiersModal() {
+    const modal = document.getElementById('modifiers-modal');
+    if (modal) modal.classList.add('hidden');
+    posState.pendingModifierProduct = null;
+    posState.selectedModifiers = [];
 }
 
 function addItemToCart(product, selectedModifiers = []) {
@@ -246,13 +310,14 @@ function addItemToCart(product, selectedModifiers = []) {
     const itemPrice = parseFloat(product.price) + modPrice;
 
     const existing = posState.cart.items.find(i => 
-        i.product_id === product.id && JSON.stringify(i.modifiers) === JSON.stringify(selectedModifiers)
+        i.product_id === product.id && JSON.stringify(i.modifiers) === JSON.stringify(selectedModifiers) && !i.db_item_id
     );
 
     if (existing) {
         existing.qty++;
     } else {
         posState.cart.items.push({
+            db_item_id: null,
             product_id: product.id,
             name: product.name,
             price: itemPrice,
@@ -265,7 +330,7 @@ function addItemToCart(product, selectedModifiers = []) {
     renderOrderCartTicket();
 }
 
-// حساب المجموع والضرائب والخدمة والخصم بالفاتورة
+// حساب المجاميع
 function calculateCartTotals() {
     let subtotal = 0;
     let itemDiscounts = 0;
@@ -306,7 +371,7 @@ function renderOrderCartTicket() {
         itemsContainer.innerHTML = `<p class="text-slate-400 text-center py-8 text-xs font-bold">الفاتورة فارغة</p>`;
     } else {
         itemsContainer.innerHTML = posState.cart.items.map((item, idx) => {
-            const modsText = item.modifiers.map(m => `+ ${m.name}`).join(', ');
+            const modsText = item.modifiers.map(m => `+ ${m.name || m.modifier_name}`).join(', ');
             return `
                 <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold space-y-1">
                     <div class="flex justify-between items-center">
@@ -316,48 +381,95 @@ function renderOrderCartTicket() {
                     ${modsText ? `<p class="text-[10px] text-amber-600 font-bold">${modsText}</p>` : ''}
                     <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1">
                         <span>${item.price} × ${item.qty}</span>
-                        <div class="flex gap-1">
-                            <button onclick="voidCartItem(${idx})" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100">مسح/Void</button>
-                        </div>
+                        <button onclick="voidCartItem(${idx})" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-bold">مسح / Void</button>
                     </div>
                 </div>
             `;
         }).join('');
     }
 
-    // عرض المبالغ المالية
     document.getElementById('summary-subtotal').innerText = formatCurrency(totals.subtotal);
     document.getElementById('summary-tax').innerText = formatCurrency(totals.vatAmount);
     document.getElementById('summary-service').innerText = formatCurrency(totals.serviceAmount);
     document.getElementById('summary-total').innerText = formatCurrency(totals.finalTotal);
 }
 
-// مفاتيح التحكم في تفعيل/إلغاء الضريبة والخدمة اختياريا بالفاتورة
+// تطبيق الخصم
+function applyDiscountPrompt() {
+    const amountStr = prompt('أدخل قيمة الخصم (بالجنيه):', '0');
+    if (amountStr) {
+        const val = parseFloat(amountStr) || 0;
+        posState.cart.discount_amount = val;
+        renderOrderCartTicket();
+        showToast('تم تطبيق الخصم بنجاح');
+    }
+}
+
+// إلغاء/Void صنف حقيقي المربوط بالداتا بيز
+async function voidCartItem(idx) {
+    const item = posState.cart.items[idx];
+    if (!item) return;
+
+    // إذا كان الصنف لم يرفع للداتا بيز بعد (Draft)
+    if (!item.db_item_id) {
+        posState.cart.items.splice(idx, 1);
+        renderOrderCartTicket();
+        return;
+    }
+
+    // إذا كان الصنف محفوظ بالداتا بيز -> تنفيذ Void حقيقي بدالة void_order_item
+    let reasonId = posState.cancelReasons.length > 0 ? posState.cancelReasons[0].id : null;
+    const reasonPrompt = prompt('أدخل سبب مسح الصنف المكتوب بالمطبخ:\n' + posState.cancelReasons.map((r, i) => `${i+1}. ${r.reason}`).join('\n'));
+
+    if (!reasonPrompt) return;
+
+    // الحصول على المخزن المناسب لإرجاع المكونات
+    let warehouseId = 'd0000000-0000-0000-0000-000000000001'; // المخزن التجريبي الرئيسي
+
+    try {
+        const { error } = await _supabase.rpc('void_order_item', {
+            p_order_item_id: item.db_item_id,
+            p_reason_id: reasonId,
+            p_user_id: currentUser ? currentUser.id : null,
+            p_warehouse_id: warehouseId
+        });
+
+        if (error) {
+            showToast('خطأ في مسح الصنف: ' + error.message, 'error');
+            return;
+        }
+
+        posState.cart.items.splice(idx, 1);
+        
+        // إعادة حساب الفاتورة بالداتا بيز
+        const totals = calculateCartTotals();
+        await _supabase.rpc('update_order_financials', {
+            p_order_id: posState.cart.id,
+            p_sub_total: totals.subtotal,
+            p_tax_amount: totals.vatAmount,
+            p_service_amount: totals.serviceAmount,
+            p_discount_amount: totals.discountTotal,
+            p_total_amount: totals.finalTotal
+        });
+
+        renderOrderCartTicket();
+        showToast('تم مسح الصنف وإرجاع المكونات للمخزن وتسجيل الحركة بـ Audit Log');
+
+    } catch (err) {
+        console.error('Void error:', err);
+    }
+}
+
 function toggleVatTax() {
     posState.cart.enable_vat = !posState.cart.enable_vat;
     renderOrderCartTicket();
-    showToast(posState.cart.enable_vat ? 'تم إضافة الضريبة' : 'تم استبعاد الضريبة');
+    showToast(posState.cart.enable_vat ? 'تم تفعيل الضريبة' : 'تم استبعاد الضريبة');
 }
 
 function toggleServiceCharge() {
     posState.cart.enable_service = !posState.cart.enable_service;
     renderOrderCartTicket();
-    showToast(posState.cart.enable_service ? 'تم إضافة الخدمة' : 'تم استبعاد الخدمة');
-}
-
-function voidCartItem(idx) {
-    if (posState.cancelReasons.length === 0) {
-        posState.cart.items.splice(idx, 1);
-        renderOrderCartTicket();
-        return;
-    }
-    // اختيار سبب الإلغاء
-    const reasonText = prompt('أدخل سبب مسح الصنف:\n' + posState.cancelReasons.map((r, i) => `${i+1}. ${r.reason}`).join('\n'));
-    if (reasonText) {
-        posState.cart.items.splice(idx, 1);
-        renderOrderCartTicket();
-        showToast('تم مسح الصنف وتسجيل السبب');
-    }
+    showToast(posState.cart.enable_service ? 'تم تفعيل الخدمة' : 'تم استبعاد الخدمة');
 }
 
 function resetActiveCart() {
@@ -386,4 +498,186 @@ function renderWaitersAndCustomersDropdowns() {
     if (cSel) {
         cSel.innerHTML = posState.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     }
+}
+
+// حفظ وإرسال للمطبخ (دعم الإنشاء أو التعديل على طلب قائم)
+async function sendOrderToKitchen() {
+    if (posState.cart.items.length === 0) {
+        showToast('الفاتورة فارغة!', 'error');
+        return;
+    }
+
+    const branchId = currentUser.branch_id;
+    const waiterId = document.getElementById('select-waiter') ? document.getElementById('select-waiter').value : null;
+    const customerId = document.getElementById('select-customer') ? document.getElementById('select-customer').value : null;
+    const totals = calculateCartTotals();
+
+    let warehouseId = 'd0000000-0000-0000-0000-000000000001';
+
+    try {
+        if (!posState.cart.id) {
+            // إنشاء أوردر جديد
+            const { data: newOrd, error } = await _supabase.from('orders').insert([{
+                company_id: currentUser.company_id,
+                brand_id: currentUser.brand_id,
+                branch_id: branchId,
+                area_id: posState.selectedAreaId,
+                table_id: posState.selectedTable ? posState.selectedTable.id : null,
+                waiter_id: waiterId,
+                customer_id: customerId,
+                order_type: posState.selectedOrderType,
+                guest_count: posState.cart.guest_count,
+                sub_total: totals.subtotal,
+                tax_amount: totals.vatAmount,
+                service_charge_amount: totals.serviceAmount,
+                discount_amount: totals.discountTotal,
+                total_amount: totals.finalTotal,
+                status: 'sent',
+                kitchen_status: 'pending'
+            }]).select().single();
+
+            if (error) {
+                showToast('خطأ في حفظ الطلب: ' + error.message, 'error');
+                return;
+            }
+
+            posState.cart.id = newOrd.id;
+            posState.cart.order_number = newOrd.order_number;
+            posState.cart.status = 'sent';
+
+            // إدخال الأصناف والإضافات وخصم المكونات
+            for (const item of posState.cart.items) {
+                const { data: insertedItem } = await _supabase.from('order_items').insert([{
+                    order_id: newOrd.id,
+                    product_id: item.product_id,
+                    quantity: item.qty,
+                    unit_price: item.price,
+                    total_price: item.price * item.qty
+                }]).select().single();
+
+                if (insertedItem) {
+                    item.db_item_id = insertedItem.id;
+                    // إدخال الـ Modifiers
+                    for (const m of item.modifiers) {
+                        await _supabase.from('order_item_modifiers').insert([{
+                            order_item_id: insertedItem.id,
+                            modifier_id: m.id,
+                            modifier_name: m.name,
+                            unit_price: m.price
+                        }]);
+
+                        // خصم مكون الخامة المربوط بالـ Modifier من المخزن
+                        if (m.ingredient_id && m.ingredient_quantity > 0) {
+                            await _supabase.rpc('log_waste', {
+                                p_warehouse_id: warehouseId,
+                                p_ingredient_id: m.ingredient_id,
+                                p_quantity: m.ingredient_quantity * item.qty,
+                                p_reason: 'إضافة Modifier مبيوع'
+                            });
+                        }
+                    }
+                }
+
+                // خصم مكونات الصنف الأساسي بالريسبي
+                await _supabase.rpc('deduct_recipe_on_sale', {
+                    p_warehouse_id: warehouseId,
+                    p_product_id: item.product_id,
+                    p_quantity_sold: item.qty
+                });
+            }
+
+            if (posState.selectedTable) {
+                await _supabase.from('tables').update({ status: 'occupied' }).eq('id', posState.selectedTable.id);
+                await fetchBranchTables();
+                renderAreaAndTables();
+            }
+
+        } else {
+            // أوردر قائم (تعديل إضافة أصناف)
+            await _supabase.rpc('update_order_financials', {
+                p_order_id: posState.cart.id,
+                p_sub_total: totals.subtotal,
+                p_tax_amount: totals.vatAmount,
+                p_service_amount: totals.serviceAmount,
+                p_discount_amount: totals.discountTotal,
+                p_total_amount: totals.finalTotal
+            });
+
+            // إضافة الأصناف الجديدة التي لم تحفظ بعد
+            for (const item of posState.cart.items) {
+                if (!item.db_item_id) {
+                    const { data: insertedItem } = await _supabase.from('order_items').insert([{
+                        order_id: posState.cart.id,
+                        product_id: item.product_id,
+                        quantity: item.qty,
+                        unit_price: item.price,
+                        total_price: item.price * item.qty
+                    }]).select().single();
+
+                    if (insertedItem) item.db_item_id = insertedItem.id;
+
+                    await _supabase.rpc('deduct_recipe_on_sale', {
+                        p_warehouse_id: warehouseId,
+                        p_product_id: item.product_id,
+                        p_quantity_sold: item.qty
+                    });
+                }
+            }
+        }
+
+        showToast(`🚀 تم إرسال الطلب ${posState.cart.order_number} للمطبخ بنجاح!`);
+        renderOrderCartTicket();
+
+    } catch (err) {
+        console.error('Checkout error:', err);
+    }
+}
+
+// دفع وإغلاق الفاتورة
+async function payAndCloseOrder() {
+    if (posState.cart.items.length === 0) return;
+
+    if (!posState.cart.id) {
+        await sendOrderToKitchen();
+    }
+
+    const totals = calculateCartTotals();
+
+    // تسجيل العملية في جدول payments
+    await _supabase.from('payments').insert([{
+        order_id: posState.cart.id,
+        payment_method: 'cash',
+        amount: totals.finalTotal
+    }]);
+
+    // إغلاق الطلب
+    await _supabase.from('orders').update({ status: 'closed', kitchen_status: 'ready' }).eq('id', posState.cart.id);
+
+    // إتاحة الطاولة
+    if (posState.selectedTable) {
+        await _supabase.from('tables').update({ status: 'available' }).eq('id', posState.selectedTable.id);
+        await fetchBranchTables();
+        renderAreaAndTables();
+    }
+
+    showToast(`💳 تم دفع وإغلاق الطلب ${posState.cart.order_number} بنجاح!`);
+    resetActiveCart();
+    renderOrderCartTicket();
+}
+
+function setOrderType(type) {
+    posState.selectedOrderType = type;
+    document.querySelectorAll('.type-btn').forEach(b => b.className = "type-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200");
+    const activeBtn = document.getElementById('type-' + type);
+    if (activeBtn) activeBtn.className = "type-btn px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow";
+
+    const typeInfo = document.getElementById('ticket-type-info');
+    if (typeInfo) typeInfo.innerText = `النوع: ${type}`;
+
+    renderAreaAndTables();
+}
+
+function updateGuestCount() {
+    const input = document.getElementById('input-guests');
+    if (input) posState.cart.guest_count = parseInt(input.value) || 1;
 }
