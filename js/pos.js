@@ -159,11 +159,11 @@ function renderAreaAndTables() {
 }
 
 async function selectPosTable(tableId) {
-    if (posState.cart.id && posState.selectedTable?.id !== tableId) {
-        return showToast('أغلق الطلب الحالي قبل الانتقال إلى طاولة أخرى', 'error');
-    }
-    if (!posState.cart.id && posState.cart.items.length > 0) {
-        return showToast('أرسل الطلب الحالي أو أفرغه قبل اختيار طاولة أخرى', 'error');
+    // الانتقال بين الطاولات مسموح، طول ما مفيش أصناف جديدة لسه ما اتبعتتش للمطبخ.
+    // الطلب اللي اتبعت محفوظ على السيرفر، ولما ترجع لطاولته بيتفتح تاني زي ما هو.
+    const hasUnsentItems = posState.cart.items.some(i => !i.db_item_id);
+    if (hasUnsentItems && posState.selectedTable?.id !== tableId) {
+        return showToast('في أصناف جديدة لسه ما اتبعتتش للمطبخ: ابعتها أو امسحها الأول قبل الانتقال لطاولة تانية', 'error');
     }
 
     const previousTable = posState.selectedTable;
