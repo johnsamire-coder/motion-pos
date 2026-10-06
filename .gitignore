@@ -1,0 +1,6 @@
+﻿
+# never commit data or full dumps
+data_*.sql
+full_*.sql
+*.dump
+*.backup
