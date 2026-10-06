@@ -2,7 +2,7 @@
 
 async function loadFinancialDashboard() {
     try {
-        const { data, error } = await _supabase.rpc('get_financial_summary');
+        const { data, error } = await _supabase.rpc('get_financial_summary_secure', { p_token: staffSessionToken });
         if (error || !data || data.length === 0) return;
 
         const res = data[0];

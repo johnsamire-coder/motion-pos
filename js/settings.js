@@ -9,6 +9,22 @@ let settingsState = {
     products: []
 };
 
+// كل تعديل في الإعدادات بيتعمل على السيرفر بتذكرة الوردية، ومسموح للمدير والمالك بس، وبيتسجل مين عمل إيه
+async function settingsAction(action, data) {
+    try {
+        const res = await serverRpc('settings_action_secure', { p_action: action, p_data: data });
+        if (!res || !res.ok) {
+            showToast(serverReasonMessage(res, 'تعذر الحفظ'), 'error');
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('Settings action error:', err);
+        showToast('تعذر الحفظ: ' + (err.message || 'خطأ غير معروف'), 'error');
+        return false;
+    }
+}
+
 async function initSettingsModule() {
     await loadSettingsData();
     renderTaxSettings();
@@ -101,12 +117,7 @@ async function addNewCategoryPrompt() {
     if (!name) return;
 
     try {
-        const brandId = currentUser ? currentUser.brand_id : 'b0000000-0000-0000-0000-000000000000';
-        const { error } = await _supabase.from('categories').insert([{ brand_id: brandId, name: name }]);
-
-        if (error) {
-            showToast('خطأ في إضافة القسم: ' + error.message, 'error');
-        } else {
+        if (await settingsAction('add_category', { name: name })) {
             showToast('تمت إضافة القسم الجديد بنجاح');
             await loadSettingsData();
             renderMenuSettings();
@@ -141,18 +152,7 @@ async function addNewProductPrompt() {
     const price = parseFloat(priceStr) || 0;
 
     try {
-        const brandId = currentUser ? currentUser.brand_id : 'b0000000-0000-0000-0000-000000000000';
-        const { error } = await _supabase.from('products').insert([{
-            brand_id: brandId,
-            category_id: categoryId,
-            name: name,
-            price: price,
-            is_available: true
-        }]);
-
-        if (error) {
-            showToast('خطأ في إضافة المنتج: ' + error.message, 'error');
-        } else {
+        if (await settingsAction('add_product', { name: name, price: String(price), category_id: categoryId })) {
             showToast('تمت إضافة المنتج الجديد بنجاح المنيو');
             await loadSettingsData();
             renderMenuSettings();
@@ -171,10 +171,7 @@ async function editProductPrice(productId, currentPrice) {
     if (isNaN(price) || price < 0) return alert('أدخل سعر صحفي!');
 
     try {
-        const { error } = await _supabase.from('products').update({ price: price }).eq('id', productId);
-        if (error) {
-            showToast('خطأ في التعديل: ' + error.message, 'error');
-        } else {
+        if (await settingsAction('set_product_price', { product_id: productId, price: String(price) })) {
             showToast('تم تحديث سعر المنتج بنجاح');
             await loadSettingsData();
             renderMenuSettings();
@@ -187,10 +184,7 @@ async function editProductPrice(productId, currentPrice) {
 
 async function toggleProductAvailability(productId, currentStatus) {
     try {
-        const { error } = await _supabase.from('products').update({ is_available: !currentStatus }).eq('id', productId);
-        if (error) {
-            showToast('خطأ في تحديث حالة المنتج', 'error');
-        } else {
+        if (await settingsAction('toggle_product', { product_id: productId, is_available: String(!currentStatus) })) {
             showToast(!currentStatus ? 'تم تفعيل الصنف بجدول الكاشير' : 'تم إيقاف الصنف');
             await loadSettingsData();
             renderMenuSettings();
@@ -238,10 +232,9 @@ async function addNewBranchPrompt() {
     const hasTablesConfirm = confirm('هل يدعم هذا الفرع طاولات وقعدة صالة\n(موافق = نعم إلغاء = تيك أواي فقط)');
 
     try {
-        const brandId = currentUser ? currentUser.brand_id : 'b0000000-0000-0000-0000-000000000000';
-        const { error } = await _supabase.from('branches').insert([{ brand_id: brandId, name: name, address: address || '', has_tables: hasTablesConfirm }]);
-        if (error) showToast('خطأ: ' + error.message, 'error');
-        else { showToast('تم إضافة الفرع بنجاح'); await loadSettingsData(); renderBranchesSettings(); renderTaxSettings(); }
+        if (await settingsAction('add_branch', { name: name, address: address || '', has_tables: String(hasTablesConfirm) })) {
+            showToast('تم إضافة الفرع بنجاح'); await loadSettingsData(); renderBranchesSettings(); renderTaxSettings();
+        }
     } catch (err) { console.error(err); }
 }
 
@@ -281,9 +274,9 @@ async function addNewWarehousePrompt() {
     let selectedBranchId = choiceIdx > 0 && choiceIdx <= settingsState.branches.length ? settingsState.branches[choiceIdx - 1].id : null;
 
     try {
-        const { error } = await _supabase.from('warehouses').insert([{ branch_id: selectedBranchId, name: name, is_main: !selectedBranchId }]);
-        if (error) showToast('خطأ: ' + error.message, 'error');
-        else { showToast('تم إضافة المخزن بنجاح'); await loadSettingsData(); renderWarehousesSettings(); }
+        if (await settingsAction('add_warehouse', { name: name, branch_id: selectedBranchId })) {
+            showToast('تم إضافة المخزن بنجاح'); await loadSettingsData(); renderWarehousesSettings();
+        }
     } catch (err) { console.error(err); }
 }
 
@@ -314,9 +307,10 @@ function renderTaxSettings() {
 async function saveTaxSettings(branchId) {
     const vat = parseFloat(document.getElementById(`tax-vat-${branchId}`).value) || 0;
     const srv = parseFloat(document.getElementById(`tax-srv-${branchId}`).value) || 0;
-    const { error } = await _supabase.from('branch_tax_settings').upsert({ branch_id: branchId, vat_percentage: vat, service_charge_percentage: srv });
-    if (error) showToast('خطأ في الحفظ', 'error');
-    else { showToast('تم التحديث بنجاح'); if (currentUser && currentUser.branch_id === branchId) { taxSettings.vat_percentage = vat; taxSettings.service_charge_percentage = srv; } }
+    if (await settingsAction('save_tax', { branch_id: branchId, vat_percentage: String(vat), service_charge_percentage: String(srv) })) {
+        showToast('تم التحديث بنجاح');
+        if (currentUser && currentUser.branch_id === branchId) { taxSettings.vat_percentage = vat; taxSettings.service_charge_percentage = srv; }
+    }
 }
 
 function renderTablesSettings() {
@@ -347,22 +341,22 @@ function renderTablesSettings() {
 async function editTableCapacity(tableId, currentCapacity) {
     const newCap = prompt('أدخل عدد الضيوف الجديد:', currentCapacity);
     if (!newCap) return;
-    const { error } = await _supabase.from('tables').update({ capacity: parseInt(newCap) || 4 }).eq('id', tableId);
-    if (error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تم التعديل بنجاح'); await loadSettingsData(); renderTablesSettings(); }
+    if (await settingsAction('set_table_capacity', { table_id: tableId, capacity: String(parseInt(newCap) || 4) })) {
+        showToast('تم التعديل بنجاح'); await loadSettingsData(); renderTablesSettings();
+    }
 }
 
 async function addNewTable(areaId) {
     const tNum = prompt('أدخل رقم الطاولة:'); if (!tNum) return;
     const cap = prompt('أدخل سعة الطاولة:', '4'); if (!cap) return;
-    const { error } = await _supabase.from('tables').insert([{ area_id: areaId, table_number: tNum, capacity: parseInt(cap) || 4 }]);
-    if (error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تمت الإضافة بنجاح'); await loadSettingsData(); renderTablesSettings(); }
+    if (await settingsAction('add_table', { area_id: areaId, table_number: tNum, capacity: String(parseInt(cap) || 4) })) {
+        showToast('تمت الإضافة بنجاح'); await loadSettingsData(); renderTablesSettings();
+    }
 }
 
 async function deleteTable(tableId) {
     if (!confirm('حذف الطاولة')) return;
-    const { error } = await _supabase.from('tables').delete().eq('id', tableId);
-    if (error) showToast('لا يمكن حذف طاولة عليها طلبات سابقة', 'error');
-    else { showToast('تم الحذف'); await loadSettingsData(); renderTablesSettings(); }
+    if (await settingsAction('delete_table', { table_id: tableId })) {
+        showToast('تم الحذف'); await loadSettingsData(); renderTablesSettings();
+    }
 }
