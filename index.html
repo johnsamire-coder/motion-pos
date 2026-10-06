@@ -426,15 +426,23 @@
             if (targetTab === 'settings' && typeof initSettingsModule === 'function') initSettingsModule();
         }
 
-        function verifyManagerModalPIN() {
+        async function verifyManagerModalPIN() {
             const pin = document.getElementById('modal-pin-input').value;
-            if (hasManagerRole() && String(pin) === String(currentUser?.pin_code || '')) {
-                isManagerUnlocked = true;
-                const targetTab = pendingTabTarget;
-                closeManagerModal();
-                if (targetTab) switchMainTab(targetTab);
+            if (!hasManagerRole()) { alert('رمز PIN غير صحيح'); return; }
+            try {
+                // الرقم بيتراجع على السيرفر (verify_manager_pin) ولازم يكون رقم الموظف الداخل نفسه
+                const { data: managerId, error } = await _supabase.rpc('verify_manager_pin', { p_pin: String(pin), p_branch_id: currentUser?.branch_id || null });
+                if (!error && managerId && String(managerId) === String(currentUser?.id)) {
+                    isManagerUnlocked = true;
+                    const targetTab = pendingTabTarget;
+                    closeManagerModal();
+                    if (targetTab) switchMainTab(targetTab);
+                    return;
+                }
+            } catch (err) {
+                console.error('Manager PIN check error:', err);
             }
-            else { alert('رمز PIN غير صحيح'); }
+            alert('رمز PIN غير صحيح');
         }
         function closeManagerModal() { document.getElementById('pin-auth-modal').classList.add('hidden'); document.getElementById('modal-pin-input').value = ''; pendingTabTarget = null; }
     </script>

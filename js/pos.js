@@ -43,7 +43,7 @@ async function loadPOSMasterData() {
     const branchId = currentUser.branch_id;
     try {
         const [waitersRes, custRes, catRes, prodRes, reasonRes, discRes] = await Promise.all([
-            _supabase.from('staff').select('*').eq('branch_id', branchId),
+            _supabase.rpc('list_branch_staff', { p_token: staffSessionToken }),
             _supabase.from('customers').select('*'),
             _supabase.from('categories').select('*'),
             _supabase.from('products').select('*'),

@@ -1,4 +1,8 @@
 // js/auth.js - نظام تسجيل الدخول بالـ PIN المرن والمحصن
+// الدخول بيتم على السيرفر (staff_login): المتصفح بيبعت الرقم بس، والسيرفر بيرد ببيانات الموظف وتذكرة وردية.
+// التذكرة بتتحفظ في ذاكرة الصفحة بس، وبتتبعت مع أي عملية حساسة على السيرفر.
+
+let staffSessionToken = null;
 
 function appendPin(num) {
     const input = document.getElementById('login-pin');
@@ -23,35 +27,33 @@ async function loginWithPin() {
     }
 
     try {
-        // 1. جلب بيانات الموظف برقم الـ PIN
-        const { data: staffMember, error } = await _supabase
-            .from('staff')
-            .select('*')
-            .eq('pin_code', pin)
-            .maybeSingle();
+        // 1. الدخول على السيرفر: الرقم بيتراجع هناك، ومفيش أي رقم أو بصمة بترجع للمتصفح
+        const { data: loginRes, error } = await _supabase.rpc('staff_login', { p_pin: String(pin) });
 
-        if (error || !staffMember) {
-            showToast('رقم PIN غير صحيح أو غير موجود بالداتا بيز', 'error');
+        if (error || !loginRes) {
+            console.error('Login error:', error);
+            showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error');
             clearPin();
             return;
         }
 
-        // 2. جلب اسم الدور
-        let roleName = 'كاشير';
-        if (staffMember.role_id) {
-            const { data: roleData } = await _supabase.from('roles').select('name').eq('id', staffMember.role_id).maybeSingle();
-            if (roleData) roleName = roleData.name;
+        if (!loginRes.ok) {
+            if (loginRes.reason === 'locked') {
+                showToast('تم إيقاف الدخول مؤقتاً بسبب محاولات خاطئة كثيرة. حاول مرة أخرى بعد 10 دقائق.', 'error');
+            } else {
+                showToast('رقم PIN غير صحيح', 'error');
+            }
+            clearPin();
+            return;
         }
 
-        // 3. جلب بيانات الفرع
-        let branchData = { name: 'الفرع الرئيسي', has_tables: true };
-        if (staffMember.branch_id) {
-            const { data: bData } = await _supabase.from('branches').select('*').eq('id', staffMember.branch_id).maybeSingle();
-            if (bData) branchData = bData;
-        }
+        // 2. بيانات الموظف والدور والفرع جاية جاهزة من السيرفر
+        const roleName = (loginRes.role && loginRes.role.name) || 'كاشير';
+        const branchData = loginRes.branch || { name: 'الفرع الرئيسي', has_tables: true };
+        staffSessionToken = loginRes.session_token || null;
 
         currentUser = {
-            ...staffMember,
+            ...loginRes.staff,
             roles: { name: roleName },
             branches: branchData
         };
@@ -59,20 +61,13 @@ async function loginWithPin() {
         if (typeof pendingTabTarget !== 'undefined') pendingTabTarget = null;
         currentBranch = branchData;
 
-        // 4. جلب إعدادات الضرائب والخدمة للفرع
-        if (currentUser.branch_id) {
-            const { data: taxData } = await _supabase
-                .from('branch_tax_settings')
-                .select('*')
-                .eq('branch_id', currentUser.branch_id)
-                .maybeSingle();
-
-            if (taxData) {
-                taxSettings.vat_percentage = parseFloat(taxData.vat_percentage) || 0;
-                taxSettings.service_charge_percentage = parseFloat(taxData.service_charge_percentage) || 0;
-                taxSettings.enable_vat = taxSettings.vat_percentage > 0;
-                taxSettings.enable_service = taxSettings.service_charge_percentage > 0;
-            }
+        // 3. إعدادات الضرائب والخدمة للفرع (جاية مع رد الدخول)
+        const taxData = loginRes.tax;
+        if (taxData) {
+            taxSettings.vat_percentage = parseFloat(taxData.vat_percentage) || 0;
+            taxSettings.service_charge_percentage = parseFloat(taxData.service_charge_percentage) || 0;
+            taxSettings.enable_vat = taxSettings.vat_percentage > 0;
+            taxSettings.enable_service = taxSettings.service_charge_percentage > 0;
         }
 
         // 5. فتح الواجهة الرئيسية
@@ -103,6 +98,10 @@ function logout() {
         showToast('جارٍ حفظ الطلب، انتظر حتى تظهر نتيجة العملية قبل تسجيل الخروج.', 'error');
         return;
     }
+    if (staffSessionToken) {
+        _supabase.rpc('staff_logout', { p_token: staffSessionToken }).then(() => {}, () => {});
+    }
+    staffSessionToken = null;
     currentUser = null;
     currentBranch = null;
     if (typeof isManagerUnlocked !== 'undefined') isManagerUnlocked = false;
