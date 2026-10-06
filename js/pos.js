@@ -329,26 +329,64 @@ function renderOrderCartTicket() {
     document.getElementById('summary-total').innerText = formatCurrency(totals.finalTotal);
 }
 
+// شباك صغير لرقم المدير: الأرقام بتظهر نجوم عشان الكاشير ميشوفش رقم المدير
+function askManagerPin(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4';
+        overlay.innerHTML = '<div class="bg-white rounded-2xl p-5 w-full max-w-xs shadow-xl text-right" dir="rtl">'
+            + '<p class="text-sm font-bold mb-3 text-slate-700"></p>'
+            + '<input type="password" inputmode="numeric" maxlength="4" autocomplete="off" class="w-full text-center text-2xl font-extrabold tracking-widest bg-slate-50 border p-3 rounded-2xl mb-4 focus:outline-none">'
+            + '<div class="flex gap-2"><button data-ok class="flex-1 bg-blue-600 text-white py-2 rounded-xl font-bold text-xs">تأكيد</button>'
+            + '<button data-cancel class="flex-1 bg-slate-200 text-slate-700 py-2 rounded-xl font-bold text-xs">إلغاء</button></div></div>';
+        overlay.querySelector('p').textContent = message;
+        const input = overlay.querySelector('input');
+        const done = value => { overlay.remove(); resolve(value); };
+        overlay.querySelector('[data-ok]').onclick = () => done(input.value || null);
+        overlay.querySelector('[data-cancel]').onclick = () => done(null);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') done(input.value || null);
+            if (e.key === 'Escape') done(null);
+        });
+        document.body.appendChild(overlay);
+        input.focus();
+    });
+}
+
 async function voidCartItem(idx) {
     const item = posState.cart.items[idx];
     if (!item) return;
     if (!item.db_item_id) { posState.cart.items.splice(idx, 1); renderOrderCartTicket(); return; }
 
-    const reasonPrompt = prompt('أدخل سبب مسح الصنف المكتوب بالمطبخ:\n' + posState.cancelReasons.map((r, i) => `${i+1}. ${r.reason}`).join('\n'));
+    if (!posState.cancelReasons.length) return showToast('لا توجد أسباب إلغاء مسجلة. أضف أسباب الإلغاء أولاً.', 'error');
+    const reasonPrompt = prompt('اكتب رقم سبب مسح الصنف المكتوب بالمطبخ:\n' + posState.cancelReasons.map((r, i) => `${i+1}. ${r.reason}`).join('\n'));
     if (!reasonPrompt) return;
-    let reasonId = posState.cancelReasons.length > 0 ? posState.cancelReasons[0].id : null;
+    const reason = posState.cancelReasons[parseInt(reasonPrompt, 10) - 1];
+    if (!reason) return showToast('رقم السبب غير صحيح', 'error');
+
+    // مسح صنف اتبعت للمطبخ لازم موافقة المدير، والسيرفر هو اللي بيتأكد من رقمه
+    const managerPin = await askManagerPin('مسح صنف اتبعت للمطبخ يحتاج موافقة المدير. أدخل رقم المدير:');
+    if (!managerPin) return;
 
     try {
-        const { error } = await _supabase.rpc('void_order_item', {
-            p_order_item_id: item.db_item_id, p_reason_id: reasonId, p_user_id: currentUser.id, p_warehouse_id: 'd0000000-0000-0000-0000-000000000001'
+        const { data: res, error } = await _supabase.rpc('void_order_item_secure', {
+            p_token: staffSessionToken, p_order_item_id: item.db_item_id, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim()
         });
         if (error) return showToast('خطأ: ' + error.message, 'error');
-        
+        if (!res || !res.ok) {
+            const messages = {
+                manager_pin: 'رقم المدير غير صحيح، أو الموافقة متوقفة مؤقتاً بسبب محاولات خاطئة كثيرة',
+                bad_reason: 'سبب الإلغاء غير صحيح',
+                item_not_found: 'الصنف غير موجود أو الطلب مقفول'
+            };
+            return showToast(messages[res && res.reason] || 'تعذر مسح الصنف', 'error');
+        }
+
         posState.cart.items.splice(idx, 1);
         const totals = calculateCartTotals();
         await _supabase.rpc('update_order_financials', { p_order_id: posState.cart.id, p_sub_total: totals.subtotal, p_tax_amount: totals.vatAmount, p_service_amount: totals.serviceAmount, p_discount_amount: totals.discountTotal, p_total_amount: totals.finalTotal });
-        renderOrderCartTicket(); showToast('تم مسح الصنف وإرجاع المخزون');
-    } catch (err) { console.error(err); }
+        renderOrderCartTicket(); showToast('تم مسح الصنف بموافقة المدير');
+    } catch (err) { console.error(err); showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error'); }
 }
 
 function toggleVatTax() { posState.cart.enable_vat = !posState.cart.enable_vat; renderOrderCartTicket(); }
