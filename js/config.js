@@ -91,6 +91,9 @@ async function serverRpc(name, params = {}) {
         if (String(error.message || '').includes('not_allowed')) {
             throw new Error('العملية دي مش مسموحة لدورك.');
         }
+        if (String(error.message || '').includes('store_server_only')) {
+            throw new Error('الفرع ده شغال من كمبيوتر المحل. فتح الوردية والطلبات وقفل اليوم بيتعملوا من المحل بس.');
+        }
         throw error;
     }
     return data;
@@ -155,6 +158,10 @@ const SERVER_REASON_MESSAGES = {
     not_allowed: 'العملية دي مش مسموحة لدورك',
     owner_only: 'الإعدادات دي للمالك بس',
     pin_duplicate: 'الرقم السري ده مكرر لأكتر من موظف. كلم المالك يغيّره',
+    store_server_only: 'الفرع ده شغال من كمبيوتر المحل. العملية دي بتتعمل من المحل بس',
+    store_offline: 'النت في المحل واقف دلوقتي',
+    conflict_not_found: 'التعارض ده اتقفل قبل كده',
+    retry_failed: 'لسه مش نافع يتكتب. صلّح السبب الأول وجرّب تاني',
     unknown_action: 'عملية غير معروفة',
     invalid_name: 'الاسم غير صحيح',
     invalid_price: 'السعر غير صحيح',

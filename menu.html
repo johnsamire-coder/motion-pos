@@ -61,7 +61,9 @@
             try {
                 const { data, error } = await _supabase.rpc('qr_request_public', { p_qr: qrToken, p_type: type });
                 if (error || !data || !data.ok) {
-                    alert(data && data.reason === 'too_many' ? 'طلبات كتير. الويتر جاي حالاً.' : 'تعذر الإرسال. حاول تاني.');
+                    alert(data && data.reason === 'too_many' ? 'طلبات كتير. الويتر جاي حالاً.'
+                        : data && data.reason === 'store_offline' ? 'النت في المحل واقف دلوقتي 🙏 من فضلك نادي الويتر بإيدك.'
+                        : 'تعذر الإرسال. حاول تاني.');
                     return;
                 }
                 alert(type === 'bill' ? 'تم طلب الحساب ✅ الويتر جاي بالفاتورة' : 'تم النداء ✅ الويتر جاي حالاً');

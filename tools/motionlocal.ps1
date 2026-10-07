@@ -1,5 +1,5 @@
 # Motion POS - shop server on this PC (database + API + screens), works on any Windows PC
-# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|cloud|sync|syncloop [-Rebuild] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
+# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop [-Rebuild] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
 param([string]$Step = 'status', [switch]$Rebuild, [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -49,8 +49,9 @@ $Files = [ordered]@{
   'supabase\migrations\014_phase12_fixes.sql'                     = '7a5ef7eff86194f6'
   'supabase\migrations\015_phase13_sync_log.sql'                  = '8066e2b93300489a'
   'supabase\migrations\016_phase13_sync_engine.sql'               = '8ca679605935e4de'
+  'supabase\migrations\017_phase13_sync_admin.sql'                = '7acb02b62e6f7e85'
 }
-$LastVersion = '016'
+$LastVersion = '017'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }
@@ -287,6 +288,14 @@ server-port = $ApiPort
 }
 
 'start'  { Use-Env; Start-Db; Start-Api; Start-Web; Test-All }
+'update' {
+  # copy the latest screens from the repo to the shop server folder
+  Set-Location $Repo
+  $st = git status --short; if ($st) { Fail "Repo has changes:`n$st" }
+  & robocopy $Repo $Www /MIR /NFL /NDL /NJH /NJS /NP /XD .git supabase docs tests tools /XF README.md .gitignore .vercelignore | Out-Null
+  if ($LASTEXITCODE -ge 8) { Fail 'Copying the screens failed' }
+  Ok "Screens on this PC updated to $((git rev-parse --short HEAD).Trim())"
+}
 'stop'   {
   Get-Process caddy, postgrest -ErrorAction SilentlyContinue | Stop-Process -Force; Ok 'Screens server and API stopped'
   Use-Env; Invoke-PgCtl "-D `"$Data`" -w stop -m fast" | Out-Null; Ok 'Database stopped'

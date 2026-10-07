@@ -76,13 +76,90 @@ function set2RenderAll() {
         set2Form('inventory', 'المخازن', [['default_min_stock', 'الحد الأدنى الافتراضي للخامة الجديدة', 'number']], '', '', 'work', true);
         set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'ميعاد بداية الشغل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'سماح التأخير بالدقايق', 'number']], '', '', 'work', true);
     }
-    set2Form('offline', 'الشغل من غير نت', [['mode', 'الطريقة', 'select', [['none', 'محتاج نت دايماً'], ['cashier', 'الكاشير بس يكمّل من غير نت'], ['branch', 'الفرع كله بجهاز سيرفر محلي']]],
-        ['local_server_url', 'عنوان السيرفر المحلي (لطريقة الفرع كله)', 'text']],
-        '<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ الاختيار بيتحفظ دلوقتي، والتشغيل الفعلي هيتعمل في المرحلة الجاية.</p>', 'للمالك بس');
+    set2RenderSync();
     set2RenderRecipes();
     if (typeof set2RenderModifiers === 'function') set2RenderModifiers();
     set2RenderLists();
     set2RenderPayAcc();
+}
+
+// ---------------------------------------------------------------- الشغل من غير نت (المزامنة) - للمالك بس
+const SYNC_TABLE_NAMES = { customers: 'العملاء', products: 'الأصناف', categories: 'أقسام المنيو', staff: 'الموظفين', orders: 'الطلبات',
+    order_items: 'أصناف الطلبات', payments: 'الدفعات', ingredients: 'الخامات', recipes: 'الوصفات', suppliers: 'الموردين',
+    purchase_orders: 'المشتريات', expenses: 'المصروفات', tables: 'الطاولات', areas: 'المناطق', branches: 'الفروع', discounts: 'الخصومات',
+    app_settings: 'الإعدادات', modifier_groups: 'مجموعات الإضافات', modifiers: 'الإضافات', customer_ledger: 'حساب العميل',
+    stock_movements: 'حركات المخزن', warehouses: 'المخازن', units: 'الوحدات', roles: 'الأدوار' };
+let set2Sync = null;
+
+async function set2RenderSync() {
+    const box = document.getElementById('set-section-offline');
+    if (!box) return;
+    box.innerHTML = '<p class="text-center text-slate-400 font-bold text-xs py-6">جاري التحميل...</p>';
+    let res = null;
+    try { res = await serverRpc('sync_admin_secure', { p_action: 'status', p_data: null }); } catch (err) { res = { ok: false, reason: '', message: err.message }; }
+    if (!res || res.ok === false) {
+        box.innerHTML = uiCard('الشغل من غير نت', `<p class="text-xs font-bold text-slate-500">${uiEsc(res && res.message ? res.message : serverReasonMessage(res, 'تعذر التحميل'))}</p>`);
+        return;
+    }
+    set2Sync = res;
+    const isStore = res.node === 'store';
+    const last = res.last_sync ? new Date(res.last_sync) : null;
+    const mins = last ? Math.floor((Date.now() - last.getTime()) / 60000) : null;
+    const fresh = mins !== null && mins < 3;
+    const status = `<div class="grid md:grid-cols-3 gap-3 text-xs font-bold">
+        <div class="bg-slate-50 rounded-xl p-3">النسخة دي: <span class="font-black">${isStore ? '🖥️ كمبيوتر المحل' : '☁️ النت'}</span></div>
+        <div class="rounded-xl p-3 ${fresh ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}">${isStore ? 'آخر مزامنة ناجحة' : 'آخر مرة كمبيوتر المحل كلّم النت'}:
+            <span class="font-black">${last ? uiDate(res.last_sync) + (mins !== null ? ` (من ${mins} دقيقة)` : '') : 'لسه محصلش'}</span></div>
+        <div class="rounded-xl p-3 ${res.open_count ? 'bg-amber-50 text-amber-700' : 'bg-slate-50'}">تعارضات ومشاكل مفتوحة: <span class="font-black">${res.open_count}</span></div></div>
+        <p class="text-[11px] text-slate-500 font-bold mt-2">لو آخر مزامنة أكتر من ٣ دقايق، يبقى النت في المحل واقف أو برنامج المزامنة مقفول. الشغل في المحل مكمّل عادي، والبيانات هتتنقل لوحدها أول ما النت يرجع.</p>`;
+    const branches = uiTable(res.branches, [{ label: 'الفرع', key: 'name' },
+        { label: 'عنده كمبيوتر في المحل', render: b => `<input type="checkbox" class="w-5 h-5" ${b.has_store_server ? 'checked' : ''} onchange="set2SyncBranch('${b.id}', this.checked, this)">` }], 'مفيش فروع');
+    const rows = res.items.map(x => ({ ...x }));
+    const items = uiTable(rows, [
+        { label: 'الوقت', render: x => uiEsc(uiDate(x.created_at)) },
+        { label: 'النوع', render: x => x.kind === 'conflict' ? '<span class="text-amber-700">اتعدّل في المكانين</span>' : '<span class="text-red-700">متكتبش</span>' },
+        { label: 'فين', render: x => uiEsc(SYNC_TABLE_NAMES[x.tbl] || x.tbl) },
+        { label: 'إيه', render: x => uiEsc(set2SyncLabel(x)) },
+        { label: 'اللي اتطبق', render: x => x.kind === 'conflict' ? (x.winner === 'store' ? 'نسخة المحل' : 'نسخة النت') : '-' },
+        { label: '', render: x => `<div class="flex flex-wrap gap-1">${uiBtn('تفاصيل', `set2SyncDetails('${x.id}')`, 'gray')}
+            ${x.kind === 'conflict' ? uiBtn('رجّع التانية', `set2SyncAct('${x.id}', 'use_other')`, 'amber') : uiBtn('جرّب تاني', `set2SyncAct('${x.id}', 'retry')`, 'amber')}
+            ${uiBtn('تمام', `set2SyncAct('${x.id}', 'keep')`, 'green')}</div>` }], 'مفيش تعارضات 👌');
+    box.innerHTML = uiCard('حالة الشغل من غير نت', status, uiBtn('تحديث', 'set2RenderSync()', 'gray'))
+        + uiCard('الفروع اللي ليها كمبيوتر في المحل', `${branches}<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ علّم على الفرع بس لما كمبيوتر المحل يكون شغال فعلاً. ساعتها الموقع على النت مش هيفتح وردية ولا طلبات للفرع ده، وكله يتعمل من المحل.</p>`)
+        + uiCard('التعارضات والمشاكل', `<p class="text-[11px] text-slate-500 font-bold mb-2">"اتعدّل في المكانين": آخر تعديل اتطبق، والتاني محفوظ هنا. "تمام" = سيب اللي اتطبق. "رجّع التانية" = طبّق النسخة التانية بدله.<br>"متكتبش": صف مقدرش يتنقل (مثلاً نفس الموبايل لعميلين). صلّح السبب وبعدها "جرّب تاني"، أو "تمام" لو مش مهم.</p>${items}`);
+}
+
+function set2SyncLabel(x) {
+    const d = x.store_data || x.cloud_data || {};
+    return d.name || d.name_ar || (d.order_number ? '#' + d.order_number : '') || d.phone || d.reason || d.section || (x.message || '').slice(0, 60) || '-';
+}
+
+async function set2SyncDetails(id) {
+    const x = ((set2Sync && set2Sync.items) || []).find(i => i.id === id);
+    if (!x) return;
+    const a = x.store_data || {}, b = x.cloud_data || {};
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+    const fmt = v => v === undefined ? '-' : (v === null ? 'فاضي' : (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+    const table = x.kind === 'conflict'
+        ? uiTable(keys.map(k => ({ k, s: fmt(a[k]), c: fmt(b[k]) })), [{ label: 'الخانة', key: 'k' }, { label: 'في المحل', key: 's' }, { label: 'على النت', key: 'c' }], x.store_data === null || x.cloud_data === null ? 'واحدة منهم اتمسحت' : 'مفيش فرق')
+        : `<p class="text-red-700">${uiEsc(x.message || '')}</p>` + uiTable(Object.keys(a).length ? Object.keys(a).map(k => ({ k, v: fmt(a[k]) })) : Object.keys(b).map(k => ({ k, v: fmt(b[k]) })), [{ label: 'الخانة', key: 'k' }, { label: 'القيمة', key: 'v' }]);
+    await uiForm(`${SYNC_TABLE_NAMES[x.tbl] || x.tbl}: ${set2SyncLabel(x)}`, [{ type: 'note', html: table }], { ok: 'قفل' });
+}
+
+async function set2SyncAct(id, action) {
+    const msg = { keep: 'تسيب اللي اتطبق وتقفل التعارض ده؟', use_other: 'تطبّق النسخة التانية بدل اللي اتطبقت؟ (هتتنقل للمكان التاني كمان)', retry: 'تجرّب تكتب الصف ده تاني؟' }[action];
+    if (!(await uiConfirm(msg))) return;
+    const res = await uiCall('sync_admin_secure', { p_action: action, p_data: { id } }, 'تم');
+    if (res === null) { const x = ((set2Sync && set2Sync.items) || []).find(i => i.id === id); if (x) console.warn('sync action failed', action, x); }
+    set2RenderSync();
+}
+
+async function set2SyncBranch(branchId, on, el) {
+    const ok = await uiConfirm(on ? 'الفرع ده هيشتغل من كمبيوتر المحل، والموقع على النت مش هيفتح له وردية ولا طلبات. متأكد إن كمبيوتر المحل شغال؟'
+                                  : 'الفرع ده هيرجع يشتغل من الموقع على النت عادي. متأكد؟', 'موافق', on);
+    if (!ok) { el.checked = !on; return; }
+    if (!(await uiCall('sync_admin_secure', { p_action: 'set_store_server', p_data: { branch_id: branchId, on } }, 'تم'))) el.checked = !on;
+    set2RenderSync();
 }
 
 // generic form for one settings section. fields: [key, label, type, options]
