@@ -156,10 +156,11 @@ async function set2Station(categoryId, station) {
 async function set2PrintQr() {
     const res = await uiCall('tables_qr_secure', {});
     if (!res) return;
-    try { await loadScriptOnce('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'); }
+    try { await loadScriptOnce('vendor/qrcode.min.js'); }
     catch (err) { return showToast(err.message, 'error'); }
     const g = (appSettings && appSettings.general) || {};
-    const base = location.origin + location.pathname.replace(/[^/]*$/, '') + 'menu.html?t=';
+    // كود الـ QR لازم يفتح الموقع على النت دايماً (موبايل الزبون مش على شبكة المحل)
+    const base = (MOTION_LOCAL ? CLOUD_SITE : location.origin + location.pathname.replace(/[^/]*$/, '')) + 'menu.html?t=';
     const cards = (res.tables || []).map(t => {
         const qr = qrcode(0, 'M'); qr.addData(base + t.qr_token); qr.make();
         return `<div class="card">${g.logo ? `<img class="logo" src="${uiEsc(g.logo)}">` : `<div class="co">${uiEsc(g.company_name || '')}</div>`}

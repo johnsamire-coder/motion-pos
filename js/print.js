@@ -154,14 +154,14 @@ function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const s = document.createElement('script');
-        s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('تعذر تحميل مكتبة التصدير. اتأكد من النت.'));
+        s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('تعذر تحميل مكتبة التصدير.'));
         document.head.appendChild(s);
     });
 }
 
 async function exportReportExcel(rep) {
     try {
-        await loadScriptOnce('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js');
+        await loadScriptOnce('vendor/exceljs.min.js');
         const g = (typeof appSettings !== 'undefined' && appSettings && appSettings.general) || {};
         const wb = new ExcelJS.Workbook();
         wb.creator = 'Motion POS';

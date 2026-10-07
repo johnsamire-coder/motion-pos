@@ -1,5 +1,9 @@
 // js/config.js - الإعدادات المركزية
-const SUPABASE_URL = 'https://qyrezfpzcuioxasxjhiq.supabase.co';
+// المحل: الصفحة جاية من كمبيوتر المحل (http) فبتكلم قاعدة بيانات المحل. النت: الموقع (https) بيكلم قاعدة بيانات النت.
+const MOTION_LOCAL = location.protocol === 'http:';
+const CLOUD_URL = 'https://qyrezfpzcuioxasxjhiq.supabase.co';
+const CLOUD_SITE = 'https://motion-pos.vercel.app/';
+const SUPABASE_URL = MOTION_LOCAL ? location.origin : CLOUD_URL;
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cmV6ZnB6Y3Vpb3hhc3hqaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNzY2ODAsImV4cCI6MjEwNjc1MjY4MH0._BrruPh4V6IUKa78u5CDJl-I4cRmU0RvZf5MsmAUXTQ';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
