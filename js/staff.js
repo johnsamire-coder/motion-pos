@@ -6,7 +6,7 @@ function setStaffTab(tab) { stfState.tab = tab; renderStaffBody(); }
 const STAFF_ROLE_NAMES = { owner: 'المالك', branch_manager: 'مدير فرع', cashier: 'كاشير', waiter: 'ويتر', storekeeper: 'أمين مخزن' };
 const PERM_NAMES = { pos: 'البيع', kds: 'المطبخ', shift: 'الوردية', inventory: 'المخازن', inventory_approve: 'موافقات المخازن',
     purchasing: 'المشتريات', treasury: 'الخزينة', expenses: 'المصروفات', staff: 'الموظفين', payroll: 'المرتبات',
-    reports: 'التقارير', settings: 'الإعدادات', accounting: 'الحسابات' };
+    reports: 'التقارير', settings: 'الإعدادات', accounting: 'الحسابات', sales: 'المبيعات', customers: 'العملاء' };
 
 async function loadStaffScreen() {
     renderStaffBody();

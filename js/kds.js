@@ -5,6 +5,7 @@ let kdsOrders = [];
 let kdsPollTimer = null;
 let kdsStation = 'kitchen';
 let kdsKnownIds = new Set();
+let kdsWarnMinutes = null;
 const KDS_STATION_NAMES = { kitchen: 'المطبخ 👨‍🍳', bar: 'البار 🍹', shisha: 'الشيشة 💨' };
 
 function subscribeToKDSRealtime() {
@@ -46,6 +47,7 @@ async function loadKDSOrders() {
         const fresh = (res.orders || []).filter(o => !kdsKnownIds.has(o.id));
         if (kdsKnownIds.size && fresh.length) kdsBeep();
         kdsOrders = res.orders || [];
+        kdsWarnMinutes = Number(res.warn_minutes) || null;
         kdsKnownIds = new Set(kdsOrders.map(o => o.id));
         renderKDSCards();
     } catch (err) {
@@ -60,9 +62,9 @@ function renderKDSCards() {
         grid.innerHTML = `<div class="col-span-3 text-center py-16 bg-white rounded-3xl border border-slate-200"><p class="text-slate-400 font-extrabold text-base">🎉 لا توجد طلبات معلقة هنا الآن!</p></div>`;
         return;
     }
-    const warn = Number(appSet('kds', 'warn_minutes', 15)) || 15;
+    const warn = kdsWarnMinutes || Number(appSet('kds', 'warn_' + kdsStation + '_minutes', kdsStation === 'kitchen' ? 20 : 10)) || 15;
     grid.innerHTML = kdsOrders.map(ord => {
-        const minutes = Math.max(0, Math.floor((Date.now() - new Date(ord.created_at).getTime()) / 60000));
+        const minutes = Math.max(0, Math.floor((Date.now() - new Date(ord.since || ord.created_at).getTime()) / 60000));
         const late = minutes >= warn;
         const isPreparing = ord.status === 'preparing';
         const cardBg = late ? 'bg-red-50 border-red-300' : (isPreparing ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200');
@@ -82,7 +84,7 @@ function renderKDSCards() {
                     </div>
                     <div class="flex justify-between items-center mb-2 text-[11px] font-bold">
                         <span>${isPreparing ? '👨‍🍳 قيد التحضير' : '⏳ في الانتظار'}${ord.waiter ? ' | ' + uiEsc(ord.waiter) : ''}</span>
-                        <span class="${late ? 'text-red-600 font-black' : 'text-slate-400'}">⏰ ${minutes} دقيقة</span>
+                        <span class="${late ? 'text-red-600 font-black' : 'text-slate-400'}">⏰ ${minutes} دقيقة${late ? ' (متأخر)' : ` / ${warn}`}</span>
                     </div>
                     <div class="space-y-1 mb-3">${itemsHtml}</div>
                 </div>

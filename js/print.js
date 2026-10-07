@@ -40,7 +40,7 @@ function buildReceiptHtml(o, s) {
     const r = s.receipt || {};
     const money = v => (Number(v) || 0).toFixed(2);
     const paid = o.status === 'closed';
-    const items = (o.items || []).map(i => `<tr><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}</td>
+    const items = (o.items || []).map(i => `<tr><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}${i.notes ? `<br><small>📝 ${uiEsc(i.notes)}</small>` : ''}</td>
         <td class="num">${uiEsc(i.quantity)}×${money(i.unit_price)}</td><td class="num">${money(i.total_price)}</td></tr>`).join('');
     const pays = (o.payments || []).filter(p => Number(p.amount) > 0).map(p => `<tr><td>${uiEsc(PRINT_METHOD_NAMES[p.method] || p.method)}</td><td class="num">${money(p.amount)}</td></tr>`).join('');
     return `

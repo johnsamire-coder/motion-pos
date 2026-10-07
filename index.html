@@ -135,6 +135,8 @@
                 <button onclick="switchMainTab('expenses')" id="tab-btn-expenses" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المصروفات 🧾</button>
                 <button onclick="switchMainTab('staff')" id="tab-btn-staff" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الموظفين 👥</button>
                 <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول</button>
+                <button onclick="switchMainTab('sales')" id="tab-btn-sales" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المبيعات 🧾</button>
+                <button onclick="switchMainTab('customers')" id="tab-btn-customers" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">العملاء 👤</button>
                 <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊</button>
                 <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات</button>
                 <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات ⚙️</button>
@@ -200,13 +202,19 @@
                         </div>
                         <div>
                             <label for="select-customer" class="block text-[10px] text-slate-400 font-bold mb-0.5">العميل</label>
-                            <select id="select-customer" onchange="posState.cart.customer_id = this.value || null" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
+                            <select id="select-customer" onchange="posState.cart.customer_id = this.value || null; renderPosCustomerInfo()" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
                         </div>
                         <div>
                             <label for="input-guests" class="block text-[10px] text-slate-400 font-bold mb-0.5">عدد الضيوف</label>
                             <input type="number" id="input-guests" value="1" min="1" onchange="updateGuestCount()" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px] text-center">
                         </div>
                     </div>
+                    <div class="flex gap-1 mb-1">
+                        <input id="pos-cust-phone" type="tel" placeholder="📱 موبايل العميل (دوّر أو ضيف)" onkeydown="if(event.key==='Enter')posFindCustomer()" class="flex-1 bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]">
+                        <button onclick="posFindCustomer()" class="bg-blue-600 text-white px-2.5 rounded-xl text-[11px] font-black">بحث</button>
+                        <button onclick="posClearCustomer()" class="bg-slate-100 text-slate-600 px-2 rounded-xl text-[11px] font-black" title="شيل العميل">✖</button>
+                    </div>
+                    <div id="pos-cust-info" class="text-[10px] font-bold text-slate-500 mb-1"></div>
                     <div id="cart-items-list" class="space-y-2 overflow-y-auto max-h-[240px] border-t border-b py-3 my-2"></div>
                 </div>
 
@@ -263,6 +271,10 @@
         <div id="view-expenses-workspace" class="hidden space-y-4"><div id="expenses-root"></div></div>
 
         <div id="view-staff-workspace" class="hidden space-y-4"><div id="staff-root"></div></div>
+
+        <div id="view-sales-workspace" class="hidden space-y-4"><div id="sales-root"></div></div>
+
+        <div id="view-customers-workspace" class="hidden space-y-4"><div id="customers-root"></div></div>
 
         <div id="view-cost-workspace" class="hidden space-y-4">
             <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -342,6 +354,9 @@
     <script src="js/reports2.js"></script>
     <script src="js/expenses.js"></script>
     <script src="js/staff.js"></script>
+    <script src="js/modifiers.js"></script>
+    <script src="js/sales.js"></script>
+    <script src="js/customers.js"></script>
 
     <script>
         let pendingTabTarget = null;
@@ -355,7 +370,7 @@
         // كل تبويب مربوط بصلاحية. السيرفر هو اللي بيمنع فعلاً، والتبويب بيستخبى بس عشان الشاشة تبقى أوضح.
         const TAB_PERMS = { pos: 'pos', kds: 'kds', shift: 'shift', inventory: 'inventory', purchase: 'purchasing',
             treasury: 'treasury', expenses: 'expenses', staff: 'staff', cost: 'reports', reports: 'reports',
-            accounting: 'accounting', settings: 'settings' };
+            accounting: 'accounting', settings: 'settings', sales: 'sales', customers: 'customers' };
 
         function canOpenTab(tab) {
             const perms = currentUser?.perms;
@@ -406,7 +421,8 @@
                 if (typeof loadKDSOrders === 'function') loadKDSOrders();
             }
             const loaders = { shift: 'loadShiftScreen', treasury: 'loadTreasuryScreen', inventory: 'loadInventoryScreen',
-                purchase: 'loadPurchasingScreen', expenses: 'loadExpensesScreen', staff: 'loadStaffScreen' };
+                purchase: 'loadPurchasingScreen', expenses: 'loadExpensesScreen', staff: 'loadStaffScreen',
+                sales: 'loadSalesScreen', customers: 'loadCustomersScreen' };
             if (loaders[targetTab] && typeof window[loaders[targetTab]] === 'function') window[loaders[targetTab]]();
             if (targetTab === 'cost') {
                 if (typeof loadCostAnalysis === 'function') loadCostAnalysis();

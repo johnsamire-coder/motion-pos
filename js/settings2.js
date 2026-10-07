@@ -3,7 +3,7 @@
 // الأقسام دي بتتضاف جنب أقسام الإعدادات القديمة (الضرائب والطاولات، الفروع والمخازن، المنيو).
 
 const SET2_SECTIONS = [['general', 'الشركة واللوجو'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
-    ['qr', 'الويتر والـ QR'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'],
+    ['qr', 'الويتر والـ QR'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
     ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب']];
 
 let set2 = { settings: null, data: null, recipeProduct: '', recipeLines: [], products: [] };
@@ -57,9 +57,11 @@ function set2RenderAll() {
         ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool'], ['auto_kitchen_ticket', 'طباعة ورقة المطبخ أوتوماتيك بعد الإرسال', 'bool']]);
     set2Form('pos', 'إعدادات الكاشير', [['order_types', 'أنواع الطلبات المفعّلة', 'multi', [['dine_in', 'صالة'], ['takeaway', 'تيك أواي'], ['delivery', 'توصيل'], ['pickup', 'استلام']]],
         ['payment_methods', 'طرق الدفع المفعّلة', 'multi', [['cash', 'كاش'], ['card', 'كارت'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'آجل']]],
-        ['require_waiter', 'لازم يتختار ويتر قبل الإرسال للمطبخ', 'bool']], '', '', 'poscfg');
+        ['require_waiter', 'لازم يتختار ويتر قبل الإرسال للمطبخ', 'bool'],
+        ['quick_notes', 'الملاحظات الجاهزة اللي بتظهر للكاشير (كل ملاحظة في سطر، مثلاً: بدون بصل)', 'lines']], '', '', 'poscfg');
     set2Form('kds', 'شاشة التحضير', [['stations', 'الأماكن المفعّلة', 'multi', [['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']]],
-        ['warn_minutes', 'الكارت يحمر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number']],
+        ['warn_kitchen_minutes', 'المطبخ: الطلب يبقى متأخر بعد كام دقيقة', 'number'], ['warn_bar_minutes', 'البار: متأخر بعد كام دقيقة', 'number'],
+        ['warn_shisha_minutes', 'الشيشة: متأخر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number']],
         `<div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
          ${uiTable(set2.data.categories, [{ label: 'القسم', key: 'name' }, { label: 'المكان', render: c => `<select onchange="set2Station('${c.id}', this.value)" class="${uiInputClass()}">
             ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
@@ -78,6 +80,7 @@ function set2RenderAll() {
         ['local_server_url', 'عنوان السيرفر المحلي (لطريقة الفرع كله)', 'text']],
         '<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ الاختيار بيتحفظ دلوقتي، والتشغيل الفعلي هيتعمل في المرحلة الجاية.</p>', 'للمالك بس');
     set2RenderRecipes();
+    if (typeof set2RenderModifiers === 'function') set2RenderModifiers();
     set2RenderLists();
     set2RenderPayAcc();
 }
@@ -93,6 +96,7 @@ function set2Form(section, title, fields, extraHtml = '', note = '', boxId = nul
         if (type === 'bool') input = `<input type="checkbox" data-s2="${section}" data-k="${k}" data-t="bool" ${v ? 'checked' : ''} class="w-4 h-4">`;
         else if (type === 'number') input = `<input type="number" data-s2="${section}" data-k="${k}" data-t="number" value="${uiEsc(v)}" class="${uiInputClass()} w-32">`;
         else if (type === 'select') input = `<select data-s2="${section}" data-k="${k}" data-t="${typeof opts[0][0] === 'number' ? 'number' : 'text'}" class="${uiInputClass()}">${opts.map(([ov, ol]) => `<option value="${uiEsc(ov)}" ${String(v) === String(ov) ? 'selected' : ''}>${uiEsc(ol)}</option>`).join('')}</select>`;
+        else if (type === 'lines') input = `<textarea rows="6" data-s2="${section}" data-k="${k}" data-t="lines" class="${uiInputClass()} w-full">${uiEsc((v || []).join('\n'))}</textarea>`;
         else if (type === 'multi') input = `<div class="flex flex-wrap gap-3">${opts.map(([ov, ol]) => `<label class="flex items-center gap-1"><input type="checkbox" data-s2="${section}" data-k="${k}" data-t="multi" value="${uiEsc(ov)}" ${(v || []).includes(ov) ? 'checked' : ''}>${uiEsc(ol)}</label>`).join('')}</div>`;
         else input = `<input type="text" data-s2="${section}" data-k="${k}" data-t="text" value="${uiEsc(v)}" class="${uiInputClass()} w-full">`;
         return `<div class="flex flex-wrap items-center justify-between gap-2 py-2 border-b text-xs font-bold"><span>${uiEsc(label)}</span><div class="min-w-[200px] text-left">${input}</div></div>`;
@@ -107,6 +111,7 @@ async function set2SaveForm(section) {
         const k = el.dataset.k;
         if (el.dataset.t === 'bool') data[k] = el.checked;
         else if (el.dataset.t === 'number') data[k] = Number(el.value) || 0;
+        else if (el.dataset.t === 'lines') data[k] = el.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 50);
         else if (el.dataset.t === 'multi') { data[k] = data[k] || []; if (el.checked) data[k].push(el.value); }
         else data[k] = el.value;
     });

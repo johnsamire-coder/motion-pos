@@ -313,48 +313,191 @@ async function checkAndAddProduct(productId) {
     const product = posState.products.find(p => p.id === productId);
     if (!product) return;
     const { data: modGroupLinks } = await _supabase.from('product_modifier_groups').select('group_id, modifier_groups(*, modifiers(*))').eq('product_id', productId);
-    
-    if (modGroupLinks && modGroupLinks.length > 0) {
-        const groups = modGroupLinks.map(l => l.modifier_groups).filter(g => g !== null);
-        if (groups.length > 0) { openModifiersModal(product, groups); return; }
-    }
+    const groups = (modGroupLinks || []).map(l => l.modifier_groups).filter(g => g && (g.modifiers || []).length > 0);
+    if (groups.length > 0) { openModifiersModal(product, groups); return; }
     addItemToCart(product, []);
 }
 
+// شباك الإضافات: كل مجموعة بقواعدها (لازم / اختياري / أكتر عدد)، وتحتها الملاحظات الجاهزة وخانة ملاحظة
+function posModRule(g) {
+    const min = Math.max(Number(g.min_selection) || 0, g.is_required ? 1 : 0);
+    const max = Number(g.max_selection) || 1;
+    return { min, max, text: min > 0 ? (min === max ? `لازم تختار ${min}` : `لازم تختار من ${min} لـ ${max}`) : (max === 1 ? 'اختياري (واحدة)' : `اختياري (لحد ${max})`) };
+}
+
 function openModifiersModal(product, groups) {
-    posState.pendingModifierProduct = product; posState.selectedModifiers = [];
+    posState.pendingModifierProduct = product;
+    posState.selectedModifiers = [];
+    posState.modGroups = groups.map(g => ({ ...g, modifiers: [...(g.modifiers || [])].sort((x, y) => String(x.created_at || '').localeCompare(String(y.created_at || ''))) }));
     let modal = document.getElementById('modifiers-modal');
     if (!modal) {
         modal = document.createElement('div'); modal.id = 'modifiers-modal';
         modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
         document.body.appendChild(modal);
     }
-    const groupsHtml = groups.map(g => `
+    const groupsHtml = posState.modGroups.map((g, gi) => `
         <div class="mb-4 text-right">
-            <h4 class="font-black text-xs text-slate-800 mb-2 border-b pb-1">${g.name}</h4>
+            <h4 class="font-black text-xs text-slate-800 mb-2 border-b pb-1 flex justify-between"><span>${uiEsc(g.name)}</span><span class="text-[10px] ${posModRule(g).min > 0 ? 'text-red-600' : 'text-slate-400'}">${uiEsc(posModRule(g).text)}</span></h4>
             <div class="grid grid-cols-2 gap-2">
-                ${g.modifiers.map(m => `<button onclick="toggleModifierSelection('${m.id}', '${m.name}', ${m.price}, '${m.ingredient_id||''}', ${m.ingredient_quantity||0}, this)" class="mod-option-btn p-2 border rounded-xl text-xs font-bold bg-slate-50 text-slate-700 flex justify-between items-center hover:border-blue-500"><span>${m.name}</span><span class="text-blue-600">${m.price > 0 ? '+' + formatCurrency(m.price) : 'مجاني'}</span></button>`).join('')}
+                ${g.modifiers.map((m, mi) => `<button id="pos-mod-${gi}-${mi}" onclick="toggleModifierSelection(${gi}, ${mi})" class="mod-option-btn p-2 border rounded-xl text-xs font-bold bg-slate-50 text-slate-700 flex justify-between items-center hover:border-blue-500"><span>${uiEsc(m.name)}</span><span class="text-blue-600">${Number(m.price) > 0 ? '+' + formatCurrency(m.price) : 'مجاني'}</span></button>`).join('')}
             </div>
-        </div>
-    `).join('');
-    modal.innerHTML = `<div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100"><h3 class="font-black text-base text-slate-800 mb-1 text-center">إضافات: ${product.name}</h3><div class="max-h-[300px] overflow-y-auto mb-4">${groupsHtml}</div><div class="flex gap-2"><button onclick="confirmModifiersSelection()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-xs hover:bg-blue-700 shadow">إضافة</button><button onclick="closeModifiersModal()" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-xs hover:bg-slate-200">إلغاء</button></div></div>`;
+        </div>`).join('');
+    modal.innerHTML = `<div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100" dir="rtl">
+        <h3 class="font-black text-base text-slate-800 mb-1 text-center">${uiEsc(product.name)}</h3>
+        <div class="max-h-[340px] overflow-y-auto mb-3">${groupsHtml}${posNotesHtml('pos-mod-note', '')}</div>
+        <div class="flex gap-2"><button onclick="confirmModifiersSelection()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-xs hover:bg-blue-700 shadow">إضافة</button><button onclick="closeModifiersModal()" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold text-xs hover:bg-slate-200">إلغاء</button></div></div>`;
     modal.classList.remove('hidden');
 }
 
-function toggleModifierSelection(id, name, price, ingId, ingQty, btn) {
-    const idx = posState.selectedModifiers.findIndex(m => m.id === id);
-    if (idx >= 0) { posState.selectedModifiers.splice(idx, 1); btn.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700'); } 
-    else { posState.selectedModifiers.push({ id, name, price, ingredient_id: ingId, ingredient_quantity: ingQty }); btn.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700'); }
+function toggleModifierSelection(gi, mi) {
+    const g = posState.modGroups[gi];
+    const m = g && g.modifiers[mi];
+    if (!m) return;
+    const rule = posModRule(g);
+    const idx = posState.selectedModifiers.findIndex(x => x.id === m.id);
+    if (idx >= 0) {
+        posState.selectedModifiers.splice(idx, 1);
+    } else {
+        const inGroup = posState.selectedModifiers.filter(x => x.group_id === g.id);
+        if (inGroup.length >= rule.max) {
+            if (rule.max === 1) posState.selectedModifiers = posState.selectedModifiers.filter(x => x.group_id !== g.id);
+            else return showToast(`أكتر عدد في "${g.name}" هو ${rule.max}`, 'error');
+        }
+        posState.selectedModifiers.push({ id: m.id, name: m.name, price: Number(m.price) || 0, group_id: g.id });
+    }
+    posState.modGroups.forEach((gg, a) => gg.modifiers.forEach((mm, b) => {
+        const btn = document.getElementById(`pos-mod-${a}-${b}`);
+        const on = posState.selectedModifiers.some(x => x.id === mm.id);
+        if (btn) btn.classList.toggle('border-blue-600', on), btn.classList.toggle('bg-blue-50', on), btn.classList.toggle('text-blue-700', on);
+    }));
 }
-function confirmModifiersSelection() { if (posState.pendingModifierProduct) addItemToCart(posState.pendingModifierProduct, [...posState.selectedModifiers]); closeModifiersModal(); }
-function closeModifiersModal() { const modal = document.getElementById('modifiers-modal'); if (modal) modal.classList.add('hidden'); posState.pendingModifierProduct = null; posState.selectedModifiers = []; }
 
-function addItemToCart(product, selectedModifiers = []) {
+function confirmModifiersSelection() {
+    for (const g of (posState.modGroups || [])) {
+        const rule = posModRule(g);
+        const n = posState.selectedModifiers.filter(x => x.group_id === g.id).length;
+        if (n < rule.min) return showToast(`"${g.name}": ${rule.text}`, 'error');
+    }
+    const note = (document.getElementById('pos-mod-note')?.value || '').trim();
+    // نفس ترتيب المجموعات عشان الصنف المتكرر يتجمّع صح
+    const order = [];
+    (posState.modGroups || []).forEach(g => g.modifiers.forEach(m => order.push(m.id)));
+    const mods = [...posState.selectedModifiers].sort((x, y) => order.indexOf(x.id) - order.indexOf(y.id))
+        .map(m => ({ id: m.id, name: m.name, price: m.price }));
+    if (posState.pendingModifierProduct) addItemToCart(posState.pendingModifierProduct, mods, note);
+    closeModifiersModal();
+}
+function closeModifiersModal() { const modal = document.getElementById('modifiers-modal'); if (modal) modal.classList.add('hidden'); posState.pendingModifierProduct = null; posState.selectedModifiers = []; posState.modGroups = []; }
+
+// الملاحظات الجاهزة (من الإعدادات) + خانة ملاحظة حرة
+function posNotesHtml(inputId, value) {
+    const quick = (typeof appSet === 'function' ? appSet('pos', 'quick_notes', []) : []) || [];
+    return `<div class="text-right border-t pt-3">
+        <p class="text-[11px] font-black text-slate-600 mb-1.5">📝 ملاحظة للمطبخ / البار</p>
+        <div class="flex flex-wrap gap-1.5 mb-2">${quick.map((q, i) => `<button type="button" onclick="posToggleQuickNote('${inputId}', ${i})" class="px-2 py-1 rounded-lg border text-[11px] font-bold bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100">${uiEsc(q)}</button>`).join('')}</div>
+        <input id="${inputId}" value="${uiEsc(value || '')}" maxlength="200" placeholder="اكتب أي ملاحظة (مثلاً: الصوص لوحده)" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
+    </div>`;
+}
+
+function posToggleQuickNote(inputId, i) {
+    const quick = appSet('pos', 'quick_notes', []) || [];
+    const q = quick[i];
+    const input = document.getElementById(inputId);
+    if (!q || !input) return;
+    const parts = input.value.split('،').map(x => x.trim()).filter(Boolean);
+    const at = parts.indexOf(q);
+    if (at >= 0) parts.splice(at, 1); else parts.push(q);
+    input.value = parts.join('، ');
+}
+
+function editCartItemNote(idx) {
+    const item = posState.cart.items[idx];
+    if (!item || item.db_item_id) return;
+    let modal = document.getElementById('pos-note-modal');
+    if (!modal) {
+        modal = document.createElement('div'); modal.id = 'pos-note-modal';
+        modal.className = 'fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4';
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="bg-white p-5 rounded-3xl shadow-2xl max-w-md w-full" dir="rtl">
+        <h3 class="font-black text-sm text-slate-800 mb-2">${uiEsc(item.name)} ×${uiEsc(item.qty)}</h3>
+        ${posNotesHtml('pos-item-note', item.notes)}
+        <div class="flex gap-2 mt-3"><button onclick="saveCartItemNote(${idx})" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">حفظ</button>
+        <button onclick="document.getElementById('pos-note-modal').remove()" class="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-xl font-bold text-xs">إلغاء</button></div></div>`;
+    setTimeout(() => document.getElementById('pos-item-note')?.focus(), 50);
+}
+
+function saveCartItemNote(idx) {
+    const item = posState.cart.items[idx];
+    const v = (document.getElementById('pos-item-note')?.value || '').trim();
+    if (item && !item.db_item_id) item.notes = v.slice(0, 200);
+    document.getElementById('pos-note-modal')?.remove();
+    renderOrderCartTicket();
+}
+
+function addItemToCart(product, selectedModifiers = [], notes = '') {
     let modPrice = selectedModifiers.reduce((s, m) => s + parseFloat(m.price || 0), 0);
     const itemPrice = parseFloat(product.price) + modPrice;
-    const existing = posState.cart.items.find(i => i.product_id === product.id && JSON.stringify(i.modifiers) === JSON.stringify(selectedModifiers) && !i.db_item_id);
-    if (existing) { existing.qty++; } else { posState.cart.items.push({ db_item_id: null, product_id: product.id, name: product.name, price: itemPrice, qty: 1, modifiers: selectedModifiers, discount: 0, notes: '' }); }
+    const existing = posState.cart.items.find(i => i.product_id === product.id && !i.db_item_id
+        && JSON.stringify((i.modifiers || []).map(m => m.id)) === JSON.stringify(selectedModifiers.map(m => m.id)) && (i.notes || '') === (notes || ''));
+    if (existing) { existing.qty++; } else { posState.cart.items.push({ db_item_id: null, product_id: product.id, name: product.name, price: itemPrice, qty: 1, modifiers: selectedModifiers, discount: 0, notes: notes || '' }); }
     renderOrderCartTicket();
+}
+
+// ---------------------------------------------------------------- العميل بالموبايل
+function posSetCustomer(c) {
+    if (!c) return;
+    if (!posState.customers.some(x => x.id === c.id)) {
+        posState.customers.push({ id: c.id, name: c.name, phone: c.phone, customer_type: c.customer_type, balance: 0 });
+        posState.customers.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'));
+        renderWaitersAndCustomersDropdowns();
+    }
+    posState.cart.customer_id = c.id;
+    const sel = document.getElementById('select-customer');
+    if (sel) sel.value = c.id;
+    posState.lastCustomerInfo = c;
+    renderPosCustomerInfo();
+}
+
+function posClearCustomer() {
+    posState.cart.customer_id = null;
+    const sel = document.getElementById('select-customer');
+    if (sel) sel.value = '';
+    const input = document.getElementById('pos-cust-phone');
+    if (input) input.value = '';
+    renderPosCustomerInfo();
+}
+
+function renderPosCustomerInfo() {
+    const box = document.getElementById('pos-cust-info');
+    if (!box) return;
+    const id = posState.cart.customer_id;
+    if (!id) { box.innerHTML = ''; return; }
+    const c = posState.customers.find(x => x.id === id) || {};
+    const extra = posState.lastCustomerInfo && posState.lastCustomerInfo.id === id ? posState.lastCustomerInfo : null;
+    box.innerHTML = `👤 <span class="text-slate-800">${uiEsc(c.name || '')}</span> ${c.phone ? '| ' + uiEsc(c.phone) : ''}`
+        + (extra && extra.orders_count !== undefined ? ` | ${uiEsc(extra.orders_count)} طلب قبل كده` : '')
+        + (extra && extra.notes ? `<div class="text-amber-700">📝 ${uiEsc(extra.notes)}</div>` : '');
+}
+
+async function posFindCustomer() {
+    const input = document.getElementById('pos-cust-phone');
+    const phone = (input?.value || '').trim();
+    if (!phone) return showToast('اكتب موبايل العميل', 'error');
+    let res;
+    try { res = await serverRpc('customer_lookup_secure', { p_phone: phone }); }
+    catch (err) { return showToast(err.message || 'تعذر البحث', 'error'); }
+    if (!res || res.ok === false) return showToast(serverReasonMessage(res, 'تعذر البحث'), 'error');
+    if (res.found) { posSetCustomer(res.customer); showToast(`العميل: ${res.customer.name}`); return; }
+    const name = prompt(`الرقم ${res.phone} مش متسجّل.\nاكتب اسم العميل عشان يتسجّل:`);
+    if (!name || !name.trim()) return;
+    let add;
+    try { add = await serverRpc('customer_quick_add_secure', { p_name: name.trim(), p_phone: phone }); }
+    catch (err) { return showToast(err.message || 'تعذر الحفظ', 'error'); }
+    if (add && add.ok === false && add.reason === 'phone_taken' && add.customer) { posSetCustomer(add.customer); return; }
+    if (!add || add.ok === false) return showToast(serverReasonMessage(add, 'تعذر الحفظ'), 'error');
+    posSetCustomer({ ...add.customer, orders_count: 0 });
+    showToast('تم تسجيل العميل');
 }
 
 // نفس طريقة حساب السيرفر بالظبط، للعرض بس. الرقم اللي بيتدفع بيتجاب من السيرفر.
@@ -398,6 +541,7 @@ function renderOrderCartTicket() {
     if (waiterSelect) waiterSelect.value = posState.cart.waiter_id || '';
     const customerSelect = document.getElementById('select-customer');
     if (customerSelect) customerSelect.value = posState.cart.customer_id || '';
+    renderPosCustomerInfo();
     const guestInput = document.getElementById('input-guests');
     if (guestInput) guestInput.value = posState.cart.guest_count || 1;
 
@@ -412,8 +556,9 @@ function renderOrderCartTicket() {
             const sentBadge = item.db_item_id ? '' : '<span class="text-[9px] text-amber-600 font-bold">(لسه ما اتبعتش)</span>';
             return `<div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold space-y-1">
                 <div class="flex justify-between items-center"><span class="text-slate-800">${item.name} ${sentBadge}</span><span class="text-blue-600 font-extrabold">${formatCurrency(item.price * item.qty)}</span></div>
-                ${modsText ? `<p class="text-[10px] text-amber-600 font-bold">${modsText}</p>` : ''}
-                <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1"><span>${item.price} × ${item.qty}</span><button onclick="voidCartItem(${idx})" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-bold">مسح / Void</button></div>
+                ${modsText ? `<p class="text-[10px] text-amber-600 font-bold">${uiEsc(modsText)}</p>` : ''}
+                ${item.notes ? `<p class="text-[10px] text-red-600 font-bold">📝 ${uiEsc(item.notes)}</p>` : ''}
+                <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1"><span>${item.price} × ${item.qty}</span><span class="flex gap-1">${item.db_item_id ? '' : `<button onclick="editCartItemNote(${idx})" class="text-amber-700 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-bold">📝 ملاحظة</button>`}<button onclick="voidCartItem(${idx})" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-bold">مسح / Void</button></span></div>
             </div>`;
         }).join('');
     }

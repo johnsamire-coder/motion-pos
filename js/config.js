@@ -173,6 +173,12 @@ const SERVER_REASON_MESSAGES = {
     value_too_long: 'القيمة طويلة جداً',
     invalid_logo: 'اللوجو لازم يكون صورة (PNG أو JPG أو WEBP أو SVG)',
     qr_disabled: 'الخدمة دي متوقفة من الإعدادات',
+    phone_taken: 'رقم الموبايل ده متسجّل لعميل تاني',
+    invalid_phone: 'رقم الموبايل غلط (لازم ٨ أرقام على الأقل)',
+    invalid_date: 'التاريخ غلط',
+    group_not_found: 'مجموعة الإضافات غير موجودة',
+    modifier_not_found: 'الإضافة غير موجودة',
+    invalid_selection_limits: 'أقل وأكتر عدد غلط: الأقل ميزيدش عن الأكتر، والأكتر ميزيدش عن عدد الإضافات',
     too_many: 'طلبات كتير. حاول بعد شوية',
     invalid_status: 'حالة غير صحيحة'
 };
