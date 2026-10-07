@@ -125,15 +125,19 @@
                     <p class="text-[11px] text-slate-400 font-bold" id="staff-role-display">الدور: ---</p>
                 </div>
             </div>
-            <nav class="flex gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-                <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
-                <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨🍳</button>
-                <button onclick="switchMainTab('inventory')" id="tab-btn-inventory" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المخازن 🔒</button>
-                <button onclick="switchMainTab('purchase')" id="tab-btn-purchase" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المشتريات 🛒🔒</button>
-                <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول 🔒</button>
-                <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊🔒</button>
-                <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات 🔒</button>
-                <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200 border-l border-slate-200 pr-2">الإعدادات ⚙️🔒</button>
+            <nav class="flex flex-wrap gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 max-w-[60%]">
+                <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
+                <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨‍🍳</button>
+                <button onclick="switchMainTab('shift')" id="tab-btn-shift" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الوردية 💵</button>
+                <button onclick="switchMainTab('inventory')" id="tab-btn-inventory" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المخازن 📦</button>
+                <button onclick="switchMainTab('purchase')" id="tab-btn-purchase" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المشتريات 🛒</button>
+                <button onclick="switchMainTab('treasury')" id="tab-btn-treasury" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الخزينة 🏦</button>
+                <button onclick="switchMainTab('expenses')" id="tab-btn-expenses" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المصروفات 🧾</button>
+                <button onclick="switchMainTab('staff')" id="tab-btn-staff" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الموظفين 👥</button>
+                <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول</button>
+                <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊</button>
+                <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات</button>
+                <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات ⚙️</button>
             </nav>
             <div class="flex items-center gap-2">
                 <span class="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl font-bold text-xs border border-blue-200" id="branch-badge">الفرع</span>
@@ -246,48 +250,17 @@
             <div id="kds-cards-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
         </div>
 
-        <div id="view-inventory-workspace" class="hidden space-y-4">
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                <section class="xl:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                        <h2 class="font-black text-slate-800 text-sm">📦 أرصدة المخازن</h2>
-                        <select id="inventory-warehouse-select" onchange="loadInventoryStock()" class="bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
-                    </div>
-                    <div class="overflow-x-auto"><table class="w-full text-right"><tbody id="inventory-table-body"></tbody></table></div>
-                </section>
-                <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-                    <h3 class="font-black text-xs text-red-600 border-b pb-2">تسجيل هالك / تالف</h3>
-                    <select id="waste-ingredient-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
-                    <input type="number" id="waste-qty" min="0" step="any" placeholder="الكمية" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
-                    <select id="waste-reason" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"><option value="انكباب/دلق">انكباب/دلق</option><option value="انتهاء صلاحية">انتهاء صلاحية</option></select>
-                    <button onclick="submitWasteLog()" class="w-full bg-red-600 text-white py-2.5 rounded-xl font-bold text-xs">تسجيل الهالك</button>
-                    <h3 class="font-black text-xs text-blue-600 border-y py-2">الجرد الفعلي الموزون</h3>
-                    <select id="stocktake-ingredient-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
-                    <input type="number" id="stocktake-qty" min="0" step="any" placeholder="الكمية الفعلية" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
-                    <button onclick="submitStockTake()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">حفظ الجرد</button>
-                </section>
-            </div>
-        </div>
+        <div id="view-inventory-workspace" class="hidden space-y-4"><div id="inventory-root"></div></div>
 
-        <div id="view-purchase-workspace" class="hidden space-y-4">
-            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-3">
-                <h2 class="font-black text-slate-800 text-sm border-b pb-2">🛒 إضافة فاتورة توريد / مشتريات</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <select id="purchase-supplier" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold"></select>
-                    <select id="purchase-warehouse" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold text-blue-600"></select>
-                </div>
-                <select id="purchase-ingredient" class="w-full bg-slate-50 border p-2.5 rounded-xl text-xs font-bold"></select>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input type="number" id="purchase-qty" min="0" step="any" placeholder="الكمية" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold">
-                    <input type="number" id="purchase-unit-price" min="0" step="0.0001" placeholder="سعر الوحدة" class="bg-slate-50 border p-2.5 rounded-xl text-xs font-bold">
-                </div>
-                <button onclick="submitPurchaseInvoice()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-xs">حفظ التوريد وتحديث التكاليف</button>
-            </section>
-            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="font-black text-slate-800 text-sm border-b pb-2 mb-3">📋 أرشيف المشتريات</h2>
-                <div class="overflow-x-auto"><table class="w-full text-right"><tbody id="purchase-history-body"></tbody></table></div>
-            </section>
-        </div>
+        <div id="view-purchase-workspace" class="hidden space-y-4"><div id="purchase-root"></div></div>
+
+        <div id="view-shift-workspace" class="hidden space-y-4"><div id="shift-root"></div></div>
+
+        <div id="view-treasury-workspace" class="hidden space-y-4"><div id="treasury-root"></div></div>
+
+        <div id="view-expenses-workspace" class="hidden space-y-4"><div id="expenses-root"></div></div>
+
+        <div id="view-staff-workspace" class="hidden space-y-4"><div id="staff-root"></div></div>
 
         <div id="view-cost-workspace" class="hidden space-y-4">
             <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -328,7 +301,7 @@
                     <h2 class="font-black text-slate-800 text-sm border-b pb-3">تسجيل مصروف</h2>
                     <select id="exp-account-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
                     <input id="exp-amount-input" type="number" min="0" step="0.01" placeholder="المبلغ" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
-                    <select id="exp-method-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"><option value="cash">نقدي</option><option value="card">بطاقة</option></select>
+                    <select id="exp-method-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"><option value="cash">من الخزينة الرئيسية</option><option value="card">من البنك</option></select>
                     <input id="exp-desc-input" type="text" placeholder="وصف المصروف" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
                     <button onclick="submitExpenseAction()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">تسجيل المصروف</button>
                 </div>
@@ -379,6 +352,9 @@
     <script src="js/reports.js"></script>
     <script src="js/accounting.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/treasury.js"></script>
+    <script src="js/expenses.js"></script>
+    <script src="js/staff.js"></script>
 
     <script>
         let pendingTabTarget = null;
@@ -389,39 +365,57 @@
             return ['admin', 'manager', 'owner', 'مدير', 'مالك', 'مسؤول'].some(role => roleName.includes(role));
         }
 
-        function switchMainTab(targetTab) {
-            const protectedTabs = ['inventory', 'purchase', 'cost', 'reports', 'accounting', 'settings'];
-            if (protectedTabs.includes(targetTab) && !isManagerUnlocked) {
-                if (!hasManagerRole()) {
-                    showToast('هذا القسم متاح لحساب المدير أو المالك فقط', 'error');
-                    return;
+        // كل تبويب مربوط بصلاحية. السيرفر هو اللي بيمنع فعلاً، والتبويب بيستخبى بس عشان الشاشة تبقى أوضح.
+        const TAB_PERMS = { pos: 'pos', kds: 'kds', shift: 'shift', inventory: 'inventory', purchase: 'purchasing',
+            treasury: 'treasury', expenses: 'expenses', staff: 'staff', cost: 'reports', reports: 'reports',
+            accounting: 'accounting', settings: 'settings' };
+
+        function canOpenTab(tab) {
+            const perms = currentUser?.perms;
+            if (!Array.isArray(perms)) return tab === 'pos' || tab === 'kds';
+            return perms.includes(TAB_PERMS[tab]);
+        }
+
+        async function applyTabPermissions() {
+            try {
+                const res = await serverRpc('pos_settings_list_secure');
+                if (res && res.ok && currentUser) {
+                    currentUser.perms = res.perms || [];
+                    currentUser.settings = { working_days_per_month: res.working_days_per_month, expense_manager_limit: res.expense_manager_limit };
                 }
-                pendingTabTarget = targetTab;
-                document.getElementById('pin-auth-modal').classList.remove('hidden');
-                document.getElementById('modal-pin-input').focus();
+            } catch (err) {
+                console.error('Permissions load error:', err);
+            }
+            Object.keys(TAB_PERMS).forEach(tab => {
+                const btn = document.getElementById('tab-btn-' + tab);
+                if (btn) btn.classList.toggle('hidden', !canOpenTab(tab));
+            });
+        }
+
+        function switchMainTab(targetTab) {
+            if (!canOpenTab(targetTab)) {
+                showToast('القسم ده مش مسموح لدورك', 'error');
                 return;
             }
-            ['pos', 'kds', 'inventory', 'purchase', 'cost', 'reports', 'accounting', 'settings'].forEach(tab => {
+            Object.keys(TAB_PERMS).forEach(tab => {
                 const el = document.getElementById('view-' + tab + '-workspace');
                 if (el) el.classList.add('hidden');
             });
             const activeEl = document.getElementById('view-' + targetTab + '-workspace');
             if (activeEl) activeEl.classList.remove('hidden');
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
-                btn.className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200";
+                const hidden = btn.classList.contains('hidden');
+                btn.className = "main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200" + (hidden ? ' hidden' : '');
             });
             const activeButton = document.getElementById('tab-btn-' + targetTab);
-            if (activeButton) activeButton.className = "main-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow";
+            if (activeButton) activeButton.className = "main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow";
             if (targetTab === 'kds') {
                 if (typeof subscribeToKDSRealtime === 'function') subscribeToKDSRealtime();
                 if (typeof loadKDSOrders === 'function') loadKDSOrders();
             }
-            if (targetTab === 'inventory' && typeof loadInventoryOptions === 'function') {
-                loadInventoryOptions().then(loaded => { if (loaded) loadInventoryStock(); });
-            }
-            if (targetTab === 'purchase' && typeof loadPurchaseOptions === 'function') {
-                loadPurchaseOptions().then(loaded => { if (loaded) loadPurchaseHistory(); });
-            }
+            const loaders = { shift: 'loadShiftScreen', treasury: 'loadTreasuryScreen', inventory: 'loadInventoryScreen',
+                purchase: 'loadPurchasingScreen', expenses: 'loadExpensesScreen', staff: 'loadStaffScreen' };
+            if (loaders[targetTab] && typeof window[loaders[targetTab]] === 'function') window[loaders[targetTab]]();
             if (targetTab === 'cost') {
                 if (typeof loadCostAnalysis === 'function') loadCostAnalysis();
                 if (typeof loadWasteReport === 'function') loadWasteReport();

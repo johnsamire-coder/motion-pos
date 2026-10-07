@@ -57,6 +57,9 @@ async function serverRpc(name, params = {}) {
         if (String(error.message || '').includes('session_invalid')) {
             throw new Error('انتهت صلاحية الوردية. اخرج وادخل تاني برقمك.');
         }
+        if (String(error.message || '').includes('not_allowed')) {
+            throw new Error('العملية دي مش مسموحة لدورك.');
+        }
         throw error;
     }
     return data;
@@ -130,7 +133,40 @@ const SERVER_REASON_MESSAGES = {
     table_not_found: 'الطاولة غير موجودة',
     invalid_table_number: 'رقم الطاولة غير صحيح',
     area_not_found: 'المنطقة غير موجودة',
-    table_has_orders: 'مينفعش تمسح طاولة عليها طلبات سابقة'
+    table_has_orders: 'مينفعش تمسح طاولة عليها طلبات سابقة',
+    no_open_shift: 'لازم تفتح ورديتك الأول من شاشة "الوردية"',
+    shift_already_open: 'عندك وردية مفتوحة بالفعل',
+    shift_not_found: 'الوردية غير موجودة',
+    not_enough_cash: 'المبلغ أكبر من الموجود في الدرج',
+    invalid_destination: 'الجهة غير صحيحة',
+    reason_required: 'لازم تكتب السبب أو الوصف',
+    open_shifts_exist: 'في ورديات لسه مفتوحة. لازم تتقفل الأول',
+    day_already_closed: 'اليوم ده اتقفل قبل كده',
+    warehouse_not_allowed: 'المخزن ده مش تبع فرعك',
+    ingredient_not_found: 'الخامة غير موجودة',
+    invalid_warehouses: 'اختيار المخازن غلط',
+    transfer_not_found: 'التحويل غير موجود',
+    wrong_transfer_status: 'الخطوة دي مش مناسبة لحالة التحويل',
+    invalid_role: 'الدور غير صحيح',
+    staff_not_found: 'الموظف غير موجود أو مش تبعك',
+    cannot_disable_self: 'مينفعش توقف نفسك',
+    invalid_pin: 'الرقم السري لازم يكون 4 أرقام',
+    pin_taken: 'الرقم السري ده مستخدم لموظف تاني. اختار رقم تاني',
+    wrong_pin: 'الرقم السري غلط',
+    locked: 'متوقف مؤقتاً بسبب محاولات غلط كتير. استنى 10 دقايق',
+    payroll_not_draft: 'المرتبات دي اتعتمدت، مينفعش تتعدل',
+    payroll_not_approved: 'لازم تعتمد المرتبات الأول',
+    not_found: 'غير موجود',
+    owner_pin_required: 'المبلغ فوق حد المدير، ومحتاج رقم المالك',
+    invalid_account: 'الحساب غير صحيح',
+    recurring_already_paid: 'المصروف المتكرر ده اتصرف الشهر ده',
+    no_custody: 'الموظف ده معهوش عهدة',
+    custody_amount_mismatch: 'المجموع أكبر من العهدة اللي معاه',
+    supplier_not_found: 'المورد غير موجود',
+    po_not_found: 'أمر الشراء غير موجود',
+    wrong_po_status: 'الخطوة دي مش مناسبة لحالة أمر الشراء',
+    invoice_duplicate: 'رقم الفاتورة ده متسجل قبل كده للمورد ده',
+    nothing_to_invoice: 'مفيش بضاعة مستلمة لسه من غير فاتورة'
 };
 
 function serverReasonMessage(res, fallback) {
@@ -140,4 +176,103 @@ function serverReasonMessage(res, fallback) {
 
 function round2(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+// -----------------------------------------
+// أدوات الشاشات (جداول، تواريخ، نداء السيرفر مع رسالة واضحة)
+// -----------------------------------------
+function uiEsc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function uiDate(ts) {
+    if (!ts) return '-';
+    const d = new Date(ts);
+    return d.toLocaleDateString('ar-EG') + ' ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+}
+
+function uiToday(offsetDays = 0) {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    return d.toISOString().slice(0, 10);
+}
+
+// columns: [{ label, key }] or [{ label, render: row => html }]
+function uiTable(rows, columns, emptyText = 'لا توجد بيانات') {
+    if (!rows || rows.length === 0) return `<p class="text-center text-slate-400 font-bold text-xs py-6">${uiEsc(emptyText)}</p>`;
+    const head = columns.map(c => `<th class="p-2 text-[11px] text-slate-500 font-black border-b">${uiEsc(c.label)}</th>`).join('');
+    const body = rows.map(r => '<tr class="border-b border-slate-100 text-xs font-bold hover:bg-slate-50">'
+        + columns.map(c => `<td class="p-2">${c.render ? c.render(r) : uiEsc(r[c.key])}</td>`).join('') + '</tr>').join('');
+    return `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function uiTabs(groupId, tabs, active, onClickName) {
+    return '<div class="flex flex-wrap gap-1.5 mb-4">' + tabs.map(([key, label]) =>
+        `<button onclick="${onClickName}('${key}')" class="px-3 py-1.5 rounded-xl text-xs font-black ${key === active ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${uiEsc(label)}</button>`).join('') + '</div>';
+}
+
+function uiCard(title, inner, actionsHtml = '') {
+    return `<section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-2 mb-3 border-b pb-2"><h3 class="font-black text-sm text-slate-800">${uiEsc(title)}</h3><div class="flex flex-wrap gap-2">${actionsHtml}</div></div>
+        ${inner}</section>`;
+}
+
+function uiBtn(label, onclick, color = 'blue') {
+    const colors = { blue: 'bg-blue-600 text-white hover:bg-blue-700', red: 'bg-red-600 text-white hover:bg-red-700',
+        green: 'bg-emerald-600 text-white hover:bg-emerald-700', gray: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+        amber: 'bg-amber-500 text-white hover:bg-amber-600' };
+    return `<button onclick="${onclick}" class="px-3 py-1.5 rounded-xl text-xs font-black ${colors[color] || colors.blue}">${uiEsc(label)}</button>`;
+}
+
+function uiInputClass() { return 'bg-slate-50 border p-2 rounded-xl text-xs font-bold'; }
+
+function uiOptions(items, valueKey, labelFn, placeholder) {
+    return (placeholder ? `<option value="">${uiEsc(placeholder)}</option>` : '')
+        + (items || []).map(i => `<option value="${uiEsc(i[valueKey])}">${uiEsc(labelFn(i))}</option>`).join('');
+}
+
+// Asks the manager PIN through the same small window the cashier uses
+function uiAskPin(message) {
+    if (typeof askManagerPin === 'function') return askManagerPin(message);
+    return Promise.resolve(prompt(message));
+}
+
+// Call a server function; on refusal show the reason. Returns the result or null.
+// If the server asks for the owner PIN, ask for it and try once more.
+async function uiCall(name, params, okMessage, ownerPinParam) {
+    try {
+        let res = await serverRpc(name, params);
+        if (res && res.ok === false && res.reason === 'owner_pin_required' && ownerPinParam) {
+            const pin = await uiAskPin(`المبلغ فوق حد المدير (${formatCurrency(res.limit)}). أدخل رقم المالك:`);
+            if (!pin) return null;
+            res = await serverRpc(name, { ...params, [ownerPinParam]: String(pin).trim() });
+        }
+        if (!res || res.ok === false) {
+            showToast(serverReasonMessage(res, 'تعذر تنفيذ العملية'), 'error');
+            return null;
+        }
+        if (okMessage) showToast(okMessage);
+        return res;
+    } catch (err) {
+        console.error(name, err);
+        showToast((err && err.message) || 'حدث خطأ أثناء الاتصال بالسيرفر', 'error');
+        return null;
+    }
+}
+
+const UI_BOX_NAMES = { main_cash: 'الخزينة الرئيسية', bank: 'البنك', owner: 'صاحب المحل', drawer: 'درج الكاشير' };
+function uiPickBox(title, allowed) {
+    const list = allowed.map((k, i) => `${i + 1}. ${UI_BOX_NAMES[k]}`).join('\n');
+    const pick = prompt(title + '\n' + list, '1');
+    if (pick === null) return null;
+    const key = allowed[parseInt(pick, 10) - 1];
+    if (!key) { showToast('اختيار غير صحيح', 'error'); return null; }
+    return key;
+}
+
+function uiAskAmount(title, defaultValue = '') {
+    const v = prompt(title, defaultValue);
+    if (v === null) return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) { showToast('المبلغ غير صحيح', 'error'); return null; }
+    return round2(n);
 }

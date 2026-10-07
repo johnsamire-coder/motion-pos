@@ -22,13 +22,14 @@ async function loadChartOfAccountsData() {
         return;
     }
     accountingState.accounts = data || [];
-    populateSelectOptions(
-        'exp-account-select',
-        accountingState.accounts.filter(account => account.account_type === 'expense'),
-        'اختر حساب المصروف',
-        'لا توجد حسابات مصروفات',
-        account => `${account.code} - ${account.name_ar}`
-    );
+    // المصروف بيتسجل على بنود المصروفات (كل بند مربوط بحساب) من خلال السيرفر
+    try {
+        const res = await serverRpc('expense_categories_secure', { p_data: null });
+        accountingState.categories = (res && res.ok && res.categories) ? res.categories.filter(c => c.is_active) : [];
+    } catch (err) {
+        accountingState.categories = [];
+    }
+    populateSelectOptions('exp-account-select', accountingState.categories, 'اختر بند المصروف', 'لا توجد بنود مصروفات', c => c.name);
 }
 
 // 1. عرض دليل الحسابات الشجري (Chart of Accounts Tree)
@@ -63,40 +64,25 @@ async function loadChartOfAccountsTree() {
     `).join('');
 }
 
-// 2. تسجيل مصروف تشغيلي جديد (Record Expense)
+// 2. تسجيل مصروف (على السيرفر: نفس قواعد شاشة المصروفات، الحد للمدير وفوقه رقم المالك)
 async function submitExpenseAction() {
-    const accId = document.getElementById('exp-account-select')?.value;
+    const catId = document.getElementById('exp-account-select')?.value;
     const amount = parseFloat(document.getElementById('exp-amount-input')?.value);
     const method = document.getElementById('exp-method-select')?.value || 'cash';
     const desc = document.getElementById('exp-desc-input')?.value;
 
-    if (!accId || !amount || amount <= 0 || !desc) {
+    if (!catId || !amount || amount <= 0 || !desc) {
         showToast('يرجى ملء جميع بيانات المصروف والمبلغ بشكل صحيح', 'error');
         return;
     }
-
-    try {
-        const { data, error } = await _supabase.rpc('record_expense', {
-            p_company_id: currentUser?.company_id || 'c0000000-0000-0000-0000-000000000000',
-            p_branch_id: currentUser?.branch_id || null,
-            p_expense_account_id: accId,
-            p_amount: amount,
-            p_payment_method: method,
-            p_description: desc,
-            p_reference_number: null,
-            p_vendor_name: null,
-            p_user_id: currentUser ? currentUser.id : null
-        });
-
-        if (error) throw error;
-
-        showToast('تم تسجيل المصروف وترحيل القيد المزدوج لـ GL بنجاح ✅');
+    const res = await uiCall('expense_record_secure', {
+        p_category_id: catId, p_amount: round2(amount), p_source: method === 'card' ? 'bank' : 'main_cash',
+        p_description: desc, p_reference: '', p_vendor: '', p_recurring_id: null, p_owner_pin: null
+    }, 'تم تسجيل المصروف وترحيل القيد ✅', 'p_owner_pin');
+    if (res) {
         document.getElementById('exp-amount-input').value = '';
         document.getElementById('exp-desc-input').value = '';
         loadTrialBalanceReportUI();
-
-    } catch (err) {
-        showToast('خطأ في تسجيل المصروف: ' + err.message, 'error');
     }
 }
 
@@ -106,11 +92,14 @@ async function loadTrialBalanceReportUI() {
         const endDate = new Date().toISOString().split('T')[0];
         const startDate = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
 
-        const { data, error } = await _supabase.rpc('get_trial_balance', {
-            p_company_id: 'c0000000-0000-0000-0000-000000000000',
-            p_start_date: startDate,
-            p_end_date: endDate
-        });
+        let data = null;
+        let error = null;
+        try {
+            const res = await serverRpc('trial_balance_secure', { p_from: startDate, p_to: endDate });
+            if (res && res.ok) data = res.rows; else error = { message: serverReasonMessage(res) };
+        } catch (err) {
+            error = err;
+        }
 
         const tbody = document.getElementById('acc-tb-tbody');
         if (!tbody) return;

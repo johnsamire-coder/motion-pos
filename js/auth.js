@@ -81,6 +81,7 @@ async function loginWithPin() {
         showToast(`أهلا بك ${currentUser.name}`);
         clearPin();
 
+        if (typeof applyTabPermissions === 'function') await applyTabPermissions();
         if (typeof initPOSModule === 'function') initPOSModule();
 
     } catch (err) {
@@ -124,6 +125,7 @@ function logout() {
         posState.discounts = [];
     }
     if (typeof kdsOrders !== 'undefined') kdsOrders = [];
+    document.querySelectorAll('.main-tab-btn').forEach(btn => btn.classList.remove('hidden'));
     ['pin-auth-modal', 'payments-modal', 'split-modal', 'modifiers-modal'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');
     });

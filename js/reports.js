@@ -61,10 +61,15 @@ async function loadCostAnalysis() {
 
 async function loadWasteReport() {
     try {
-        const { data, error } = await _supabase
-            .from('waste_logs')
-            .select('*, ingredients(name, unit)')
-            .order('created_at', { ascending: false });
+        let data = null;
+        let error = null;
+        try {
+            const res = await serverRpc('waste_report_secure');
+            if (res && res.ok) data = (res.rows || []).map(r => ({ ...r, ingredients: { name: r.ingredient, unit: r.unit } }));
+            else error = res;
+        } catch (err) {
+            error = err;
+        }
 
         const tbody = document.getElementById('waste-report-body');
         if (!tbody) return;

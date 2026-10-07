@@ -1,132 +1,218 @@
-// js/purchasing.js - موديول المشتريات وفواتير الموردين - Motion POS
+// js/purchasing.js - المشتريات والموردين: أوامر الشراء، الاستلام، فواتير الموردين، السداد، تاريخ الأسعار
 
-async function loadPurchaseOptions() {
-    try {
-        const [suppliersRes, warehousesRes, ingredientsRes] = await Promise.all([
-            _supabase.from('suppliers').select('id, name').order('name'),
-            _supabase.from('warehouses').select('id, name').order('name'),
-            _supabase.from('ingredients').select('id, name, unit').order('name')
-        ]);
-        if (suppliersRes.error) throw suppliersRes.error;
-        if (warehousesRes.error) throw warehousesRes.error;
-        if (ingredientsRes.error) throw ingredientsRes.error;
+let purState = { tab: 'orders', suppliers: [], warehouses: [], ingredients: [], lines: [] };
+function setPurchasingTab(tab) { purState.tab = tab; renderPurchasingBody(); }
 
-        populateSelectOptions('purchase-supplier', suppliersRes.data, 'اختر المورد', 'لا يوجد موردون مسجلون');
-        populateSelectOptions('purchase-warehouse', warehousesRes.data, 'اختر المخزن', 'لا توجد مخازن مسجلة');
-        populateSelectOptions('purchase-ingredient', ingredientsRes.data, 'اختر الخامة', 'لا توجد خامات مسجلة', item => item.unit ? `${item.name} (${item.unit})` : item.name);
-        return true;
-    } catch (err) {
-        console.error('Purchase options error:', err);
-        showToast('تعذر تحميل قوائم المشتريات: ' + (err.message || 'خطأ غير معروف'), 'error');
-        return false;
-    }
+async function loadPurchasingScreen() {
+    const root = document.getElementById('purchase-root');
+    if (!root) return;
+    const [sup, wh, ing] = await Promise.all([
+        uiCall('suppliers_secure', { p_data: null }),
+        uiCall('inv_warehouses_secure', {}),
+        _supabase.from('ingredients').select('id, name, unit').order('name')
+    ]);
+    purState.suppliers = (sup && sup.suppliers) || [];
+    purState.warehouses = ((wh && wh.warehouses) || []).filter(w => w.mine);
+    purState.ingredients = ing.data || [];
+    renderPurchasingBody();
 }
 
-async function submitPurchaseInvoice() {
-    const supplierId = document.getElementById('purchase-supplier')?.value;
-    const warehouseId = document.getElementById('purchase-warehouse')?.value;
-    const ingredientId = document.getElementById('purchase-ingredient')?.value;
-    const qty = parseFloat(document.getElementById('purchase-qty')?.value);
-    const price = parseFloat(document.getElementById('purchase-unit-price')?.value);
-
-    if (!supplierId || !warehouseId || !ingredientId) {
-        showToast('اختر المورد والمخزن والخامة أولًا', 'error');
-        return;
-    }
-    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) {
-        showToast('أدخل الكمية وسعر الوحدة بشكل صحيح', 'error');
-        return;
-    }
-
-    const totalPrice = qty * price;
-
-    try {
-        // 1. إنشاء رأس الفاتورة
-        const { data: po, error: poErr } = await _supabase
-            .from('purchase_orders')
-            .insert([{
-                supplier_id: supplierId,
-                warehouse_id: warehouseId,
-                total_amount: totalPrice,
-                status: 'received'
-            }])
-            .select()
-            .single();
-
-        if (poErr) {
-            showToast('خطأ في إيقاع الفاتورة: ' + poErr.message, 'error');
-            return;
-        }
-
-        // 2. إدخال عنصر الفاتورة
-        const { error: itemError } = await _supabase.from('purchase_order_items').insert([{
-            purchase_order_id: po.id,
-            ingredient_id: ingredientId,
-            quantity: qty,
-            unit_price: price,
-            total_price: totalPrice
-        }]);
-        if (itemError) throw itemError;
-
-        // 3. زيادة الكمية وتحديث التكلفة من خلال الدالة
-        const { error: processError } = await _supabase.rpc('process_purchase_item', {
-            p_warehouse_id: warehouseId,
-            p_ingredient_id: ingredientId,
-            p_quantity: qty,
-            p_unit_price: price
-        });
-        if (processError) throw processError;
-
-        showToast('تم استلام الشحنة وتحديث المخزون وسعر التكلفة بنجاح');
-        document.getElementById('purchase-qty').value = '';
-        document.getElementById('purchase-unit-price').value = '';
-
-        loadPurchaseHistory();
-        if (typeof loadInventoryStock === 'function') loadInventoryStock();
-
-    } catch (err) {
-        console.error('Purchase error:', err);
-        showToast('لم تكتمل عملية حفظ الفاتورة والمخزون: ' + (err.message || 'خطأ غير معروف'), 'error');
-    }
+function renderPurchasingBody() {
+    const root = document.getElementById('purchase-root');
+    if (!root) return;
+    root.innerHTML = uiTabs('pur', [['orders', 'أوامر الشراء'], ['new', 'أمر شراء جديد'], ['suppliers', 'الموردين'], ['prices', 'تاريخ الأسعار']],
+        purState.tab, 'setPurchasingTab') + '<div id="pur-body"></div>';
+    ({ orders: purRenderOrders, new: purRenderNew, suppliers: purRenderSuppliers, prices: purRenderPrices }[purState.tab] || purRenderOrders)();
 }
 
-async function loadPurchaseHistory() {
-    try {
-        const { data, error } = await _supabase
-            .from('purchase_order_items')
-            .select('*, purchase_orders(created_at, suppliers(name)), ingredients(name, unit)')
-            .order('id', { ascending: false });
+const PUR_STATUS = { draft: 'مسودة', approved: 'موافَق عليه', partially_received: 'استلام جزئي', fully_received: 'اتستلم كله', closed: 'مقفول', cancelled: 'ملغي' };
 
-        const tbody = document.getElementById('purchase-history-body');
-        if (!tbody) return;
+async function purRenderOrders() {
+    const res = await uiCall('po_list_secure', {});
+    if (!res) return;
+    document.getElementById('pur-body').innerHTML = uiCard('أوامر الشراء (آخر 180 يوم)', uiTable(res.orders, [
+        { label: 'الرقم', key: 'po_number' }, { label: 'التاريخ', render: o => uiEsc(uiDate(o.created_at)) },
+        { label: 'المورد', key: 'supplier' }, { label: 'المخزن', key: 'warehouse' },
+        { label: 'الحالة', render: o => uiEsc(PUR_STATUS[o.status] || o.status) },
+        { label: 'الإجمالي', render: o => formatCurrency(o.total) },
+        { label: 'المستلم', render: o => formatCurrency(o.received_value) },
+        { label: 'بفاتورة', render: o => formatCurrency(o.invoiced_value) },
+        { label: 'الخامات', render: o => (o.lines || []).map(l => `${uiEsc(l.ingredient)}: ${uiEsc(Number(l.qty_received))}/${uiEsc(Number(l.quantity))}`).join('<br>') },
+        { label: '', render: o => purOrderButtons(o) }], 'مفيش أوامر شراء'));
+    purState.orders = res.orders || [];
+}
 
-        if (error) {
-            console.error('Purchase history query error:', error);
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500 font-bold">تعذر تحميل سجل المشتريات: ${error.message}</td></tr>`;
-            showToast('تعذر تحميل سجل المشتريات: ' + error.message, 'error');
-            return;
-        }
-        if (!data || data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-slate-400 font-bold">لا توجد فواتير مشتريات مسجلة</td></tr>`;
-            return;
-        }
+function purOrderButtons(o) {
+    const b = [];
+    if (o.status === 'draft') b.push(uiBtn('موافقة', `purAction('${o.id}','approve')`, 'green'));
+    if (o.status === 'approved' || o.status === 'partially_received') b.push(uiBtn('استلام', `purReceive('${o.id}')`, 'blue'));
+    if (['partially_received', 'fully_received', 'closed'].includes(o.status) && Number(o.received_value) > Number(o.invoiced_value)) b.push(uiBtn('فاتورة المورد', `purInvoice('${o.id}')`, 'amber'));
+    if (o.status === 'partially_received' || o.status === 'fully_received') b.push(uiBtn('قفل', `purAction('${o.id}','close')`, 'gray'));
+    if (o.status === 'draft' || o.status === 'approved') b.push(uiBtn('إلغاء', `purAction('${o.id}','cancel')`, 'gray'));
+    return '<div class="flex flex-wrap gap-1">' + b.join('') + '</div>';
+}
 
-        tbody.innerHTML = data.map(item => {
-            const date = item.purchase_orders?.created_at ? new Date(item.purchase_orders.created_at).toLocaleDateString('ar-EG') : '-';
-            const supplierName = item.purchase_orders?.suppliers?.name || 'مورد عام';
-            return `
-                <tr class="border-b border-slate-100 text-xs font-bold hover:bg-slate-50">
-                    <td class="p-3 text-slate-500">${date}</td>
-                    <td class="p-3 text-slate-800 font-extrabold">${supplierName}</td>
-                    <td class="p-3 text-slate-700">${item.ingredients ? item.ingredients.name : ''}</td>
-                    <td class="p-3 text-center text-blue-600">${item.quantity} ${item.ingredients ? item.ingredients.unit : ''}</td>
-                    <td class="p-3">${formatCurrency(item.unit_price)}</td>
-                    <td class="p-3 font-extrabold text-emerald-600">${formatCurrency(item.total_price)}</td>
-                </tr>
-            `;
-        }).join('');
-
-    } catch (err) {
-        console.error('Purchase history error:', err);
+async function purAction(id, action) {
+    let pin = null;
+    if (action === 'approve') {
+        pin = await uiAskPin('الموافقة على أمر الشراء محتاجة رقم المدير:');
+        if (!pin) return;
+    } else if (!confirm(action === 'cancel' ? 'إلغاء أمر الشراء؟' : 'قفل أمر الشراء؟ (الباقي مش هيتستلم)')) {
+        return;
     }
+    if (await uiCall('po_action_secure', { p_po_id: id, p_action: action, p_manager_pin: pin ? String(pin).trim() : null }, 'تم')) purRenderOrders();
+}
+
+async function purReceive(id) {
+    const o = (purState.orders || []).find(x => x.id === id);
+    if (!o) return;
+    const lines = [];
+    for (const l of (o.lines || [])) {
+        const remaining = Number(l.quantity) - Number(l.qty_received);
+        if (remaining <= 0) continue;
+        const q = prompt(`${l.ingredient} (${l.unit}): المطلوب الباقي ${remaining}. اتستلم كام؟`, String(remaining));
+        if (q === null) return;
+        const qty = Number(q);
+        if (!Number.isFinite(qty) || qty < 0 || qty > remaining) return showToast('الكمية غير صحيحة', 'error');
+        if (qty === 0) continue;
+        const c = prompt(`${l.ingredient}: سعر الوحدة الفعلي؟`, String(Number(l.unit_price)));
+        if (c === null) return;
+        const cost = Number(c);
+        if (!Number.isFinite(cost) || cost < 0) return showToast('السعر غير صحيح', 'error');
+        lines.push({ po_item_id: l.id, qty, unit_cost: cost });
+    }
+    if (!lines.length) return showToast('مفيش كميات اتستلمت', 'error');
+    const notes = prompt('ملاحظات الاستلام (اختياري):', '') || '';
+    const res = await uiCall('po_receive_secure', { p_po_id: id, p_lines: lines, p_notes: notes });
+    if (res) { showToast(`تم الاستلام ${res.grn_number} بقيمة ${formatCurrency(res.value)}`); purRenderOrders(); }
+}
+
+async function purInvoice(id) {
+    const o = (purState.orders || []).find(x => x.id === id);
+    if (!o) return;
+    const uninvoiced = round2(Number(o.received_value) - Number(o.invoiced_value));
+    const num = prompt(`رقم فاتورة المورد (المستلم من غير فاتورة: ${formatCurrency(uninvoiced)}):`);
+    if (!num) return;
+    const amount = uiAskAmount('قيمة الفاتورة من غير الضريبة:', String(uninvoiced));
+    if (amount === null) return;
+    const tax = uiAskAmount('ضريبة القيمة المضافة على الفاتورة (صفر لو مفيش):', String(round2(amount * 0.14)));
+    if (tax === null) return;
+    const res = await uiCall('supplier_invoice_secure', { p_po_id: id, p_invoice_number: num, p_invoice_date: uiToday(), p_amount: amount, p_tax_amount: tax });
+    if (!res) return;
+    if (res.matched) showToast('تم تسجيل الفاتورة، ومطابقة للاستلام ✅');
+    else showToast(`تم تسجيل الفاتورة، بس مش مطابقة: فرق ${formatCurrency(res.difference)} عن قيمة الاستلام ${formatCurrency(res.received_value)}`, 'error');
+    purRenderOrders();
+}
+
+function purRenderNew() {
+    document.getElementById('pur-body').innerHTML = uiCard('أمر شراء جديد', `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+            <select id="pur-new-sup" class="${uiInputClass()}">${uiOptions(purState.suppliers.filter(s => s.is_active !== false), 'id', s => s.name, 'اختار المورد')}</select>
+            <select id="pur-new-wh" class="${uiInputClass()}">${uiOptions(purState.warehouses, 'id', w => w.name, 'اختار المخزن')}</select>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-2">
+            <select id="pur-new-ing" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
+            <input id="pur-new-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()} w-28">
+            <input id="pur-new-price" type="number" min="0" step="0.0001" placeholder="سعر الوحدة" class="${uiInputClass()} w-28">
+            ${uiBtn('إضافة', 'purAddLine()', 'gray')}
+        </div>
+        <div id="pur-new-lines"></div>
+        <input id="pur-new-notes" type="text" placeholder="ملاحظات" class="${uiInputClass()} w-full mt-2">
+        <div class="mt-3">${uiBtn('حفظ كمسودة', 'purSubmitNew()', 'blue')}</div>`);
+    purRenderLines();
+}
+
+function purAddLine() {
+    const ing = document.getElementById('pur-new-ing').value;
+    const qty = Number(document.getElementById('pur-new-qty').value);
+    const price = Number(document.getElementById('pur-new-price').value);
+    if (!ing || !(qty > 0) || !(price >= 0) || document.getElementById('pur-new-price').value === '') return showToast('اختار الخامة واكتب الكمية والسعر', 'error');
+    if (purState.lines.some(l => l.ingredient_id === ing)) return showToast('الخامة موجودة بالفعل', 'error');
+    purState.lines.push({ ingredient_id: ing, qty, unit_price: price });
+    purRenderLines();
+}
+
+function purRemoveLine(idx) { purState.lines.splice(idx, 1); purRenderLines(); }
+
+function purRenderLines() {
+    const box = document.getElementById('pur-new-lines');
+    if (!box) return;
+    const names = Object.fromEntries(purState.ingredients.map(i => [i.id, `${i.name} (${i.unit})`]));
+    const total = purState.lines.reduce((s, l) => s + l.qty * l.unit_price, 0);
+    box.innerHTML = purState.lines.length ? uiTable(purState.lines.map((l, idx) => ({ ...l, idx })), [
+        { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', key: 'qty' },
+        { label: 'السعر', render: l => formatCurrency(l.unit_price) }, { label: 'الإجمالي', render: l => formatCurrency(l.qty * l.unit_price) },
+        { label: '', render: l => uiBtn('شيل', `purRemoveLine(${l.idx})`, 'gray') }]) + `<p class="text-xs font-black mt-2">الإجمالي: ${formatCurrency(total)}</p>` : '';
+}
+
+async function purSubmitNew() {
+    const sup = document.getElementById('pur-new-sup').value;
+    const wh = document.getElementById('pur-new-wh').value;
+    if (!sup || !wh || !purState.lines.length) return showToast('اختار المورد والمخزن وضيف خامة واحدة على الأقل', 'error');
+    const res = await uiCall('po_create_secure', { p_supplier_id: sup, p_warehouse_id: wh, p_lines: purState.lines,
+        p_notes: document.getElementById('pur-new-notes').value });
+    if (res) { showToast(`تم حفظ أمر الشراء ${res.po_number}. محتاج موافقة المدير.`); purState.lines = []; setPurchasingTab('orders'); }
+}
+
+function purRenderSuppliers() {
+    document.getElementById('pur-body').innerHTML = uiCard('الموردين', uiTable(purState.suppliers, [
+        { label: 'الاسم', key: 'name' }, { label: 'التليفون', key: 'phone' }, { label: 'الشركة', key: 'company_name' },
+        { label: 'الرصيد (مستحق له)', render: s => `<b class="${Number(s.balance) > 0 ? 'text-red-600' : ''}">${formatCurrency(s.balance)}</b>` },
+        { label: 'الحالة', render: s => s.is_active === false ? 'موقوف' : 'شغال' },
+        { label: '', render: s => '<div class="flex flex-wrap gap-1">' + uiBtn('كشف حساب', `purStatement('${s.id}')`, 'gray')
+            + uiBtn('سداد', `purPay('${s.id}')`, 'green') + uiBtn('تعديل', `purEditSupplier('${s.id}')`, 'gray') + '</div>' }], 'مفيش موردين'),
+        uiBtn('إضافة مورد', 'purEditSupplier(null)', 'blue')) + '<div id="pur-statement"></div>';
+}
+
+async function purEditSupplier(id) {
+    const s = id ? purState.suppliers.find(x => x.id === id) : {};
+    const name = prompt('اسم المورد:', s.name || '');
+    if (!name) return;
+    const phone = prompt('التليفون:', s.phone || '') ?? '';
+    const company = prompt('اسم الشركة (اختياري):', s.company_name || '') ?? '';
+    const tax = prompt('الرقم الضريبي (اختياري):', s.tax_number || '') ?? '';
+    const active = id ? confirm('المورد شغال؟ (إلغاء = إيقافه)') : true;
+    const res = await uiCall('suppliers_secure', { p_data: { id: id || null, name, phone, company_name: company, tax_number: tax, is_active: String(active) } }, 'تم الحفظ');
+    if (res) { purState.suppliers = res.suppliers || []; purRenderSuppliers(); }
+}
+
+async function purStatement(id) {
+    const res = await uiCall('supplier_statement_secure', { p_supplier_id: id });
+    const s = purState.suppliers.find(x => x.id === id) || {};
+    const names = { invoice: 'فاتورة', payment: 'سداد', adjustment: 'تسوية' };
+    if (res) document.getElementById('pur-statement').innerHTML = uiCard(`كشف حساب ${s.name || ''}`, uiTable(res.entries, [
+        { label: 'التاريخ', render: e => uiEsc(uiDate(e.at)) }, { label: 'النوع', render: e => uiEsc(names[e.type] || e.type) },
+        { label: 'المبلغ', render: e => formatCurrency(e.amount) }, { label: 'الرصيد بعدها', render: e => formatCurrency(e.balance_after) },
+        { label: 'المرجع', key: 'reference' }], 'مفيش حركات'));
+}
+
+async function purPay(id) {
+    const s = purState.suppliers.find(x => x.id === id) || {};
+    const amount = uiAskAmount(`سداد للمورد ${s.name} (المستحق ${formatCurrency(s.balance)}). المبلغ:`, String(Math.max(0, Number(s.balance) || 0)));
+    if (!amount) return;
+    const source = uiPickBox('الفلوس طالعة منين؟', ['main_cash', 'bank', 'drawer']);
+    if (!source) return;
+    const ref = prompt('رقم الإيصال أو التحويل (اختياري):', '') || '';
+    const res = await uiCall('supplier_payment_secure', { p_supplier_id: id, p_amount: amount, p_source: source, p_reference: ref, p_notes: 'سداد مورد', p_owner_pin: null },
+        'تم السداد', 'p_owner_pin');
+    if (res) loadPurchasingScreen();
+}
+
+function purRenderPrices() {
+    document.getElementById('pur-body').innerHTML = uiCard('تاريخ أسعار خامة', `
+        <div class="flex gap-2 mb-3"><select id="pur-price-ing" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
+        ${uiBtn('عرض', 'purLoadPrices()', 'gray')}</div><div id="pur-price-table"></div>`);
+}
+
+async function purLoadPrices() {
+    const ing = document.getElementById('pur-price-ing').value;
+    if (!ing) return;
+    const res = await uiCall('price_history_secure', { p_ingredient_id: ing });
+    if (!res) return;
+    document.getElementById('pur-price-table').innerHTML =
+        '<h4 class="font-black text-xs mb-1">السعر الحالي عند كل مورد</h4>'
+        + uiTable(res.current, [{ label: 'المورد', key: 'supplier' }, { label: 'السعر', render: x => formatCurrency(x.unit_price) }], 'مفيش')
+        + '<h4 class="font-black text-xs mt-3 mb-1">كل الاستلامات</h4>'
+        + uiTable(res.history, [{ label: 'التاريخ', render: x => uiEsc(uiDate(x.at)) }, { label: 'المورد', key: 'supplier' },
+            { label: 'الكمية', key: 'qty' }, { label: 'سعر الوحدة', render: x => formatCurrency(x.unit_cost) }, { label: 'الاستلام', key: 'grn' }], 'مفيش');
 }
