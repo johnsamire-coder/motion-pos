@@ -144,6 +144,7 @@ async function renderTablesForArea() {
 
 function renderPOSTerminal() {
     renderAreaAndTables(); renderCategoriesPills(); renderProductsGrid(); renderWaitersAndCustomersDropdowns(); renderOrderCartTicket();
+    refreshTypeButtons();
 }
 
 function renderAreaAndTables() {
@@ -191,6 +192,23 @@ function refreshTypeButtons() {
     });
     const activeTypeButton = document.getElementById('type-' + posState.selectedOrderType);
     if (activeTypeButton) activeTypeButton.className = "type-btn px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow";
+    // أنواع الطلبات المقفولة من الإعدادات بتستخبى
+    const enabled = (typeof appSet === 'function') ? appSet('pos', 'order_types', null) : null;
+    if (Array.isArray(enabled)) {
+        ['dine_in', 'takeaway', 'delivery', 'pickup'].forEach(t => {
+            const b = document.getElementById('type-' + t);
+            if (b) b.classList.toggle('hidden', !enabled.includes(t) && t !== posState.selectedOrderType);
+        });
+    }
+}
+
+// طباعة الحساب قبل الدفع (الويتر والكاشير)
+async function printCurrentBill() {
+    if (posState.cart.items.length === 0) return showToast('الفاتورة فارغة!', 'error');
+    if (!posState.cart.id || hasUnsentItems()) {
+        if (!(await sendOrderToKitchen())) return;
+    }
+    if (typeof printOrderReceipt === 'function') printOrderReceipt(posState.cart.id);
 }
 
 // تحميل طلب محفوظ من السيرفر للفاتورة اللي على الشاشة
@@ -523,6 +541,10 @@ async function sendOrderToKitchen() {
         showToast('الفاتورة فارغة!', 'error');
         return false;
     }
+    if (typeof appSet === 'function' && appSet('pos', 'require_waiter', false) && !(document.getElementById('select-waiter')?.value)) {
+        showToast('لازم تختار الويتر الأول (من الإعدادات)', 'error');
+        return false;
+    }
     orderSubmissionInProgress = true;
     const waiterId = document.getElementById('select-waiter')?.value || null;
     const customerId = document.getElementById('select-customer')?.value || null;
@@ -569,6 +591,9 @@ async function sendOrderToKitchen() {
             renderAreaAndTables();
         }
         showToast(unsent.length ? '🚀 تم الإرسال للمطبخ!' : 'تم حفظ بيانات الطلب');
+        if (unsent.length && posState.cart.id && typeof printKitchenTickets === 'function' && appSet('receipt', 'auto_kitchen_ticket', false)) {
+            printKitchenTickets(posState.cart.id);
+        }
         renderOrderCartTicket();
         return true;
     } catch (err) {
@@ -630,7 +655,9 @@ function renderPaymentLines() {
     if (remainingEl) remainingEl.innerText = formatCurrency(remaining);
     if (collectedEl) collectedEl.innerText = formatCurrency(totalCollected);
 
-    const methods = [['cash', 'نقدي (Cash)'], ['card', 'بطاقة (Card)'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'على الحساب (آجل)']];
+    const enabledMethods = (typeof appSet === 'function') ? appSet('pos', 'payment_methods', null) : null;
+    const methods = [['cash', 'نقدي (Cash)'], ['card', 'بطاقة (Card)'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'على الحساب (آجل)']]
+        .filter(([value]) => !Array.isArray(enabledMethods) || enabledMethods.includes(value) || posState.paymentsList.some(p => p.method === value));
     container.innerHTML = posState.paymentsList.map((p, idx) => `
         <div class="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-200 mb-2">
             <select onchange="updatePaymentMethod(${idx}, this.value)" class="bg-white border text-xs font-bold p-2 rounded-lg flex-1">
@@ -706,9 +733,11 @@ async function confirmMultiplePaymentsAndClose() {
             return showToast(message, 'error');
         }
 
+        const closedOrderId = posState.cart.id;
         closeMultiplePaymentsModal();
         resetActiveCart();
         posState.selectedTable = null;
+        if (typeof printOrderReceipt === 'function' && appSet('receipt', 'auto_print_after_pay', false)) printOrderReceipt(closedOrderId);
         if (currentBranch && currentBranch.has_tables) await fetchBranchTables();
         renderAreaAndTables();
         renderOrderCartTicket();

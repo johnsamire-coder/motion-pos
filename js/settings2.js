@@ -1,0 +1,308 @@
+// js/settings2.js - باقي الإعدادات: الشركة واللوجو، الطباعة، الكاشير، المطبخ والأماكن، الويتر والـ QR،
+// الوردية والمخازن والموظفين، الشغل من غير نت، الوصفات والخامات، القوايم، طرق الدفع والضرايب.
+// الأقسام دي بتتضاف جنب أقسام الإعدادات القديمة (الضرائب والطاولات، الفروع والمخازن، المنيو).
+
+const SET2_SECTIONS = [['general', 'الشركة واللوجو'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
+    ['qr', 'الويتر والـ QR'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'],
+    ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب']];
+
+let set2 = { settings: null, data: null, recipeProduct: '', recipeLines: [], products: [] };
+
+const _origInitSettingsModule = initSettingsModule;
+initSettingsModule = async function () {
+    await _origInitSettingsModule();
+    await initSettings2();
+};
+
+function set2Inject() {
+    const aside = document.querySelector('#view-settings-workspace aside');
+    const content = document.querySelector('#view-settings-workspace .lg\\:col-span-3');
+    if (!aside || !content || document.getElementById('btn-set-general')) return;
+    SET2_SECTIONS.forEach(([k, label]) => {
+        const b = document.createElement('button');
+        b.id = 'btn-set-' + k;
+        b.className = 'set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2';
+        b.textContent = label;
+        b.onclick = () => switchSettingsSection(k);
+        aside.appendChild(b);
+        const d = document.createElement('div');
+        d.id = 'set-section-' + k;
+        d.className = 'set-section hidden space-y-4';
+        content.appendChild(d);
+    });
+}
+
+async function initSettings2() {
+    set2Inject();
+    const [a, b, p] = await Promise.all([uiCall('app_settings_get_secure', {}), uiCall('settings2_secure', { p_action: 'get', p_data: null }),
+        _supabase.from('products').select('id, name, price').order('name')]);
+    if (!a || !b) return;
+    set2.settings = a.settings;
+    set2.data = b;
+    set2.products = p.data || [];
+    appSettings = a.settings;
+    set2RenderAll();
+}
+
+function set2RenderAll() {
+    set2Form('general', 'الشركة', [['company_name', 'اسم الشركة', 'text'], ['address', 'العنوان', 'text'], ['phone', 'التليفون', 'text'],
+        ['tax_number', 'الرقم الضريبي', 'text'], ['commercial_register', 'السجل التجاري', 'text'], ['currency', 'العملة', 'text']],
+        `<div class="mt-3 border-t pt-3"><p class="text-xs font-black mb-2">اللوجو (بيظهر في الشاشة والفاتورة والتقارير والمنيو)</p>
+         <div class="flex flex-wrap items-center gap-3"><div id="set2-logo-preview">${set2.settings.general.logo ? `<img src="${uiEsc(set2.settings.general.logo)}" class="h-16 max-w-[160px] object-contain border rounded-xl p-1">` : '<span class="text-xs text-slate-400">مفيش لوجو</span>'}</div>
+         <input type="file" accept="image/png,image/jpeg,image/webp" onchange="set2PickLogo(this)" class="text-xs">
+         ${set2.settings.general.logo ? uiBtn('شيل اللوجو', "set2Save('general', { logo: '' })", 'gray') : ''}</div></div>`, 'الإعدادات العامة للمالك بس');
+    set2Form('receipt', 'الطباعة والفاتورة', [['header', 'سطر فوق الفاتورة', 'text'], ['footer', 'سطر تحت الفاتورة (رسالة شكر)', 'text'],
+        ['show_logo', 'اللوجو يظهر في الفاتورة', 'bool'], ['show_tax_number', 'الرقم الضريبي يظهر في الفاتورة', 'bool'],
+        ['paper_mm', 'مقاس الورق', 'select', [[58, '58 مم'], [80, '80 مم']]], ['copies', 'عدد النسخ', 'number'],
+        ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool'], ['auto_kitchen_ticket', 'طباعة ورقة المطبخ أوتوماتيك بعد الإرسال', 'bool']]);
+    set2Form('pos', 'إعدادات الكاشير', [['order_types', 'أنواع الطلبات المفعّلة', 'multi', [['dine_in', 'صالة'], ['takeaway', 'تيك أواي'], ['delivery', 'توصيل'], ['pickup', 'استلام']]],
+        ['payment_methods', 'طرق الدفع المفعّلة', 'multi', [['cash', 'كاش'], ['card', 'كارت'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'آجل']]],
+        ['require_waiter', 'لازم يتختار ويتر قبل الإرسال للمطبخ', 'bool']], '', '', 'poscfg');
+    set2Form('kds', 'شاشة التحضير', [['stations', 'الأماكن المفعّلة', 'multi', [['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']]],
+        ['warn_minutes', 'الكارت يحمر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number']],
+        `<div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
+         ${uiTable(set2.data.categories, [{ label: 'القسم', key: 'name' }, { label: 'المكان', render: c => `<select onchange="set2Station('${c.id}', this.value)" class="${uiInputClass()}">
+            ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
+    set2Form('waiter_qr', 'الويتر والـ QR', [['qr_enabled', 'منيو الـ QR شغال', 'bool'], ['qr_call_waiter', 'زرار نداء الويتر', 'bool'],
+        ['qr_request_bill', 'زرار طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في المنيو', 'bool']],
+        `<div class="mt-4 border-t pt-3">${uiBtn('طباعة أكواد الطاولات (QR)', 'set2PrintQr()', 'blue')}
+         <p class="text-[11px] text-slate-500 font-bold mt-2">كل طاولة ليها كود سري مختلف. اطبعهم وحط كل واحد على طاولته.</p></div>`, '', 'qr');
+    const work = document.getElementById('set-section-work');
+    if (work) {
+        work.innerHTML = '';
+        set2Form('shift', 'الوردية', [['default_float', 'العهدة (الفكة) الافتراضية عند فتح الوردية', 'number']], '', '', 'work', true);
+        set2Form('inventory', 'المخازن', [['default_min_stock', 'الحد الأدنى الافتراضي للخامة الجديدة', 'number']], '', '', 'work', true);
+        set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'ميعاد بداية الشغل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'سماح التأخير بالدقايق', 'number']], '', '', 'work', true);
+    }
+    set2Form('offline', 'الشغل من غير نت', [['mode', 'الطريقة', 'select', [['none', 'محتاج نت دايماً'], ['cashier', 'الكاشير بس يكمّل من غير نت'], ['branch', 'الفرع كله بجهاز سيرفر محلي']]],
+        ['local_server_url', 'عنوان السيرفر المحلي (لطريقة الفرع كله)', 'text']],
+        '<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ الاختيار بيتحفظ دلوقتي، والتشغيل الفعلي هيتعمل في المرحلة الجاية.</p>', 'للمالك بس');
+    set2RenderRecipes();
+    set2RenderLists();
+    set2RenderPayAcc();
+}
+
+// generic form for one settings section. fields: [key, label, type, options]
+function set2Form(section, title, fields, extraHtml = '', note = '', boxId = null, append = false) {
+    const box = document.getElementById('set-section-' + (boxId || section));
+    if (!box) return;
+    const vals = set2.settings[section] || {};
+    const inputs = fields.map(([k, label, type, opts]) => {
+        const v = vals[k];
+        let input;
+        if (type === 'bool') input = `<input type="checkbox" data-s2="${section}" data-k="${k}" data-t="bool" ${v ? 'checked' : ''} class="w-4 h-4">`;
+        else if (type === 'number') input = `<input type="number" data-s2="${section}" data-k="${k}" data-t="number" value="${uiEsc(v)}" class="${uiInputClass()} w-32">`;
+        else if (type === 'select') input = `<select data-s2="${section}" data-k="${k}" data-t="${typeof opts[0][0] === 'number' ? 'number' : 'text'}" class="${uiInputClass()}">${opts.map(([ov, ol]) => `<option value="${uiEsc(ov)}" ${String(v) === String(ov) ? 'selected' : ''}>${uiEsc(ol)}</option>`).join('')}</select>`;
+        else if (type === 'multi') input = `<div class="flex flex-wrap gap-3">${opts.map(([ov, ol]) => `<label class="flex items-center gap-1"><input type="checkbox" data-s2="${section}" data-k="${k}" data-t="multi" value="${uiEsc(ov)}" ${(v || []).includes(ov) ? 'checked' : ''}>${uiEsc(ol)}</label>`).join('')}</div>`;
+        else input = `<input type="text" data-s2="${section}" data-k="${k}" data-t="text" value="${uiEsc(v)}" class="${uiInputClass()} w-full">`;
+        return `<div class="flex flex-wrap items-center justify-between gap-2 py-2 border-b text-xs font-bold"><span>${uiEsc(label)}</span><div class="min-w-[200px] text-left">${input}</div></div>`;
+    }).join('');
+    const html = uiCard(title, `${note ? `<p class="text-[11px] text-slate-500 font-bold mb-2">${uiEsc(note)}</p>` : ''}${inputs}${extraHtml}`, uiBtn('حفظ', `set2SaveForm('${section}')`, 'green'));
+    if (append) box.insertAdjacentHTML('beforeend', html); else box.innerHTML = html;
+}
+
+async function set2SaveForm(section) {
+    const data = {};
+    document.querySelectorAll(`[data-s2="${section}"]`).forEach(el => {
+        const k = el.dataset.k;
+        if (el.dataset.t === 'bool') data[k] = el.checked;
+        else if (el.dataset.t === 'number') data[k] = Number(el.value) || 0;
+        else if (el.dataset.t === 'multi') { data[k] = data[k] || []; if (el.checked) data[k].push(el.value); }
+        else data[k] = el.value;
+    });
+    await set2Save(section, data);
+}
+
+async function set2Save(section, data) {
+    const res = await uiCall('app_settings_save_secure', { p_section: section, p_data: data }, 'تم الحفظ');
+    if (!res) return;
+    set2.settings = res.settings;
+    appSettings = res.settings;
+    if (section === 'general' && typeof loadAppSettings === 'function') loadAppSettings();
+    set2RenderAll();
+}
+
+function set2PickLogo(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            const max = 400;
+            const scale = Math.min(1, max / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const url = canvas.toDataURL('image/png');
+            if (url.length > 400000) return showToast('الصورة كبيرة جداً، اختار صورة أصغر', 'error');
+            set2Save('general', { logo: url });
+        };
+        img.onerror = () => showToast('الملف ده مش صورة', 'error');
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function set2Station(categoryId, station) {
+    await uiCall('settings2_secure', { p_action: 'set_category_station', p_data: { category_id: categoryId, station } }, 'تم');
+}
+
+async function set2PrintQr() {
+    const res = await uiCall('tables_qr_secure', {});
+    if (!res) return;
+    try { await loadScriptOnce('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'); }
+    catch (err) { return showToast(err.message, 'error'); }
+    const g = (appSettings && appSettings.general) || {};
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '') + 'menu.html?t=';
+    const cards = (res.tables || []).map(t => {
+        const qr = qrcode(0, 'M'); qr.addData(base + t.qr_token); qr.make();
+        return `<div class="card">${g.logo ? `<img class="logo" src="${uiEsc(g.logo)}">` : `<div class="co">${uiEsc(g.company_name || '')}</div>`}
+            <img class="qr" src="${qr.createDataURL(6, 2)}"><div class="t">طاولة ${uiEsc(t.table_number)}</div><div class="s">${uiEsc(t.area || '')} | امسح الكود للمنيو ونداء الويتر</div></div>`;
+    }).join('');
+    if (!cards) return showToast('مفيش طاولات في الفرع', 'error');
+    printHtml(`<div class="grid">${cards}</div>`, `@page { size: A4; margin: 10mm; } .grid { display: flex; flex-wrap: wrap; gap: 8mm; justify-content: center; }
+        .card { width: 60mm; border: 1px dashed #999; border-radius: 4mm; padding: 4mm; text-align: center; page-break-inside: avoid; }
+        .logo { max-height: 14mm; max-width: 40mm; } .co { font-weight: bold; font-size: 14px; } .qr { width: 45mm; height: 45mm; }
+        .t { font-size: 18px; font-weight: bold; } .s { font-size: 10px; color: #555; }`);
+}
+
+// ---------------------------------------------------------------- recipes and ingredients
+async function set2RenderRecipes() {
+    const box = document.getElementById('set-section-recipes');
+    if (!box) return;
+    const ings = set2.data.ingredients || [];
+    let recipeHtml = '';
+    if (set2.recipeProduct) {
+        const names = Object.fromEntries(ings.map(i => [i.id, i]));
+        const cost = set2.recipeLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(names[l.ingredient_id]?.cost_per_unit) || 0), 0);
+        const product = set2.products.find(p => p.id === set2.recipeProduct) || {};
+        recipeHtml = `${uiTable(set2.recipeLines.map((l, i) => ({ ...l, i })), [
+            { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id] ? `${names[l.ingredient_id].name} (${names[l.ingredient_id].unit})` : '') },
+            { label: 'الكمية', render: l => `<input type="number" min="0" step="any" value="${uiEsc(l.qty)}" onchange="set2.recipeLines[${l.i}].qty = this.value; set2RenderRecipes()" class="${uiInputClass()} w-28">` },
+            { label: 'التكلفة', render: l => formatCurrency((Number(l.qty) || 0) * (Number(names[l.ingredient_id]?.cost_per_unit) || 0)) },
+            { label: '', render: l => uiBtn('شيل', `set2.recipeLines.splice(${l.i},1); set2RenderRecipes()`, 'gray') }], 'الوصفة فاضية')}
+            <div class="flex flex-wrap gap-2 mt-2"><select id="set2-rec-ing" class="${uiInputClass()}">${uiOptions(ings, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
+            <input id="set2-rec-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()} w-28">${uiBtn('إضافة', 'set2RecipeAdd()', 'gray')}</div>
+            <p class="text-xs font-black mt-3">تكلفة الصنف: ${formatCurrency(cost)} من سعر ${formatCurrency(product.price)} (${product.price ? (100 * cost / product.price).toFixed(1) : 0}%)</p>
+            <div class="mt-2">${uiBtn('حفظ الوصفة', 'set2RecipeSave()', 'green')}</div>`;
+    }
+    box.innerHTML = uiCard('الوصفات (الريسبي)', `<div class="flex gap-2 mb-3"><select onchange="set2RecipeLoad(this.value)" class="${uiInputClass()}">
+        ${uiOptions(set2.products, 'id', p => p.name, 'اختار الصنف')}</select></div>${recipeHtml}`)
+        + uiCard('الخامات', uiTable(ings, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
+            { label: 'التكلفة (من المشتريات)', render: i => formatCurrency(i.cost_per_unit) }, { label: 'الحد الأدنى', key: 'min_stock_alert' },
+            { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'مفيش خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
+    const sel = box.querySelector('select');
+    if (sel) sel.value = set2.recipeProduct;
+}
+
+async function set2RecipeLoad(productId) {
+    set2.recipeProduct = productId;
+    set2.recipeLines = [];
+    if (productId) {
+        const res = await uiCall('settings2_secure', { p_action: 'get_recipe', p_data: { product_id: productId } });
+        set2.recipeLines = ((res && res.lines) || []).map(l => ({ ingredient_id: l.ingredient_id, qty: l.qty }));
+    }
+    set2RenderRecipes();
+}
+
+function set2RecipeAdd() {
+    const ing = document.getElementById('set2-rec-ing').value;
+    const qty = Number(document.getElementById('set2-rec-qty').value);
+    if (!ing || !(qty > 0)) return showToast('اختار الخامة واكتب الكمية', 'error');
+    const ex = set2.recipeLines.find(l => l.ingredient_id === ing);
+    if (ex) ex.qty = (Number(ex.qty) || 0) + qty; else set2.recipeLines.push({ ingredient_id: ing, qty });
+    set2RenderRecipes();
+}
+
+async function set2RecipeSave() {
+    const lines = set2.recipeLines.filter(l => Number(l.qty) > 0).map(l => ({ ingredient_id: l.ingredient_id, qty: Number(l.qty) }));
+    await uiCall('settings2_secure', { p_action: 'save_recipe', p_data: { product_id: set2.recipeProduct, lines } }, 'تم حفظ الوصفة');
+}
+
+async function set2EditIngredient(id) {
+    const i = id ? (set2.data.ingredients || []).find(x => x.id === id) : {};
+    const name = prompt('اسم الخامة:', i.name || '');
+    if (!name) return;
+    const unit = prompt('الوحدة (كيلو، جرام، لتر، علبة...):', i.unit || '');
+    if (!unit) return;
+    const min = uiAskAmount('الحد الأدنى للتنبيه:', String(i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5)));
+    if (min === null) return;
+    let cost = 0;
+    if (!id) { cost = uiAskAmount('تكلفة الوحدة المبدئية (بعد كده بتتحسب من المشتريات):', '0'); if (cost === null) return; }
+    if (await uiCall('settings2_secure', { p_action: 'save_ingredient', p_data: { id: id || null, name, unit, min_stock_alert: String(min), cost_per_unit: String(cost) } }, 'تم الحفظ')) initSettings2();
+}
+
+// ---------------------------------------------------------------- discounts, cancel reasons, areas
+function set2RenderLists() {
+    const box = document.getElementById('set-section-lists');
+    if (!box) return;
+    const typeNames = { void_item: 'إلغاء صنف', cancel_order: 'إلغاء طلب', return: 'مرتجع' };
+    box.innerHTML = uiCard('الخصومات', uiTable(set2.data.discounts, [{ label: 'الاسم', key: 'name' },
+        { label: 'القيمة', render: d => d.discount_type === 'percentage' ? `${uiEsc(d.value)}%` : formatCurrency(d.value) },
+        { label: 'محتاج موافقة المدير', render: d => d.requires_approval !== false ? 'نعم' : 'لا' },
+        { label: '', render: d => uiBtn('تعديل', `set2EditDiscount('${d.id}')`, 'gray') }], 'مفيش'), uiBtn('إضافة خصم', 'set2EditDiscount(null)', 'blue'))
+        + uiCard('أسباب الإلغاء والمرتجع', uiTable(set2.data.cancel_reasons, [{ label: 'السبب', key: 'reason' }, { label: 'النوع', render: r => uiEsc(typeNames[r.reason_type] || r.reason_type) },
+            { label: '', render: r => uiBtn('تعديل', `set2EditReason('${r.id}')`, 'gray') }], 'مفيش'), uiBtn('إضافة سبب', 'set2EditReason(null)', 'blue'))
+        + uiCard('مناطق الصالة', uiTable(set2.data.areas, [{ label: 'المنطقة', key: 'name' }], 'مفيش'), uiBtn('إضافة منطقة', 'set2AddArea()', 'blue'));
+}
+
+async function set2EditDiscount(id) {
+    const d = id ? set2.data.discounts.find(x => x.id === id) : {};
+    const name = prompt('اسم الخصم:', d.name || '');
+    if (!name) return;
+    const t = prompt('النوع:\n1. نسبة %\n2. مبلغ ثابت', d.discount_type === 'fixed' ? '2' : '1');
+    const type = t === '2' ? 'fixed' : (t === '1' ? 'percentage' : null);
+    if (!type) return;
+    const value = uiAskAmount(type === 'percentage' ? 'النسبة %:' : 'المبلغ:', String(d.value || ''));
+    if (!value) return;
+    const approval = confirm('الخصم ده محتاج موافقة المدير؟ (موافق = نعم)');
+    if (await uiCall('settings2_secure', { p_action: 'save_discount', p_data: { id: id || null, name, discount_type: type, value: String(value), requires_approval: String(approval) } }, 'تم الحفظ')) initSettings2();
+}
+
+async function set2EditReason(id) {
+    const r = id ? set2.data.cancel_reasons.find(x => x.id === id) : {};
+    const reason = prompt('السبب:', r.reason || '');
+    if (!reason) return;
+    const t = prompt('النوع:\n1. إلغاء صنف\n2. إلغاء طلب\n3. مرتجع', { void_item: '1', cancel_order: '2', return: '3' }[r.reason_type] || '1');
+    const type = { 1: 'void_item', 2: 'cancel_order', 3: 'return' }[t];
+    if (!type) return;
+    if (await uiCall('settings2_secure', { p_action: 'save_cancel_reason', p_data: { id: id || null, reason, reason_type: type } }, 'تم الحفظ')) initSettings2();
+}
+
+async function set2AddArea() {
+    const name = prompt('اسم المنطقة (مثلاً: الدور الأول، التراس):');
+    if (!name) return;
+    if (await uiCall('settings2_secure', { p_action: 'add_area', p_data: { name } }, 'تم الحفظ')) initSettings2();
+}
+
+// ---------------------------------------------------------------- payment accounts and tax flags
+function set2RenderPayAcc() {
+    const box = document.getElementById('set-section-payacc');
+    if (!box) return;
+    const names = { cash: 'كاش', card: 'كارت', instapay: 'إنستاباي', wallet: 'محفظة', on_account: 'آجل' };
+    const accOpts = set2.data.asset_accounts || [];
+    box.innerHTML = uiCard('ربط طرق الدفع بالحسابات (للمالك بس)', uiTable(set2.data.payment_accounts, [{ label: 'طريقة الدفع', render: p => uiEsc(names[p.method] || p.method) },
+        { label: 'الحساب', render: p => `<select onchange="set2PayAccount('${p.method}', this.value)" class="${uiInputClass()}">${accOpts.map(a => `<option value="${uiEsc(a.id)}" ${a.id === p.account_id ? 'selected' : ''}>${uiEsc(a.name)}</option>`).join('')}${p.account_id ? '' : '<option value="" selected>مش مربوط</option>'}</select>` }]))
+        + uiCard('الضرايب والخدمة لكل فرع', uiTable(set2.data.tax, [{ label: 'الفرع', key: 'branch' },
+            { label: 'الضريبة %', key: 'vat_percentage' }, { label: 'الخدمة %', key: 'service_charge_percentage' },
+            { label: 'الأسعار شاملة الضريبة', render: t => `<input type="checkbox" id="tx-inc-${uiEsc(t.branch_id)}" ${t.is_vat_inclusive ? 'checked' : ''}>` },
+            { label: 'الضريبة على الخدمة', render: t => `<input type="checkbox" id="tx-srv-${uiEsc(t.branch_id)}" ${t.is_service_taxable ? 'checked' : ''}>` },
+            { label: '', render: t => uiBtn('حفظ', `set2TaxFlags('${t.branch_id}')`, 'green') }]),
+            '<span class="text-[11px] text-slate-500 font-bold">النسب نفسها بتتعدل من "الضرائب والطاولات"</span>');
+}
+
+async function set2PayAccount(method, accountId) {
+    if (!accountId) return;
+    await uiCall('settings2_secure', { p_action: 'set_payment_account', p_data: { method, account_id: accountId } }, 'تم الربط');
+}
+
+async function set2TaxFlags(branchId) {
+    const inc = document.getElementById('tx-inc-' + branchId).checked;
+    const srv = document.getElementById('tx-srv-' + branchId).checked;
+    if (await uiCall('settings2_secure', { p_action: 'save_tax_flags', p_data: { branch_id: branchId, is_vat_inclusive: String(inc), is_service_taxable: String(srv) } }, 'تم الحفظ')
+        && currentUser && currentUser.branch_id === branchId) {
+        taxSettings.is_vat_inclusive = inc;
+        taxSettings.is_service_taxable = srv;
+    }
+}

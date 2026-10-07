@@ -125,6 +125,8 @@ function logout() {
         posState.discounts = [];
     }
     if (typeof kdsOrders !== 'undefined') kdsOrders = [];
+    if (typeof stopWaiterFeed === 'function') stopWaiterFeed();
+    appSettings = null;
     document.querySelectorAll('.main-tab-btn').forEach(btn => btn.classList.remove('hidden'));
     ['pin-auth-modal', 'payments-modal', 'split-modal', 'modifiers-modal'].forEach(id => {
         document.getElementById(id)?.classList.add('hidden');

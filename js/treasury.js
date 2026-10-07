@@ -40,7 +40,7 @@ async function loadShiftScreen() {
 }
 
 async function shiftOpen() {
-    const amount = uiAskAmount('اكتب مبلغ العهدة (الفكة) اللي استلمتها في الدرج:', '0');
+    const amount = uiAskAmount('اكتب مبلغ العهدة (الفكة) اللي استلمتها في الدرج:', String(appSet('shift', 'default_float', 0)));
     if (amount === null) return;
     if (await uiCall('shift_open_secure', { p_opening_float: amount }, 'تم فتح الوردية')) loadShiftScreen();
 }

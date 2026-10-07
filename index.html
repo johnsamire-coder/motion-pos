@@ -117,7 +117,7 @@
 
     <!-- التطبيق الرئيسي -->
     <div id="app" class="hidden max-w-[1600px] mx-auto p-4 space-y-4">
-        <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+        <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-3">
             <div class="flex items-center gap-4">
                 <div class="bg-blue-600 text-white px-3.5 py-2 rounded-xl font-black text-sm tracking-wide" id="main-brand-logo">Motion POS</div>
                 <div>
@@ -125,7 +125,7 @@
                     <p class="text-[11px] text-slate-400 font-bold" id="staff-role-display">الدور: ---</p>
                 </div>
             </div>
-            <nav class="flex flex-wrap gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 max-w-[60%]">
+            <nav class="flex flex-wrap gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 w-full lg:w-auto lg:max-w-[60%] order-3 lg:order-none">
                 <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
                 <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨‍🍳</button>
                 <button onclick="switchMainTab('shift')" id="tab-btn-shift" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الوردية 💵</button>
@@ -140,14 +140,15 @@
                 <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات ⚙️</button>
             </nav>
             <div class="flex items-center gap-2">
+                <button id="waiter-bell" onclick="openWaiterFeed()" class="hidden px-3 py-1.5 rounded-xl text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">🔔 <span id="waiter-bell-count">0</span></button>
                 <span class="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl font-bold text-xs border border-blue-200" id="branch-badge">الفرع</span>
                 <button onclick="logout()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">خروج 🚪</button>
             </div>
         </header>
 
         <!-- TAB 1: WORKSPACE POS -->
-        <div id="view-pos-workspace" class="grid grid-cols-12 gap-4">
-            <div class="col-span-8 space-y-4">
+        <div id="view-pos-workspace" class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div class="lg:col-span-8 space-y-4">
                 <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
                     <div class="flex gap-2">
                         <button onclick="setOrderType('dine_in')" id="type-dine_in" class="type-btn px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow">صالة (Dine In)</button>
@@ -179,7 +180,7 @@
             </div>
 
             <!-- Right Side: Order Ticket -->
-            <div class="col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between min-h-[580px]">
+            <div class="lg:col-span-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between min-h-[580px]">
                 <div>
                     <div class="border-b pb-3 mb-3">
                         <div class="flex justify-between items-center mb-1">
@@ -234,9 +235,10 @@
                         <button onclick="refundOrderPrompt()" class="bg-red-50 text-red-600 py-2 rounded-xl font-bold text-xs border border-red-200 hover:bg-red-100 col-span-2">مرتجع طلب مدفوع ↩️</button>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 pt-1">
+                    <div class="grid grid-cols-3 gap-2 pt-1">
                         <button onclick="sendOrderToKitchen()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-amber-600">إرسال للمطبخ 👨🍳</button>
-                        <button onclick="openMultiplePaymentsModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وإغلاق 💳</button>
+                        <button onclick="printCurrentBill()" class="w-full bg-slate-700 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-slate-800">الحساب 🧾</button>
+                        <button id="pos-pay-btn" onclick="openMultiplePaymentsModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وإغلاق 💳</button>
                     </div>
                 </div>
             </div>
@@ -244,7 +246,7 @@
 
         <div id="view-kds-workspace" class="hidden space-y-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
-                <h2 class="font-black text-slate-800 text-sm">شاشة تحضير الطلبات الحية</h2>
+                <div class="flex flex-wrap items-center gap-2"><h2 class="font-black text-slate-800 text-sm">شاشة التحضير</h2><div id="kds-station-tabs" class="flex flex-wrap gap-1.5"></div></div>
                 <button onclick="loadKDSOrders()" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">تحديث 🔄</button>
             </div>
             <div id="kds-cards-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
@@ -277,6 +279,7 @@
         </div>
 
         <div id="view-reports-workspace" class="hidden space-y-4">
+            <div id="reports-root"></div>
             <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="font-black text-slate-800 text-sm border-b pb-4 mb-6 flex justify-between items-center">
                     <span>📊 لوحة الأرباح والخسائر</span>
@@ -291,27 +294,7 @@
             </section>
         </div>
 
-        <div id="view-accounting-workspace" class="hidden space-y-4">
-            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="font-black text-slate-800 text-sm border-b pb-3 mb-3">دليل الحسابات</h2>
-                <div class="overflow-x-auto"><table class="w-full text-right"><tbody id="acc-coa-tbody"></tbody></table></div>
-            </section>
-            <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-                    <h2 class="font-black text-slate-800 text-sm border-b pb-3">تسجيل مصروف</h2>
-                    <select id="exp-account-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"></select>
-                    <input id="exp-amount-input" type="number" min="0" step="0.01" placeholder="المبلغ" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
-                    <select id="exp-method-select" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold"><option value="cash">من الخزينة الرئيسية</option><option value="card">من البنك</option></select>
-                    <input id="exp-desc-input" type="text" placeholder="وصف المصروف" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
-                    <button onclick="submitExpenseAction()" class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">تسجيل المصروف</button>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 class="font-black text-slate-800 text-sm border-b pb-3 mb-3">ميزان المراجعة</h2>
-                    <div class="overflow-x-auto"><table class="w-full text-right"><tbody id="acc-tb-tbody"></tbody></table></div>
-                    <div class="flex justify-between border-t mt-3 pt-3 text-xs font-black"><span>إجمالي مدين: <b id="tb-total-debit">0</b></span><span>إجمالي دائن: <b id="tb-total-credit">0</b></span></div>
-                </div>
-            </section>
-        </div>
+        <div id="view-accounting-workspace" class="hidden space-y-4"></div>
 
         <div id="view-settings-workspace" class="hidden">
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -352,7 +335,11 @@
     <script src="js/reports.js"></script>
     <script src="js/accounting.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/settings2.js"></script>
+    <script src="js/print.js"></script>
+    <script src="js/waiter.js"></script>
     <script src="js/treasury.js"></script>
+    <script src="js/reports2.js"></script>
     <script src="js/expenses.js"></script>
     <script src="js/staff.js"></script>
 
@@ -390,6 +377,11 @@
                 const btn = document.getElementById('tab-btn-' + tab);
                 if (btn) btn.classList.toggle('hidden', !canOpenTab(tab));
             });
+            await loadAppSettings();
+            // اللي معندوش وردية (زي الويتر) مبيقبضش: زرار الدفع بيستخبى
+            const payBtn = document.getElementById('pos-pay-btn');
+            if (payBtn) payBtn.classList.toggle('hidden', !canOpenTab('shift'));
+            if (typeof startWaiterFeed === 'function') startWaiterFeed();
         }
 
         function switchMainTab(targetTab) {
@@ -420,7 +412,10 @@
                 if (typeof loadCostAnalysis === 'function') loadCostAnalysis();
                 if (typeof loadWasteReport === 'function') loadWasteReport();
             }
-            if (targetTab === 'reports' && typeof loadFinancialDashboard === 'function') loadFinancialDashboard();
+            if (targetTab === 'reports') {
+                if (typeof loadFinancialDashboard === 'function') loadFinancialDashboard();
+                if (typeof loadReportsScreen === 'function') loadReportsScreen();
+            }
             if (targetTab === 'accounting' && typeof initAccountingModule === 'function') initAccountingModule();
             if (targetTab === 'settings' && typeof initSettingsModule === 'function') initSettingsModule();
         }

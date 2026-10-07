@@ -166,8 +166,34 @@ const SERVER_REASON_MESSAGES = {
     po_not_found: 'أمر الشراء غير موجود',
     wrong_po_status: 'الخطوة دي مش مناسبة لحالة أمر الشراء',
     invoice_duplicate: 'رقم الفاتورة ده متسجل قبل كده للمورد ده',
-    nothing_to_invoice: 'مفيش بضاعة مستلمة لسه من غير فاتورة'
+    nothing_to_invoice: 'مفيش بضاعة مستلمة لسه من غير فاتورة',
+    invalid_period: 'الفترة غلط (لازم البداية قبل النهاية، وبحد أقصى سنتين)',
+    not_balanced: 'القيد مش متوازن: المدين لازم يساوي الدائن',
+    cannot_reverse: 'القيد ده مينفعش يتعكس من هنا (القيود اللي السيستم بيعملها بتتعكس من شاشتها)',
+    value_too_long: 'القيمة طويلة جداً',
+    invalid_logo: 'اللوجو لازم يكون صورة (PNG أو JPG أو WEBP أو SVG)',
+    qr_disabled: 'الخدمة دي متوقفة من الإعدادات',
+    too_many: 'طلبات كتير. حاول بعد شوية',
+    invalid_status: 'حالة غير صحيحة'
 };
+
+// إعدادات الشركة والشاشات (بتتحمّل بعد الدخول)
+let appSettings = null;
+async function loadAppSettings() {
+    try {
+        const res = await serverRpc('app_settings_get_secure');
+        if (res && res.ok) {
+            appSettings = res.settings;
+            const g = appSettings.general || {};
+            const logo = document.getElementById('main-brand-logo');
+            if (logo) logo.innerHTML = g.logo ? `<img src="${uiEsc(g.logo)}" class="h-8 max-w-[120px] object-contain">` : uiEsc(g.company_name || 'Motion POS');
+            if (g.company_name) document.title = g.company_name;
+        }
+    } catch (err) {
+        console.error('Settings load error:', err);
+    }
+    return appSettings;
+}
 
 function serverReasonMessage(res, fallback) {
     const reason = res && res.reason;
