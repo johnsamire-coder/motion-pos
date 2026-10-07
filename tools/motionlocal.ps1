@@ -1,5 +1,5 @@
 # Motion POS - shop server on this PC (database + API + screens), works on any Windows PC
-# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop [-Rebuild] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
+# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off [-Rebuild] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
 param([string]$Step = 'status', [switch]$Rebuild, [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -162,6 +162,38 @@ function Invoke-SyncRound($conn) {
          & psql -X -A -t -v ON_ERROR_STOP=1 -v "conn=$conn" -h localhost -p $DbPort -U postgres -d $DbName -f - 2>&1
   if ($LASTEXITCODE -ne 0) { return @{ ok = $false; msg = (Hide $out $conn) } }
   try { return @{ ok = $true; r = ((Hide $out $conn) | ConvertFrom-Json) } } catch { return @{ ok = $false; msg = (Hide $out $conn) } }
+}
+function Invoke-Backup([switch]$Force) {
+  $bd = Join-Path $Root 'backups'
+  if (-not (Test-Path $bd)) { New-Item -ItemType Directory $bd -Force | Out-Null }
+  $f = Join-Path $bd ("motionpos_" + (Get-Date -Format 'yyyy-MM-dd') + '.dump')
+  if ((Test-Path $f) -and -not $Force) { return $null }
+  & (Join-Path $PgBin 'pg_dump.exe') -h localhost -p $DbPort -U postgres -d $DbName -Fc -f $f *> (Join-Path $Logs 'backup.log')
+  if ($LASTEXITCODE -ne 0) { return "backup FAILED (see logs\backup.log)" }
+  Get-ChildItem $bd -Filter 'motionpos_*.dump' | Sort-Object Name -Descending | Select-Object -Skip 14 | Remove-Item -Force
+  return "backup saved: $(Split-Path $f -Leaf) ($([math]::Round((Get-Item $f).Length/1KB)) KB)"
+}
+function Invoke-SyncLoop {
+  $mutex = New-Object Threading.Mutex($false, 'Local\MotionPOSSyncLoop')
+  if (-not $mutex.WaitOne(0)) { Fail 'Another sync loop is already running on this PC (window or automatic start). Close it first.' }
+  $conn = Get-CloudConn
+  $log = Join-Path $Logs 'sync.log'
+  Write-Host 'Sync every 30 seconds. Leave this window open (minimize it). Ctrl+C or close to stop.' -ForegroundColor Yellow
+  while ($true) {
+    $b = Invoke-Backup
+    if ($b) { Add-Content $log "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $b"; Write-Host $b -ForegroundColor Cyan }
+    $i = 0
+    do {
+      $i++
+      $x = Invoke-SyncRound $conn
+      $t = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+      if ($x.ok) { $line = "$t OK   " + (Show-Round $i $x.r); $more = $x.r.more } else { $line = "$t FAIL " + $x.msg; $more = $false }
+      if ($x.ok -and ($x.r.pulled + $x.r.pushed + $x.r.conflicts + $x.r.errors) -eq 0) { Write-Host "$t idle" -ForegroundColor DarkGray }
+      else { Add-Content $log $line; if ($x.ok) { Write-Host $line -ForegroundColor Green } else { Write-Host $line -ForegroundColor Red } }
+    } while ($more -and $i -lt 40)
+    if ((Get-Item $log -ErrorAction SilentlyContinue).Length -gt 5MB) { Move-Item $log "$log.old" -Force }
+    Start-Sleep 30
+  }
 }
 function Show-Round($i, $r) {
   $fc = if ($r.first_copy -ne $null) { " first_copy=$($r.first_copy) rows" } else { '' }
@@ -344,24 +376,73 @@ server-port = $ApiPort
   Write-Host 'SYNC DONE' -ForegroundColor Green
 }
 
-'syncloop' {
+
+'syncloop' { Use-Env; Start-Db; Invoke-SyncLoop }
+
+'run' {
+  # what the automatic start runs: everything up, then sync forever
+  Use-Env; Start-Db; Start-Api; Start-Web; Invoke-SyncLoop
+}
+
+'backup' {
+  Use-Env; Start-Db
+  $b = Invoke-Backup -Force
+  if ($b -like '*FAILED*') { Fail $b } else { Ok $b }
+  Ok "Backups folder: $(Join-Path $Root 'backups') (last 14 days kept)"
+}
+
+'compare' {
+  # same data on both sides? (run it when the sync window says idle)
   Use-Env; Start-Db
   $conn = Get-CloudConn
-  $log = Join-Path $Logs 'sync.log'
-  Write-Host 'Sync every 30 seconds. Leave this window open (minimize it). Ctrl+C or close to stop.' -ForegroundColor Yellow
-  while ($true) {
-    $i = 0
-    do {
-      $i++
-      $x = Invoke-SyncRound $conn
-      $t = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-      if ($x.ok) { $line = "$t OK   " + (Show-Round $i $x.r); $more = $x.r.more } else { $line = "$t FAIL " + $x.msg; $more = $false }
-      Add-Content $log $line
-      if ($x.ok -and ($x.r.pulled + $x.r.pushed + $x.r.conflicts + $x.r.errors) -eq 0) { Write-Host "$t idle" -ForegroundColor DarkGray }
-      elseif ($x.ok) { Write-Host $line -ForegroundColor Green } else { Write-Host $line -ForegroundColor Red }
-    } while ($more -and $i -lt 40)
-    Start-Sleep 30
+  $list = Get-Val "select string_agg(c.relname, ',' order by c.relname) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname not in ('sync_log', 'sync_node', 'sync_state', 'sync_runs', 'login_attempts', 'manager_pin_attempts', 'staff_sessions', 'order_sequences')"
+  $q = "set timezone = 'UTC';`n" + ((($list -split ',') | ForEach-Object { "select '$_', count(*), md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from (select to_jsonb(r) as x from public.$_ r) s" }) -join "`nunion all ") + ";`n"
+  $qf = Join-Path $Logs 'compare.sql'; Set-Content $qf $q -Encoding ASCII
+  $mine = & psql -X -q -A -t -F '|' -h localhost -p $DbPort -U postgres -d $DbName -f $qf 2>&1
+  if ($LASTEXITCODE -ne 0) { Fail "Local compare failed: $mine" }
+  $saved = $env:PGPASSWORD; Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+  $theirs = & psql $conn -X -q -A -t -F '|' -f $qf 2>&1
+  $code = $LASTEXITCODE; $env:PGPASSWORD = $saved
+  if ($code -ne 0) { Fail "Cloud compare failed: $(Hide $theirs $conn)" }
+  $m = @{}; foreach ($l in $mine) { $p = "$l".Split('|'); if ($p.Count -eq 3) { $m[$p[0]] = $p } }
+  $c = @{}; foreach ($l in $theirs) { $p = "$l".Split('|'); if ($p.Count -eq 3) { $c[$p[0]] = $p } }
+  $diff = 0; $rows = 0
+  foreach ($t in ($list -split ',')) {
+    $a = $m[$t]; $b = $c[$t]
+    if (-not $b) { Write-Host "[DIFF] $t : missing on the cloud" -ForegroundColor Red; $diff++; continue }
+    $rows += [int]$a[1]
+    if ($a[2] -ne $b[2]) { Write-Host "[DIFF] $t : shop $($a[1]) rows, cloud $($b[1]) rows, content differs" -ForegroundColor Red; $diff++ }
   }
+  if ($diff) { Fail "$diff tables differ (if the sync window was not idle, wait for idle and compare again)" }
+  Ok "All $($m.Count) tables identical on this PC and the cloud ($rows rows)"
+  Write-Host 'COMPARE DONE' -ForegroundColor Green
+}
+
+'autostart' {
+  # start everything automatically when this Windows user logs in (no admin needed)
+  $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+  $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Step run -Repo `"$Repo`" -Root `"$Root`""
+  $trg = New-ScheduledTaskTrigger -AtLogOn -User $me
+  $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+         -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+  $prn = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
+  try { Register-ScheduledTask -TaskName 'MotionPOS Shop Server' -Action $act -Trigger $trg -Settings $set -Principal $prn -Force -ErrorAction Stop | Out-Null }
+  catch { Fail "Could not create the automatic start: $($_.Exception.Message)" }
+  Ok "Automatic start created for $me (runs at Windows sign-in, hidden, restarts itself if it stops)"
+  Start-ScheduledTask -TaskName 'MotionPOS Shop Server'
+  Start-Sleep 15
+  $st = (Get-ScheduledTask -TaskName 'MotionPOS Shop Server').State
+  if ($st -ne 'Running') { Fail "Automatic start is '$st' - is a sync window still open? close it and run autostart again" }
+  Ok 'Running now in the background'
+  Use-Env
+  if ((Get-Code "http://127.0.0.1:$WebPort/") -eq 200) { Ok "Screens answer on http://localhost:$WebPort" } else { Fail 'Screens do not answer' }
+  Ok "Sync log: $(Join-Path $Logs 'sync.log')"
+}
+
+'autostart-off' {
+  Unregister-ScheduledTask -TaskName 'MotionPOS Shop Server' -Confirm:$false -ErrorAction SilentlyContinue
+  Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*motionlocal.ps1*-Step run*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+  Ok 'Automatic start removed and background sync stopped (database and screens keep running until -Step stop)'
 }
 
 default { Fail "Unknown step $Step" }
