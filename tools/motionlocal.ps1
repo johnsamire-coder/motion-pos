@@ -397,7 +397,7 @@ server-port = $ApiPort
   Use-Env; Start-Db
   $conn = Get-CloudConn
   $list = Get-Val "select string_agg(c.relname, ',' order by c.relname) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname not in ('sync_log', 'sync_node', 'sync_state', 'sync_runs', 'login_attempts', 'manager_pin_attempts', 'staff_sessions', 'order_sequences')"
-  $q = "set timezone = 'UTC';`n" + ((($list -split ',') | ForEach-Object { "select '$_', count(*), md5(coalesce(string_agg(x::text, '|' order by x::text), '')) from (select to_jsonb(r) as x from public.$_ r) s" }) -join "`nunion all ") + ";`n"
+  $q = "set timezone = 'UTC';`n" + ((($list -split ',') | ForEach-Object { "select '$_', count(*), md5(coalesce(string_agg(x::text, '|' order by x::text collate `"C`"), '')) from (select to_jsonb(r) as x from public.$_ r) s" }) -join "`nunion all ") + ";`n"
   $qf = Join-Path $Logs 'compare.sql'; Set-Content $qf $q -Encoding ASCII
   $mine = & psql -X -q -A -t -F '|' -h localhost -p $DbPort -U postgres -d $DbName -f $qf 2>&1
   if ($LASTEXITCODE -ne 0) { Fail "Local compare failed: $mine" }
