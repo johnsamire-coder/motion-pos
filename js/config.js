@@ -18,8 +18,35 @@ function formatCurrency(amount) {
     return (parseFloat(amount) || 0).toFixed(2) + ' ج.م';
 }
 
+// رسالة صغيرة فوق: "تم" بتختفي لوحدها بعد ثانيتين ونص، والغلط بيفضل لحد ما تقفله
 function showToast(message, type = 'success') {
-    alert((type === 'error' ? '❌ ' : '✅ ') + message);
+    let box = document.getElementById('ui-toasts');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'ui-toasts';
+        box.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-2 items-center w-[92%] max-w-md pointer-events-none';
+        document.body.appendChild(box);
+    }
+    const err = type === 'error';
+    const t = document.createElement('div');
+    t.dir = 'rtl';
+    t.className = `pointer-events-auto w-full rounded-2xl shadow-xl px-4 py-3 text-sm font-black flex justify-between items-start gap-3 text-white ${err ? 'bg-red-600' : 'bg-emerald-600'}`;
+    const span = document.createElement('span');
+    span.textContent = (err ? '❌ ' : '✅ ') + String(message || '');
+    t.appendChild(span);
+    const remove = () => t.remove();
+    if (err) {
+        const b = document.createElement('button');
+        b.textContent = '✖';
+        b.className = 'opacity-80 hover:opacity-100 shrink-0';
+        b.onclick = remove;
+        t.appendChild(b);
+        setTimeout(remove, 20000);
+    } else {
+        setTimeout(remove, 2500);
+    }
+    box.appendChild(t);
+    while (box.children.length > 4) box.firstChild.remove();
 }
 
 function populateSelectOptions(selectId, items, placeholderText, emptyText, labelBuilder) {
@@ -121,7 +148,9 @@ const SERVER_REASON_MESSAGES = {
     session_scope_missing: 'حساب الموظف مش مربوط بفرع',
     invalid_input: 'بيانات غير صحيحة',
     invalid_status: 'حالة غير صحيحة',
-    not_allowed: 'العملية دي للمدير أو المالك بس',
+    not_allowed: 'العملية دي مش مسموحة لدورك',
+    owner_only: 'الإعدادات دي للمالك بس',
+    pin_duplicate: 'الرقم السري ده مكرر لأكتر من موظف. كلم المالك يغيّره',
     unknown_action: 'عملية غير معروفة',
     invalid_name: 'الاسم غير صحيح',
     invalid_price: 'السعر غير صحيح',
@@ -308,3 +337,107 @@ function uiAskAmount(title, defaultValue = '') {
     if (!Number.isFinite(n) || n < 0) { showToast('المبلغ غير صحيح', 'error'); return null; }
     return round2(n);
 }
+
+// -----------------------------------------
+// شاشة واحدة لكل عملية بدل الشبابيك الصغيرة ورا بعض
+// fields: [{ key, label, type, value, options: [[value, label]], required, min, max, step, placeholder, addNew, list, help, full }]
+//   type: text | number | money | select | date | textarea | check | pin | note
+//   addNew: (select) يضيف "➕ جديد" في آخر القايمة، والقيمة اللي بتتكتب بترجع في الخانة نفسها و key + '_new' = true
+//   list: (text) اقتراحات بتنزل وانت بتكتب، وتقدر تكتب غيرها
+// Returns a Promise with the values, or null if cancelled. opts: { ok, danger, validate(values) => message | { key, msg } | null }
+// -----------------------------------------
+let uiFormSeq = 0;
+function uiForm(title, fields, opts = {}) {
+    return new Promise(resolve => {
+        const id = 'uif' + (++uiFormSeq);
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-slate-900/60 z-[60] flex items-start justify-center p-4 overflow-y-auto';
+        const fieldHtml = (f, i) => {
+            const fid = `${id}-${i}`;
+            const v = f.value === undefined || f.value === null ? '' : f.value;
+            const cls = 'w-full bg-slate-50 border p-2 rounded-xl text-sm font-bold focus:outline-none focus:border-blue-500';
+            let input = '';
+            if (f.type === 'note') return `<div class="${f.full === false ? '' : 'md:col-span-2'} text-[11px] font-bold text-slate-500 bg-slate-50 rounded-xl p-2">${f.html || uiEsc(f.label)}</div>`;
+            if (f.type === 'select') {
+                const opts2 = (f.options || []).map(([ov, ol]) => `<option value="${uiEsc(ov)}" ${String(ov) === String(v) ? 'selected' : ''}>${uiEsc(ol)}</option>`).join('');
+                input = `<select id="${fid}" class="${cls}" ${f.addNew ? `onchange="document.getElementById('${fid}-new').classList.toggle('hidden', this.value !== '__new__')"` : ''}>
+                    ${f.placeholder ? `<option value="">${uiEsc(f.placeholder)}</option>` : ''}${opts2}${f.addNew ? `<option value="__new__">➕ ${uiEsc(f.addNew)}</option>` : ''}</select>
+                    ${f.addNew ? `<input id="${fid}-new" class="${cls} mt-1 hidden" placeholder="${uiEsc(f.addNew)}">` : ''}`;
+            } else if (f.type === 'textarea') {
+                input = `<textarea id="${fid}" rows="${f.rows || 2}" class="${cls}" placeholder="${uiEsc(f.placeholder || '')}">${uiEsc(v)}</textarea>`;
+            } else if (f.type === 'check') {
+                return `<label class="flex items-center gap-2 text-sm font-bold ${f.full ? 'md:col-span-2' : ''} py-1"><input id="${fid}" type="checkbox" class="w-5 h-5" ${v ? 'checked' : ''}> ${uiEsc(f.label)}</label>`;
+            } else {
+                const t = { number: 'number', money: 'number', date: 'date', pin: 'password' }[f.type] || 'text';
+                const extra = f.type === 'pin' ? 'inputmode="numeric" maxlength="4" autocomplete="off"' : ((f.type === 'number' || f.type === 'money') ? `inputmode="decimal" step="${f.step || 'any'}" ${f.min !== undefined ? `min="${f.min}"` : ''}` : '');
+                input = `<input id="${fid}" type="${t}" ${extra} value="${uiEsc(v)}" placeholder="${uiEsc(f.placeholder || '')}" class="${cls} ${f.type === 'pin' ? 'text-center tracking-widest' : ''}" ${f.list ? `list="${fid}-list"` : ''}>
+                    ${f.list ? `<datalist id="${fid}-list">${f.list.map(x => `<option value="${uiEsc(x)}">`).join('')}</datalist>` : ''}`;
+            }
+            return `<div class="${f.full ? 'md:col-span-2' : ''}"><label for="${fid}" class="block text-xs font-black text-slate-600 mb-1">${uiEsc(f.label)}${f.required ? ' <span class="text-red-500">*</span>' : ''}</label>${input}
+                ${f.help ? `<p class="text-[10px] text-slate-400 font-bold mt-0.5">${uiEsc(f.help)}</p>` : ''}<p id="${fid}-err" class="text-[11px] text-red-600 font-bold mt-0.5 hidden"></p></div>`;
+        };
+        overlay.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full ${fields.length > 4 ? 'max-w-2xl' : 'max-w-md'} p-5 my-8 text-right" dir="rtl">
+            <h3 class="font-black text-base text-slate-800 mb-3 border-b pb-2">${uiEsc(title)}</h3>
+            <div class="grid grid-cols-1 ${fields.length > 4 ? 'md:grid-cols-2' : ''} gap-3">${fields.map(fieldHtml).join('')}</div>
+            <p id="${id}-err" class="text-xs text-red-600 font-black mt-3 hidden"></p>
+            <div class="flex gap-2 mt-4"><button data-ok class="flex-1 ${opts.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2.5 rounded-xl font-black text-sm">${uiEsc(opts.ok || 'حفظ')}</button>
+            <button data-cancel class="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-black text-sm hover:bg-slate-200">إلغاء</button></div></div>`;
+        document.body.appendChild(overlay);
+        const done = val => { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+        const showErr = (key, msg) => {
+            const i = fields.findIndex(f => f.key === key);
+            const el = document.getElementById(i >= 0 ? `${id}-${i}-err` : `${id}-err`) || document.getElementById(`${id}-err`);
+            el.textContent = msg; el.classList.remove('hidden');
+            const inp = document.getElementById(`${id}-${i}`);
+            if (inp) inp.focus();
+        };
+        const submit = () => {
+            overlay.querySelectorAll('[id$="-err"]').forEach(e => e.classList.add('hidden'));
+            const values = {};
+            for (let i = 0; i < fields.length; i++) {
+                const f = fields[i];
+                if (f.type === 'note' || !f.key) continue;
+                const el = document.getElementById(`${id}-${i}`);
+                let v;
+                if (f.type === 'check') v = el.checked;
+                else if (f.type === 'select' && el.value === '__new__') {
+                    v = document.getElementById(`${id}-${i}-new`).value.trim();
+                    if (!v) return showErr(f.key, 'اكتب الجديد');
+                    values[f.key + '_new'] = true;
+                } else v = String(el.value).trim();
+                if (f.required && (v === '' || v === null)) return showErr(f.key, 'الخانة دي لازم تتملى');
+                if ((f.type === 'number' || f.type === 'money') && v !== '') {
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return showErr(f.key, 'اكتب رقم صحيح');
+                    if (f.min !== undefined && n < f.min) return showErr(f.key, `أقل قيمة ${f.min}`);
+                    if (f.max !== undefined && n > f.max) return showErr(f.key, `أكبر قيمة ${f.max}`);
+                    v = f.type === 'money' ? round2(n) : n;
+                }
+                if ((f.type === 'number' || f.type === 'money') && v === '') v = null;
+                if (f.type === 'pin' && v !== '' && !/^[0-9]{4}$/.test(v)) return showErr(f.key, 'الرقم السري 4 أرقام');
+                values[f.key] = v;
+            }
+            if (typeof opts.validate === 'function') {
+                const r = opts.validate(values);
+                if (r) return typeof r === 'string' ? showErr(null, r) : showErr(r.key, r.msg);
+            }
+            done(values);
+        };
+        const onKey = e => {
+            if (e.key === 'Escape') done(null);
+            if (e.key === 'Enter' && e.target && e.target.tagName !== 'TEXTAREA' && overlay.contains(e.target)) { e.preventDefault(); submit(); }
+        };
+        document.addEventListener('keydown', onKey);
+        overlay.querySelector('[data-ok]').onclick = submit;
+        overlay.querySelector('[data-cancel]').onclick = () => done(null);
+        setTimeout(() => { const first = overlay.querySelector('input:not([type=checkbox]), select, textarea'); if (first) first.focus(); }, 50);
+    });
+}
+
+// سؤال نعم / لا في شاشة صغيرة بدل confirm
+function uiConfirm(message, okLabel = 'موافق', danger = false) {
+    return uiForm('تأكيد', [{ type: 'note', html: `<p class="text-sm text-slate-800 font-bold whitespace-pre-line">${uiEsc(message)}</p>` }], { ok: okLabel, danger })
+        .then(v => v !== null);
+}
+
+const UI_BOX_OPTIONS = keys => keys.map(k => [k, UI_BOX_NAMES[k]]);

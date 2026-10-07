@@ -43,52 +43,47 @@ async function stfRenderList() {
 
 async function stfEdit(id) {
     const s = id ? stfState.staff.find(x => x.id === id) : {};
-    const name = prompt('اسم الموظف:', s.name || '');
-    if (!name) return;
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
     const roles = stfState.roles.filter(r => isOwner || !['owner', 'branch_manager'].includes(r));
-    const rp = prompt('الدور:\n' + roles.map((r, i) => `${i + 1}. ${STAFF_ROLE_NAMES[r] || r}`).join('\n'),
-        String(Math.max(1, roles.indexOf(s.role) + 1)));
-    const role = roles[parseInt(rp, 10) - 1];
-    if (!role) return showToast('دور غير صحيح', 'error');
-    let branchId = s.branch_id || currentUser?.branch_id;
-    if (isOwner && stfState.branches.length > 1) {
-        const bp = prompt('الفرع:\n' + stfState.branches.map((b, i) => `${i + 1}. ${b.name}`).join('\n'),
-            String(Math.max(1, stfState.branches.findIndex(b => b.id === branchId) + 1)));
-        const b = stfState.branches[parseInt(bp, 10) - 1];
-        if (!b) return showToast('فرع غير صحيح', 'error');
-        branchId = b.id;
-    }
-    const salary = uiAskAmount('المرتب الشهري (صفر لو مفيش):', String(s.monthly_salary || 0));
-    if (salary === null) return;
-    const phone = prompt('التليفون:', s.phone || '') ?? '';
-    const active = id ? confirm('الموظف شغال؟ (إلغاء = إيقافه، وتذكرته هتتلغي فوراً)') : true;
-    const res = await uiCall('staff_save_secure', { p_data: { id: id || null, name, role, branch_id: branchId, monthly_salary: String(salary), phone, is_active: String(active) } }, 'تم الحفظ');
+    const fields = [
+        { key: 'name', label: 'اسم الموظف', value: s.name || '', required: true },
+        { key: 'role', label: 'الدور', type: 'select', options: roles.map(r => [r, STAFF_ROLE_NAMES[r] || r]), value: s.role || '', placeholder: 'اختار الدور', required: true }];
+    if (isOwner && stfState.branches.length > 1) fields.push({ key: 'branch', label: 'الفرع', type: 'select', options: stfState.branches.map(b => [b.id, b.name]), value: s.branch_id || currentUser?.branch_id || '', required: true });
+    fields.push({ key: 'salary', label: 'المرتب الشهري (صفر لو مفيش)', type: 'money', min: 0, value: s.monthly_salary || 0 },
+        { key: 'phone', label: 'التليفون', value: s.phone || '' });
+    if (id) fields.push({ key: 'active', label: 'الموظف شغال (لو شيلت العلامة، تذكرته هتتلغي فوراً)', type: 'check', value: s.is_active !== false, full: true });
+    else fields.push({ key: 'pin', label: 'الرقم السري (4 أرقام، مينفعش يتكرر)', type: 'pin', required: true });
+    const v = await uiForm(id ? 'تعديل موظف' : 'موظف جديد', fields);
+    if (!v) return;
+    const branchId = v.branch || s.branch_id || currentUser?.branch_id;
+    const res = await uiCall('staff_save_secure', { p_data: { id: id || null, name: v.name, role: v.role, branch_id: branchId, monthly_salary: String(v.salary || 0), phone: v.phone || '', is_active: String(id ? v.active : true) } }, id ? 'تم الحفظ' : null);
     if (!res) return;
     if (!id) {
-        showToast('تم إضافة الموظف. دلوقتي حدد له رقم سري.');
-        await stfSetPin(res.id);
+        if (await uiCall('staff_set_pin_secure', { p_staff_id: res.id, p_pin: v.pin }, 'تم إضافة الموظف ورقمه السري')) { stfRenderList(); return; }
+        showToast('الموظف اتضاف، بس الرقم السري متحفظش. دوس "رقم سري" جنب اسمه واكتب رقم تاني.', 'error');
     }
     stfRenderList();
 }
 
 async function stfSetPin(id) {
-    const pin = prompt('الرقم السري الجديد (4 أرقام، ومينفعش يتكرر مع موظف تاني):');
-    if (!pin) return;
-    if (!/^[0-9]{4}$/.test(pin)) return showToast('الرقم السري لازم 4 أرقام', 'error');
-    if (await uiCall('staff_set_pin_secure', { p_staff_id: id, p_pin: pin }, 'تم حفظ الرقم السري')) stfRenderList();
+    const s = stfState.staff.find(x => x.id === id) || {};
+    const v = await uiForm(`رقم سري جديد${s.name ? ' لـ ' + s.name : ''}`, [
+        { key: 'pin', label: 'الرقم السري (4 أرقام، مينفعش يتكرر مع موظف تاني)', type: 'pin', required: true },
+        { key: 'pin2', label: 'اكتبه تاني للتأكيد', type: 'pin', required: true }],
+        { validate: x => x.pin !== x.pin2 ? { key: 'pin2', msg: 'الرقمين مش زي بعض' } : null });
+    if (!v) return;
+    if (await uiCall('staff_set_pin_secure', { p_staff_id: id, p_pin: v.pin }, 'تم حفظ الرقم السري')) stfRenderList();
 }
 
 async function stfAdvance(id) {
     const s = stfState.staff.find(x => x.id === id) || {};
-    const amount = uiAskAmount(`سلفة لـ ${s.name}. المبلغ:`);
-    if (!amount) return;
-    const source = uiPickBox('الفلوس طالعة منين؟', ['main_cash', 'bank', 'drawer']);
-    if (!source) return;
-    const reason = prompt('السبب:', 'سلفة') || 'سلفة';
-    const pin = await uiAskPin('السلفة محتاجة موافقة المدير. أدخل رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('staff_advance_secure', { p_staff_id: id, p_amount: amount, p_source: source, p_reason: reason, p_manager_pin: String(pin).trim() }, 'تم صرف السلفة')) stfRenderList();
+    const v = await uiForm(`سلفة لـ ${s.name || ''}`, [
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true },
+        { key: 'source', label: 'الفلوس طالعة منين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'bank', 'drawer']), required: true },
+        { key: 'reason', label: 'السبب', value: 'سلفة', required: true },
+        { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'صرف السلفة' });
+    if (!v) return;
+    if (await uiCall('staff_advance_secure', { p_staff_id: id, p_amount: v.amount, p_source: v.source, p_reason: v.reason, p_manager_pin: v.pin }, 'تم صرف السلفة')) stfRenderList();
 }
 
 async function stfLedger(id) {
@@ -146,40 +141,39 @@ async function stfRenderPayroll() {
 }
 
 async function stfPayrollPrepare() {
-    if (stfState.run && !confirm('إعادة التجهيز هتمسح أي تعديلات عملتها على المسودة. موافق؟')) return;
+    if (stfState.run && !(await uiConfirm('إعادة التجهيز هتمسح أي تعديلات عملتها على المسودة. موافق؟', 'إعادة التجهيز', true))) return;
     if (await uiCall('payroll_prepare_secure', { p_period: stfState.period + '-01' }, 'تم تجهيز المسودة')) stfRenderPayroll();
 }
 
 async function stfPayrollEdit(lineId) {
     const l = (stfState.run?.lines || []).find(x => x.id === lineId);
     if (!l) return;
-    const absent = uiAskAmount(`${l.staff}: أيام الغياب:`, String(l.absent_days));
-    if (absent === null) return;
-    const ledger = uiAskAmount(`خصم العجز والسلف (عليه ${formatCurrency(l.staff_balance)}):`, String(l.ledger_deduction));
-    if (ledger === null) return;
-    const other = uiAskAmount('أي خصم تاني (جزاء مثلاً):', String(l.other_deduction));
-    if (other === null) return;
-    const bonus = uiAskAmount('مكافأة:', String(l.bonus));
-    if (bonus === null) return;
-    const notes = prompt('ملاحظة:', l.notes || '') ?? '';
-    const res = await uiCall('payroll_line_update_secure', { p_line_id: lineId, p_absent_days: absent, p_ledger_deduction: ledger,
-        p_other_deduction: other, p_bonus: bonus, p_notes: notes }, 'تم التعديل');
+    const v = await uiForm(`تعديل مرتب ${l.staff}`, [
+        { key: 'absent', label: 'أيام الغياب', type: 'number', min: 0, max: 31, value: l.absent_days, required: true },
+        { key: 'ledger', label: `خصم العجز والسلف (عليه ${formatCurrency(l.staff_balance)})`, type: 'money', min: 0, value: l.ledger_deduction, required: true },
+        { key: 'other', label: 'أي خصم تاني (جزاء مثلاً)', type: 'money', min: 0, value: l.other_deduction, required: true },
+        { key: 'bonus', label: 'مكافأة', type: 'money', min: 0, value: l.bonus, required: true },
+        { key: 'notes', label: 'ملاحظة', type: 'textarea', value: l.notes || '', full: true }]);
+    if (!v) return;
+    const res = await uiCall('payroll_line_update_secure', { p_line_id: lineId, p_absent_days: v.absent, p_ledger_deduction: v.ledger,
+        p_other_deduction: v.other, p_bonus: v.bonus, p_notes: v.notes || '' }, 'تم التعديل');
     if (res) stfRenderPayroll();
 }
 
 async function stfPayrollApprove() {
-    if (!confirm('اعتماد المرتبات؟ هيتعمل القيد، والعجز والسلف هيتخصموا من رصيد كل موظف، ومش هينفع تتعدل بعدها.')) return;
-    const pin = await uiAskPin('الاعتماد محتاج رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('payroll_approve_secure', { p_run_id: stfState.run.id, p_manager_pin: String(pin).trim() }, 'تم الاعتماد')) stfRenderPayroll();
+    const v = await uiForm('اعتماد المرتبات', [
+        { type: 'note', label: 'هيتعمل القيد، والعجز والسلف هيتخصموا من رصيد كل موظف، ومش هينفع تتعدل بعدها.' },
+        { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'اعتماد' });
+    if (!v) return;
+    if (await uiCall('payroll_approve_secure', { p_run_id: stfState.run.id, p_manager_pin: v.pin }, 'تم الاعتماد')) stfRenderPayroll();
 }
 
 async function stfPayrollPay() {
-    const source = uiPickBox(`صرف ${formatCurrency(stfState.run.total_net)}. من فين؟`, ['main_cash', 'bank']);
-    if (!source) return;
-    const pin = await uiAskPin('الصرف محتاج رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('payroll_pay_secure', { p_run_id: stfState.run.id, p_source: source, p_manager_pin: String(pin).trim() }, 'تم صرف المرتبات')) stfRenderPayroll();
+    const v = await uiForm(`صرف المرتبات: ${formatCurrency(stfState.run.total_net)}`, [
+        { key: 'source', label: 'من فين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'bank']), required: true },
+        { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'صرف' });
+    if (!v) return;
+    if (await uiCall('payroll_pay_secure', { p_run_id: stfState.run.id, p_source: v.source, p_manager_pin: v.pin }, 'تم صرف المرتبات')) stfRenderPayroll();
 }
 
 async function stfRenderPerformance() {

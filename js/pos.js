@@ -264,15 +264,14 @@ async function selectPosTable(tableId) {
         } else {
             let chosen = orders[0];
             if (orders.length > 1) {
-                const pick = prompt('الطاولة دي عليها أكتر من طلب. اكتب رقم الطلب اللي عايز تفتحه:\n'
-                    + orders.map((o, i) => `${i + 1}. ${o.order_number} - ${formatCurrency(o.total_amount)}`).join('\n'), '1');
-                const idx = parseInt(pick, 10) - 1;
-                if (pick === null || !orders[idx]) {
+                const pick = await uiForm('الطاولة دي عليها أكتر من طلب', [{ key: 'id', label: 'الطلب', type: 'select', required: true,
+                    options: orders.map(o => [o.id, `${o.order_number} - ${formatCurrency(o.total_amount)}`]), value: orders[0].id }], { ok: 'فتح' });
+                if (!pick) {
                     posState.selectedTable = previousTable;
                     renderAreaAndTables();
                     return;
                 }
-                chosen = orders[idx];
+                chosen = orders.find(o => o.id === pick.id) || orders[0];
             }
             await loadOrderIntoCart(chosen.id, false);
             posState.selectedTable = nextTable;
@@ -489,10 +488,10 @@ async function posFindCustomer() {
     catch (err) { return showToast(err.message || 'تعذر البحث', 'error'); }
     if (!res || res.ok === false) return showToast(serverReasonMessage(res, 'تعذر البحث'), 'error');
     if (res.found) { posSetCustomer(res.customer); showToast(`العميل: ${res.customer.name}`); return; }
-    const name = prompt(`الرقم ${res.phone} مش متسجّل.\nاكتب اسم العميل عشان يتسجّل:`);
-    if (!name || !name.trim()) return;
+    const f = await uiForm('عميل جديد', [{ type: 'note', label: `الرقم ${res.phone} مش متسجّل.` }, { key: 'name', label: 'اسم العميل', required: true }], { ok: 'تسجيل' });
+    if (!f) return;
     let add;
-    try { add = await serverRpc('customer_quick_add_secure', { p_name: name.trim(), p_phone: phone }); }
+    try { add = await serverRpc('customer_quick_add_secure', { p_name: f.name, p_phone: phone }); }
     catch (err) { return showToast(err.message || 'تعذر الحفظ', 'error'); }
     if (add && add.ok === false && add.reason === 'phone_taken' && add.customer) { posSetCustomer(add.customer); return; }
     if (!add || add.ok === false) return showToast(serverReasonMessage(add, 'تعذر الحفظ'), 'error');
@@ -593,19 +592,20 @@ function askManagerPin(message) {
 }
 
 // اختيار سبب إلغاء من القايمة
-function pickCancelReason(title) {
+// سبب الإلغاء + رقم المدير في شاشة واحدة
+async function pickCancelReason(title, type, pinLabel) {
     if (!posState.cancelReasons.length) {
-        showToast('لا توجد أسباب إلغاء مسجلة. أضف أسباب الإلغاء أولاً.', 'error');
+        showToast('لا توجد أسباب إلغاء مسجلة. أضف أسباب الإلغاء أولاً من الإعدادات.', 'error');
         return null;
     }
-    const reasonPrompt = prompt(title + '\n' + posState.cancelReasons.map((r, i) => `${i + 1}. ${r.reason}`).join('\n'));
-    if (!reasonPrompt) return null;
-    const reason = posState.cancelReasons[parseInt(reasonPrompt, 10) - 1];
-    if (!reason) {
-        showToast('رقم السبب غير صحيح', 'error');
-        return null;
-    }
-    return reason;
+    let list = posState.cancelReasons.filter(r => !type || !r.reason_type || r.reason_type === type);
+    if (!list.length) list = posState.cancelReasons;
+    const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true }];
+    if (pinLabel) fields.push({ key: 'pin', label: pinLabel, type: 'pin', required: true });
+    const v = await uiForm(title, fields, { ok: 'تأكيد', danger: true });
+    if (!v) return null;
+    const reason = list.find(r => String(r.id) === String(v.reason));
+    return reason ? { ...reason, pin: v.pin } : null;
 }
 
 async function voidCartItem(idx) {
@@ -614,12 +614,10 @@ async function voidCartItem(idx) {
     // صنف لسه ما اتبعتش للمطبخ: بيتشال من الشاشة عادي
     if (!item.db_item_id) { posState.cart.items.splice(idx, 1); renderOrderCartTicket(); return; }
 
-    const reason = pickCancelReason('اكتب رقم سبب مسح الصنف اللي اتبعت للمطبخ:');
-    if (!reason) return;
-
     // مسح صنف اتبعت للمطبخ لازم موافقة المدير، والسيرفر هو اللي بيتأكد من رقمه
-    const managerPin = await askManagerPin('مسح صنف اتبعت للمطبخ يحتاج موافقة المدير. أدخل رقم المدير:');
-    if (!managerPin) return;
+    const reason = await pickCancelReason(`مسح "${item.name}" (اتبعت للمطبخ)`, 'void_item', 'رقم المدير');
+    if (!reason) return;
+    const managerPin = reason.pin;
 
     try {
         const res = await serverRpc('void_order_item_secure', {
@@ -967,37 +965,23 @@ function renderSplitModal() {
 async function applyDiscountPrompt() {
     if (!posState.cart.id) return showToast('ابعت الطلب للمطبخ الأول، وبعدين طبّق الخصم', 'error');
     const list = posState.discounts || [];
-    const lines = ['0. إلغاء الخصم']
-        .concat(list.map((d, i) => `${i + 1}. ${d.name} (${d.discount_type === 'percentage' ? d.value + '%' : formatCurrency(d.value)})${d.requires_approval !== false ? ' - بموافقة المدير' : ''}`))
-        .concat([`${list.length + 1}. خصم يدوي بمبلغ - بموافقة المدير`]);
-    const choice = prompt('اكتب رقم الخصم:\n' + lines.join('\n'));
-    if (choice === null || choice.trim() === '') return;
-    const n = parseInt(choice, 10);
-
-    let discountId = null;
-    let manualAmount = null;
-    let needsPin = false;
-    if (n === 0) {
-        // إلغاء الخصم
-    } else if (n >= 1 && n <= list.length) {
-        discountId = list[n - 1].id;
-        needsPin = list[n - 1].requires_approval !== false;
-    } else if (n === list.length + 1) {
-        const amountStr = prompt('اكتب مبلغ الخصم بالجنيه:');
-        if (amountStr === null) return;
-        manualAmount = Number(amountStr);
-        if (!Number.isFinite(manualAmount) || manualAmount <= 0) return showToast('مبلغ الخصم غير صحيح', 'error');
-        manualAmount = round2(manualAmount);
-        needsPin = true;
-    } else {
-        return showToast('اختيار غير صحيح', 'error');
-    }
-
-    let pin = null;
-    if (needsPin) {
-        pin = await askManagerPin('الخصم ده محتاج موافقة المدير. أدخل رقم المدير:');
-        if (!pin) return;
-    }
+    const opts = [['none', 'من غير خصم (إلغاء الخصم)']]
+        .concat(list.map(d => [d.id, `${d.name} (${d.discount_type === 'percentage' ? d.value + '%' : formatCurrency(d.value)})${d.requires_approval !== false ? ' - بموافقة المدير' : ''}`]))
+        .concat([['manual', 'خصم يدوي بمبلغ - بموافقة المدير']]);
+    const needs = x => x.d === 'manual' || (list.find(d => d.id === x.d) || {}).requires_approval !== false && x.d !== 'none';
+    const v = await uiForm('الخصم', [
+        { key: 'd', label: 'الخصم', type: 'select', options: opts, required: true, placeholder: 'اختار' },
+        { key: 'amount', label: 'مبلغ الخصم اليدوي (لو اخترت يدوي)', type: 'money', min: 0 },
+        { key: 'pin', label: 'رقم المدير (لو الخصم محتاج موافقة)', type: 'pin' }], { ok: 'تطبيق', validate: x => {
+            if (x.d === 'manual' && !(x.amount > 0)) return { key: 'amount', msg: 'اكتب مبلغ الخصم' };
+            if (needs(x) && !x.pin) return { key: 'pin', msg: 'الخصم ده محتاج رقم المدير' };
+            return null;
+        } });
+    if (!v) return;
+    const n = v.d === 'none' ? 0 : 1;
+    const discountId = v.d !== 'none' && v.d !== 'manual' ? v.d : null;
+    const manualAmount = v.d === 'manual' ? round2(v.amount) : null;
+    const pin = needs(v) ? v.pin : null;
     try {
         const res = await serverRpc('apply_order_discount_secure', {
             p_order_id: posState.cart.id, p_discount_id: discountId, p_manual_amount: manualAmount,
@@ -1017,12 +1001,8 @@ function openTransferTableModal() {
     const availableTables = posState.tables.filter(table => table.id !== posState.selectedTable.id && table.status === 'available');
     if (availableTables.length === 0) return showToast('لا توجد طاولات متاحة للنقل في المنطقة دي', 'error');
 
-    const targetNumber = prompt('أدخل رقم الطاولة المتاحة:\n' + availableTables.map(table => table.table_number).join(', '));
-    if (targetNumber === null || !targetNumber.trim()) return;
-
-    const targetTable = availableTables.find(table => String(table.table_number).trim() === targetNumber.trim());
-    if (!targetTable) return showToast('الطاولة غير موجودة أو غير متاحة', 'error');
-    executeTransferTable(targetTable.id);
+    uiForm('نقل الطلب لطاولة تانية', [{ key: 't', label: 'الطاولة الفاضية', type: 'select', required: true, placeholder: 'اختار الطاولة',
+        options: availableTables.map(t => [t.id, 'طاولة ' + t.table_number]) }], { ok: 'نقل' }).then(v => { if (v) executeTransferTable(v.t); });
 }
 
 async function executeTransferTable(newTableId) {
@@ -1175,8 +1155,8 @@ function renderSplitByGuests(container) {
 // -----------------------------------------
 // طلب جديد، الطلبات المفتوحة، الدمج، إلغاء الطلب، المرتجع
 // -----------------------------------------
-function startNewOrder() {
-    if (hasUnsentItems() && !confirm('في أصناف لسه ما اتبعتتش للمطبخ. تمسحها وتبدأ طلب جديد؟')) return;
+async function startNewOrder() {
+    if (hasUnsentItems() && !(await uiConfirm('في أصناف لسه ما اتبعتتش للمطبخ. تمسحها وتبدأ طلب جديد؟', 'امسح وابدأ جديد', true))) return;
     resetActiveCart();
     posState.selectedTable = null;
     refreshTypeButtons();
@@ -1192,21 +1172,16 @@ async function chooseOpenOrder(title, excludeId) {
         return null;
     }
     const typeNames = { dine_in: 'صالة', takeaway: 'تيك أواي', delivery: 'توصيل', pickup: 'استلام' };
-    const pick = prompt(title + '\n' + orders.map((o, i) =>
-        `${i + 1}. ${o.order_number} - ${typeNames[o.order_type] || o.order_type}${o.table_number ? ' - طاولة ' + o.table_number : ''} - ${formatCurrency(o.total_amount)}`).join('\n'));
-    if (pick === null) return null;
-    const chosen = orders[parseInt(pick, 10) - 1];
-    if (!chosen) {
-        showToast('اختيار غير صحيح', 'error');
-        return null;
-    }
-    return chosen;
+    const v = await uiForm(title, [{ key: 'id', label: 'الطلب', type: 'select', required: true, placeholder: 'اختار الطلب',
+        options: orders.map(o => [o.id, `${o.order_number} - ${typeNames[o.order_type] || o.order_type}${o.table_number ? ' - طاولة ' + o.table_number : ''} - ${formatCurrency(o.total_amount)}`]) }], { ok: 'اختيار' });
+    if (!v) return null;
+    return orders.find(o => o.id === v.id) || null;
 }
 
 async function openOpenOrdersList() {
     if (hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها أو امسحها الأول', 'error');
     try {
-        const chosen = await chooseOpenOrder('اكتب رقم الطلب اللي عايز تفتحه:', null);
+        const chosen = await chooseOpenOrder('افتح طلب مفتوح', null);
         if (!chosen) return;
         await loadOrderIntoCart(chosen.id, false);
         refreshTypeButtons();
@@ -1219,9 +1194,9 @@ async function mergeOrderPrompt() {
     if (!posState.cart.id) return showToast('افتح الطلب اللي هيتجمع فيه الأول', 'error');
     if (hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها الأول', 'error');
     try {
-        const chosen = await chooseOpenOrder(`اكتب رقم الطلب اللي هيتنقل بأصنافه جوه الطلب ${posState.cart.order_number}:`, posState.cart.id);
+        const chosen = await chooseOpenOrder(`الطلب اللي هيتنقل بأصنافه جوه ${posState.cart.order_number}`, posState.cart.id);
         if (!chosen) return;
-        if (!confirm(`كل أصناف ${chosen.order_number} هتتنقل لـ ${posState.cart.order_number}، والطلب ${chosen.order_number} هيتقفل. موافق؟`)) return;
+        if (!(await uiConfirm(`كل أصناف ${chosen.order_number} هتتنقل لـ ${posState.cart.order_number}، والطلب ${chosen.order_number} هيتقفل. موافق؟`, 'دمج'))) return;
         const res = await serverRpc('merge_orders_secure', { p_source_order_id: chosen.id, p_target_order_id: posState.cart.id });
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر دمج الطلبات'), 'error');
         await loadOrderIntoCart(posState.cart.id, false);
@@ -1235,15 +1210,17 @@ async function mergeOrderPrompt() {
 async function cancelOrderPrompt() {
     if (!posState.cart.id) {
         if (posState.cart.items.length === 0) return showToast('مفيش طلب مفتوح', 'error');
-        if (!confirm('الطلب لسه ما اتبعتش. تمسحه من الشاشة؟')) return;
-        startNewOrder();
+        if (!(await uiConfirm('الطلب لسه ما اتبعتش. تمسحه من الشاشة؟', 'مسح', true))) return;
+        resetActiveCart();
+        posState.selectedTable = null;
+        refreshTypeButtons();
+        renderAreaAndTables();
+        renderOrderCartTicket();
         return;
     }
-    if (!confirm(`إلغاء الطلب ${posState.cart.order_number} بالكامل؟`)) return;
-    const reason = pickCancelReason('اكتب رقم سبب إلغاء الطلب:');
+    const reason = await pickCancelReason(`إلغاء الطلب ${posState.cart.order_number} بالكامل`, 'cancel_order', 'رقم المدير');
     if (!reason) return;
-    const managerPin = await askManagerPin('إلغاء طلب اتبعت للمطبخ محتاج موافقة المدير. أدخل رقم المدير:');
-    if (!managerPin) return;
+    const managerPin = reason.pin;
     try {
         const res = await serverRpc('cancel_order_secure', {
             p_order_id: posState.cart.id, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim()
@@ -1259,14 +1236,18 @@ async function cancelOrderPrompt() {
 }
 
 async function refundOrderPrompt() {
-    const orderNumber = prompt('اكتب رقم الطلب المدفوع اللي عايز ترجّعه (زي #1005):');
-    if (orderNumber === null || !orderNumber.trim()) return;
-    const normalized = orderNumber.trim().startsWith('#') ? orderNumber.trim() : '#' + orderNumber.trim();
-    if (!confirm(`مرتجع كامل للطلب ${normalized}؟ الفلوس هترجع للزبون، والقيد هيتعكس.`)) return;
-    const reason = pickCancelReason('اكتب رقم سبب المرتجع:');
-    if (!reason) return;
-    const managerPin = await askManagerPin('المرتجع محتاج موافقة المدير. أدخل رقم المدير:');
-    if (!managerPin) return;
+    let list = posState.cancelReasons.filter(r => !r.reason_type || r.reason_type === 'return');
+    if (!list.length) list = posState.cancelReasons;
+    if (!list.length) return showToast('لا توجد أسباب مرتجع مسجلة. أضفها من الإعدادات.', 'error');
+    const v = await uiForm('مرتجع كامل لطلب مدفوع', [
+        { type: 'note', label: 'الفلوس هترجع للزبون، والقيد هيتعكس.' },
+        { key: 'num', label: 'رقم الطلب (زي 1005)', required: true },
+        { key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true },
+        { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'مرتجع', danger: true });
+    if (!v) return;
+    const normalized = v.num.startsWith('#') ? v.num : '#' + v.num;
+    const reason = { id: v.reason };
+    const managerPin = v.pin;
     try {
         const res = await serverRpc('refund_order_secure', {
             p_order_number: normalized, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim()

@@ -79,11 +79,9 @@ async function accShowEntry(id) {
 }
 
 async function accReverse(id) {
-    const reason = prompt('سبب عكس القيد:');
-    if (!reason) return;
-    const pin = await uiAskPin('عكس القيد محتاج رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('journal_reverse_secure', { p_id: id, p_reason: reason, p_manager_pin: String(pin).trim() }, 'تم عكس القيد بقيد عكسي')) accJournalLoad();
+    const v = await uiForm('عكس القيد', [{ key: 'reason', label: 'السبب', required: true }, { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'عكس القيد', danger: true });
+    if (!v) return;
+    if (await uiCall('journal_reverse_secure', { p_id: id, p_reason: v.reason, p_manager_pin: v.pin }, 'تم عكس القيد بقيد عكسي')) accJournalLoad();
 }
 
 function accAccountOptions() {
@@ -219,7 +217,7 @@ function accCoa() {
 
 async function accPeriods(id, action) {
     const params = { p_period_id: id || null, p_action: action || null };
-    if (id && !confirm(action === 'close' ? 'قفل الفترة؟ مش هيتسجل أي قيد بتاريخ فيها بعد كده.' : 'إعادة فتح الفترة؟')) return;
+    if (id && !(await uiConfirm(action === 'close' ? 'قفل الفترة؟ مش هيتسجل أي قيد بتاريخ فيها بعد كده.' : 'إعادة فتح الفترة؟', action === 'close' ? 'قفل' : 'إعادة فتح', action === 'close'))) return;
     const res = await uiCall('fiscal_periods_secure', params, id ? 'تم' : null);
     if (!res) return;
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
@@ -243,15 +241,14 @@ async function accCustomers() {
 
 async function accEditCustomer(id) {
     const c = id ? accState.customers.find(x => x.id === id) : {};
-    const name = prompt('اسم العميل:', c.name || '');
-    if (!name) return;
-    const phone = prompt('التليفون:', c.phone || '') ?? '';
-    const t = prompt('النوع:\n1. كاش\n2. متسجّل\n3. آجل', c.customer_type === 'cash' ? '1' : (c.customer_type === 'on_account' ? '3' : '2'));
-    const type = { 1: 'cash', 2: 'registered', 3: 'on_account' }[t];
-    if (!type) return showToast('نوع غير صحيح', 'error');
-    const limit = uiAskAmount('الحد المسموح في الآجل (صفر = من غير حد):', String(c.credit_limit || 0));
-    if (limit === null) return;
-    if (await uiCall('customers_secure', { p_data: { id: id || null, name, phone, customer_type: type, credit_limit: String(limit), address: c.address || '' } }, 'تم الحفظ')) accCustomers();
+    const v = await uiForm(id ? 'تعديل عميل' : 'عميل جديد', [
+        { key: 'name', label: 'اسم العميل', value: c.name || '', required: true },
+        { key: 'phone', label: 'الموبايل', value: c.phone || '' },
+        { key: 'type', label: 'النوع', type: 'select', options: [['cash', 'كاش'], ['registered', 'متسجّل'], ['on_account', 'آجل']], value: c.customer_type || 'registered', required: true },
+        { key: 'limit', label: 'الحد المسموح في الآجل (صفر = من غير حد)', type: 'money', min: 0, value: c.credit_limit || 0 },
+        { key: 'address', label: 'العنوان', value: c.address || '', full: true }]);
+    if (!v) return;
+    if (await uiCall('customers_secure', { p_data: { id: id || null, name: v.name, phone: v.phone, customer_type: v.type, credit_limit: String(v.limit || 0), address: v.address || '' } }, 'تم الحفظ')) accCustomers();
 }
 
 async function accCustomerStatement(id) {
@@ -265,12 +262,13 @@ async function accCustomerStatement(id) {
 
 async function accCustomerReceive(id) {
     const c = accState.customers.find(x => x.id === id) || {};
-    const amount = uiAskAmount(`تحصيل من ${c.name} (عليه ${formatCurrency(c.balance)}). المبلغ:`, String(c.balance));
-    if (!amount) return;
-    const source = uiPickBox('الفلوس هتدخل فين؟', ['drawer', 'main_cash', 'bank']);
-    if (!source) return;
-    const ref = prompt('رقم الإيصال (اختياري):', '') || '';
-    if (await uiCall('customer_receive_secure', { p_customer_id: id, p_amount: amount, p_source: source, p_reference: ref }, 'تم التحصيل')) accCustomers();
+    const v = await uiForm(`تحصيل من ${c.name || ''}`, [
+        { type: 'note', label: `عليه ${formatCurrency(c.balance)}` },
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true, value: c.balance },
+        { key: 'source', label: 'الفلوس هتدخل فين', type: 'select', options: UI_BOX_OPTIONS(['drawer', 'main_cash', 'bank']), required: true },
+        { key: 'ref', label: 'رقم الإيصال (اختياري)' }], { ok: 'تحصيل' });
+    if (!v) return;
+    if (await uiCall('customer_receive_secure', { p_customer_id: id, p_amount: v.amount, p_source: v.source, p_reference: v.ref || '' }, 'تم التحصيل')) accCustomers();
 }
 
 async function accExpense() {

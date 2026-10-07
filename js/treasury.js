@@ -40,39 +40,35 @@ async function loadShiftScreen() {
 }
 
 async function shiftOpen() {
-    const amount = uiAskAmount('اكتب مبلغ العهدة (الفكة) اللي استلمتها في الدرج:', String(appSet('shift', 'default_float', 0)));
-    if (amount === null) return;
-    if (await uiCall('shift_open_secure', { p_opening_float: amount }, 'تم فتح الوردية')) loadShiftScreen();
+    const v = await uiForm('فتح وردية', [{ key: 'amount', label: 'العهدة (الفكة) اللي استلمتها في الدرج', type: 'money', min: 0, required: true, value: appSet('shift', 'default_float', 0) }], { ok: 'فتح الوردية' });
+    if (!v) return;
+    if (await uiCall('shift_open_secure', { p_opening_float: v.amount }, 'تم فتح الوردية')) loadShiftScreen();
 }
 
 async function shiftDrop() {
-    const dest = uiPickBox('الفلوس هتروح فين؟', ['main_cash', 'bank', 'owner']);
-    if (!dest) return;
-    const amount = uiAskAmount(`اكتب المبلغ اللي هيتورد لـ ${UI_BOX_NAMES[dest]}:`);
-    if (!amount) return;
-    const reason = prompt('اكتب سبب التوريد أو اسم المستلم:');
-    if (!reason) return;
-    const pin = await uiAskPin('التوريد محتاج موافقة المدير. أدخل رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('shift_cash_move_secure', { p_move_type: 'drop', p_amount: amount, p_destination: dest, p_reason: reason, p_manager_pin: String(pin).trim() }, 'تم التوريد')) loadShiftScreen();
+    const v = await uiForm('توريد فلوس من الدرج', [
+        { key: 'dest', label: 'الفلوس هتروح فين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'bank', 'owner']), required: true },
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true },
+        { key: 'reason', label: 'السبب أو اسم المستلم', required: true, full: true }, { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'توريد' });
+    if (!v) return;
+    if (await uiCall('shift_cash_move_secure', { p_move_type: 'drop', p_amount: v.amount, p_destination: v.dest, p_reason: v.reason, p_manager_pin: v.pin }, 'تم التوريد')) loadShiftScreen();
 }
 
 async function shiftCashIn() {
-    const amount = uiAskAmount('اكتب مبلغ الفكة اللي اتضافت للدرج من الخزينة الرئيسية:');
-    if (!amount) return;
-    const reason = prompt('السبب:', 'فكة');
-    if (!reason) return;
-    const pin = await uiAskPin('محتاج موافقة المدير. أدخل رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('shift_cash_move_secure', { p_move_type: 'cash_in', p_amount: amount, p_destination: null, p_reason: reason, p_manager_pin: String(pin).trim() }, 'تم تسجيل الفكة')) loadShiftScreen();
+    const v = await uiForm('فكة داخلة للدرج من الخزينة', [
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true },
+        { key: 'reason', label: 'السبب', value: 'فكة', required: true }, { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'تسجيل' });
+    if (!v) return;
+    if (await uiCall('shift_cash_move_secure', { p_move_type: 'cash_in', p_amount: v.amount, p_destination: null, p_reason: v.reason, p_manager_pin: v.pin }, 'تم تسجيل الفكة')) loadShiftScreen();
 }
 
 async function shiftClose() {
-    if (!confirm('قفل الوردية؟ اعدّ الفلوس اللي في الدرج كلها الأول (من غير الإكراميات، السيستم هيصرفها).')) return;
-    const counted = uiAskAmount('اكتب إجمالي الفلوس اللي عدّيتها في الدرج:');
-    if (counted === null) return;
-    const notes = prompt('ملاحظات (اختياري):', '') || '';
-    const res = await uiCall('shift_close_secure', { p_counted_cash: counted, p_notes: notes }, 'تم قفل الوردية');
+    const v = await uiForm('قفل الوردية', [
+        { type: 'note', label: 'اعدّ الفلوس اللي في الدرج كلها (من غير الإكراميات، السيستم هيصرفها).' },
+        { key: 'counted', label: 'إجمالي الفلوس اللي عدّيتها', type: 'money', min: 0, required: true },
+        { key: 'notes', label: 'ملاحظات (اختياري)', type: 'textarea' }], { ok: 'قفل الوردية', danger: true });
+    if (!v) return;
+    const res = await uiCall('shift_close_secure', { p_counted_cash: v.counted, p_notes: v.notes || '' }, 'تم قفل الوردية');
     if (!res) return;
     await loadShiftScreen();
     const box = document.getElementById('shift-last-report');
@@ -171,20 +167,18 @@ async function treasuryShowShift(id) {
 }
 
 async function treasuryCloseDay(date) {
-    if (!confirm(`تقفيل يوم ${date}؟ لازم كل الورديات تكون اتقفلت.`)) return;
+    if (!(await uiConfirm(`تقفيل يوم ${date}؟ لازم كل الورديات تكون اتقفلت.`, 'تقفيل اليوم'))) return;
     if (await uiCall('day_close_secure', { p_date: date }, 'تم تقفيل اليوم')) loadTreasuryScreen();
 }
 
 async function treasuryTransfer() {
-    const from = uiPickBox('الفلوس طالعة منين؟', ['main_cash', 'bank', 'owner']);
-    if (!from) return;
-    const to = uiPickBox('رايحة فين؟', ['main_cash', 'bank', 'owner'].filter(x => x !== from));
-    if (!to) return;
-    const amount = uiAskAmount('المبلغ:');
-    if (!amount) return;
-    const reason = prompt('السبب (مثلاً: إيداع إيراد اليوم في البنك):');
-    if (!reason) return;
-    const pin = await uiAskPin('التحويل محتاج موافقة المدير. أدخل رقم المدير:');
-    if (!pin) return;
-    if (await uiCall('treasury_transfer_secure', { p_from: from, p_to: to, p_amount: amount, p_reason: reason, p_manager_pin: String(pin).trim() }, 'تم التحويل')) loadTreasuryScreen();
+    const boxes = UI_BOX_OPTIONS(['main_cash', 'bank', 'owner']);
+    const v = await uiForm('تحويل بين الخزن', [
+        { key: 'from', label: 'الفلوس طالعة منين', type: 'select', options: boxes, required: true },
+        { key: 'to', label: 'رايحة فين', type: 'select', options: boxes, required: true, value: 'bank' },
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true },
+        { key: 'reason', label: 'السبب (مثلاً: إيداع إيراد اليوم في البنك)', required: true }, { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }],
+        { ok: 'تحويل', validate: x => x.from === x.to ? { key: 'to', msg: 'لازم يبقى مكان تاني' } : null });
+    if (!v) return;
+    if (await uiCall('treasury_transfer_secure', { p_from: v.from, p_to: v.to, p_amount: v.amount, p_reason: v.reason, p_manager_pin: v.pin }, 'تم التحويل')) loadTreasuryScreen();
 }

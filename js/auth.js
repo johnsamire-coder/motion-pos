@@ -40,6 +40,8 @@ async function loginWithPin() {
         if (!loginRes.ok) {
             if (loginRes.reason === 'locked') {
                 showToast('تم إيقاف الدخول مؤقتاً بسبب محاولات خاطئة كثيرة. حاول مرة أخرى بعد 10 دقائق.', 'error');
+            } else if (loginRes.reason === 'pin_duplicate') {
+                showToast('الرقم السري ده مكرر لأكتر من موظف. كلم المالك يغيّره.', 'error');
             } else {
                 showToast('رقم PIN غير صحيح', 'error');
             }

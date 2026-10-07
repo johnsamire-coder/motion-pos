@@ -55,35 +55,29 @@ function purOrderButtons(o) {
 async function purAction(id, action) {
     let pin = null;
     if (action === 'approve') {
-        pin = await uiAskPin('الموافقة على أمر الشراء محتاجة رقم المدير:');
-        if (!pin) return;
-    } else if (!confirm(action === 'cancel' ? 'إلغاء أمر الشراء؟' : 'قفل أمر الشراء؟ (الباقي مش هيتستلم)')) {
+        const v = await uiForm('موافقة على أمر الشراء', [{ key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'موافقة' });
+        if (!v) return;
+        pin = v.pin;
+    } else if (!(await uiConfirm(action === 'cancel' ? 'إلغاء أمر الشراء؟' : 'قفل أمر الشراء؟ (الباقي مش هيتستلم)', action === 'cancel' ? 'إلغاء الأمر' : 'قفل', true))) {
         return;
     }
-    if (await uiCall('po_action_secure', { p_po_id: id, p_action: action, p_manager_pin: pin ? String(pin).trim() : null }, 'تم')) purRenderOrders();
+    if (await uiCall('po_action_secure', { p_po_id: id, p_action: action, p_manager_pin: pin }, 'تم')) purRenderOrders();
 }
 
 async function purReceive(id) {
     const o = (purState.orders || []).find(x => x.id === id);
     if (!o) return;
-    const lines = [];
-    for (const l of (o.lines || [])) {
-        const remaining = Number(l.quantity) - Number(l.qty_received);
-        if (remaining <= 0) continue;
-        const q = prompt(`${l.ingredient} (${l.unit}): المطلوب الباقي ${remaining}. اتستلم كام؟`, String(remaining));
-        if (q === null) return;
-        const qty = Number(q);
-        if (!Number.isFinite(qty) || qty < 0 || qty > remaining) return showToast('الكمية غير صحيحة', 'error');
-        if (qty === 0) continue;
-        const c = prompt(`${l.ingredient}: سعر الوحدة الفعلي؟`, String(Number(l.unit_price)));
-        if (c === null) return;
-        const cost = Number(c);
-        if (!Number.isFinite(cost) || cost < 0) return showToast('السعر غير صحيح', 'error');
-        lines.push({ po_item_id: l.id, qty, unit_cost: cost });
-    }
-    if (!lines.length) return showToast('مفيش كميات اتستلمت', 'error');
-    const notes = prompt('ملاحظات الاستلام (اختياري):', '') || '';
-    const res = await uiCall('po_receive_secure', { p_po_id: id, p_lines: lines, p_notes: notes });
+    const open = (o.lines || []).map(l => ({ l, remaining: round2(Number(l.quantity) - Number(l.qty_received)) })).filter(x => x.remaining > 0);
+    if (!open.length) return showToast('كل الكميات اتستلمت', 'error');
+    const fields = [{ type: 'note', label: 'اكتب الكمية اللي وصلت فعلاً وسعرها (صفر = موصلش). الأرقام المكتوبة هي الباقي من الأمر.' }];
+    open.forEach((x, i) => fields.push(
+        { key: 'q' + i, label: `${x.l.ingredient} (${x.l.unit}): وصل كام؟ (الباقي ${x.remaining})`, type: 'number', min: 0, max: x.remaining, value: x.remaining, required: true },
+        { key: 'c' + i, label: `${x.l.ingredient}: سعر الوحدة الفعلي`, type: 'money', min: 0, value: Number(x.l.unit_price), required: true }));
+    fields.push({ key: 'notes', label: 'ملاحظات الاستلام (اختياري)', type: 'textarea', full: true });
+    const v = await uiForm('استلام بضاعة', fields, { ok: 'استلام', validate: x => open.some((_, i) => x['q' + i] > 0) ? null : 'مفيش كميات اتستلمت' });
+    if (!v) return;
+    const lines = open.map((x, i) => ({ po_item_id: x.l.id, qty: Number(v['q' + i]), unit_cost: Number(v['c' + i]) })).filter(l => l.qty > 0);
+    const res = await uiCall('po_receive_secure', { p_po_id: id, p_lines: lines, p_notes: v.notes || '' });
     if (res) { showToast(`تم الاستلام ${res.grn_number} بقيمة ${formatCurrency(res.value)}`); purRenderOrders(); }
 }
 
@@ -91,13 +85,14 @@ async function purInvoice(id) {
     const o = (purState.orders || []).find(x => x.id === id);
     if (!o) return;
     const uninvoiced = round2(Number(o.received_value) - Number(o.invoiced_value));
-    const num = prompt(`رقم فاتورة المورد (المستلم من غير فاتورة: ${formatCurrency(uninvoiced)}):`);
-    if (!num) return;
-    const amount = uiAskAmount('قيمة الفاتورة من غير الضريبة:', String(uninvoiced));
-    if (amount === null) return;
-    const tax = uiAskAmount('ضريبة القيمة المضافة على الفاتورة (صفر لو مفيش):', String(round2(amount * 0.14)));
-    if (tax === null) return;
-    const res = await uiCall('supplier_invoice_secure', { p_po_id: id, p_invoice_number: num, p_invoice_date: uiToday(), p_amount: amount, p_tax_amount: tax });
+    const v = await uiForm('فاتورة المورد', [
+        { type: 'note', label: `المستلم من غير فاتورة: ${formatCurrency(uninvoiced)}` },
+        { key: 'num', label: 'رقم فاتورة المورد', required: true },
+        { key: 'date', label: 'تاريخ الفاتورة', type: 'date', value: uiToday(), required: true },
+        { key: 'amount', label: 'قيمة الفاتورة من غير الضريبة', type: 'money', min: 0, value: uninvoiced, required: true },
+        { key: 'tax', label: 'ضريبة القيمة المضافة (صفر لو مفيش)', type: 'money', min: 0, value: 0, required: true }]);
+    if (!v) return;
+    const res = await uiCall('supplier_invoice_secure', { p_po_id: id, p_invoice_number: v.num, p_invoice_date: v.date, p_amount: v.amount, p_tax_amount: v.tax });
     if (!res) return;
     if (res.matched) showToast('تم تسجيل الفاتورة، ومطابقة للاستلام ✅');
     else showToast(`تم تسجيل الفاتورة، بس مش مطابقة: فرق ${formatCurrency(res.difference)} عن قيمة الاستلام ${formatCurrency(res.received_value)}`, 'error');
@@ -166,13 +161,15 @@ function purRenderSuppliers() {
 
 async function purEditSupplier(id) {
     const s = id ? purState.suppliers.find(x => x.id === id) : {};
-    const name = prompt('اسم المورد:', s.name || '');
-    if (!name) return;
-    const phone = prompt('التليفون:', s.phone || '') ?? '';
-    const company = prompt('اسم الشركة (اختياري):', s.company_name || '') ?? '';
-    const tax = prompt('الرقم الضريبي (اختياري):', s.tax_number || '') ?? '';
-    const active = id ? confirm('المورد شغال؟ (إلغاء = إيقافه)') : true;
-    const res = await uiCall('suppliers_secure', { p_data: { id: id || null, name, phone, company_name: company, tax_number: tax, is_active: String(active) } }, 'تم الحفظ');
+    const fields = [
+        { key: 'name', label: 'اسم المورد', value: s.name || '', required: true },
+        { key: 'phone', label: 'التليفون', value: s.phone || '' },
+        { key: 'company', label: 'اسم الشركة (اختياري)', value: s.company_name || '' },
+        { key: 'tax', label: 'الرقم الضريبي (اختياري)', value: s.tax_number || '' }];
+    if (id) fields.push({ key: 'active', label: 'المورد شغال', type: 'check', value: s.is_active !== false });
+    const v = await uiForm(id ? 'تعديل مورد' : 'مورد جديد', fields);
+    if (!v) return;
+    const res = await uiCall('suppliers_secure', { p_data: { id: id || null, name: v.name, phone: v.phone, company_name: v.company, tax_number: v.tax, is_active: String(id ? v.active : true) } }, 'تم الحفظ');
     if (res) { purState.suppliers = res.suppliers || []; purRenderSuppliers(); }
 }
 
@@ -188,12 +185,13 @@ async function purStatement(id) {
 
 async function purPay(id) {
     const s = purState.suppliers.find(x => x.id === id) || {};
-    const amount = uiAskAmount(`سداد للمورد ${s.name} (المستحق ${formatCurrency(s.balance)}). المبلغ:`, String(Math.max(0, Number(s.balance) || 0)));
-    if (!amount) return;
-    const source = uiPickBox('الفلوس طالعة منين؟', ['main_cash', 'bank', 'drawer']);
-    if (!source) return;
-    const ref = prompt('رقم الإيصال أو التحويل (اختياري):', '') || '';
-    const res = await uiCall('supplier_payment_secure', { p_supplier_id: id, p_amount: amount, p_source: source, p_reference: ref, p_notes: 'سداد مورد', p_owner_pin: null },
+    const v = await uiForm(`سداد للمورد ${s.name || ''}`, [
+        { type: 'note', label: `المستحق: ${formatCurrency(s.balance)}` },
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, value: Math.max(0, Number(s.balance) || 0), required: true },
+        { key: 'source', label: 'الفلوس طالعة منين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'bank', 'drawer']), required: true },
+        { key: 'ref', label: 'رقم الإيصال أو التحويل (اختياري)' }], { ok: 'سداد' });
+    if (!v) return;
+    const res = await uiCall('supplier_payment_secure', { p_supplier_id: id, p_amount: v.amount, p_source: v.source, p_reference: v.ref || '', p_notes: 'سداد مورد', p_owner_pin: null },
         'تم السداد', 'p_owner_pin');
     if (res) loadPurchasingScreen();
 }

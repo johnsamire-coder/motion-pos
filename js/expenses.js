@@ -94,30 +94,26 @@ async function expCustodyGive() {
 }
 
 async function expCustodySettle(staffId, balance) {
+    const cats = expState.categories.filter(c => c.is_active).map(c => [c.id, c.name]);
+    const fields = [{ type: 'note', label: `العهدة اللي معاه: ${formatCurrency(balance)}. اكتب المصروفات اللي صرفها (سيب السطر فاضي لو مش محتاجه).` }];
+    for (let i = 1; i <= 5; i++) {
+        fields.push({ key: 'cat' + i, label: `مصروف ${i}: البند`, type: 'select', options: cats, placeholder: '-' },
+            { key: 'amt' + i, label: `مصروف ${i}: المبلغ`, type: 'money', min: 0 },
+            { key: 'desc' + i, label: `مصروف ${i}: الوصف / رقم الإيصال`, full: true });
+    }
+    fields.push({ key: 'returned', label: 'الفلوس اللي رجعها', type: 'money', min: 0, value: 0 },
+        { key: 'return_to', label: 'الفلوس الراجعة تدخل فين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'drawer']), value: 'main_cash' });
+    const v = await uiForm('تسوية عهدة', fields, { ok: 'تسوية', validate: x => {
+        for (let i = 1; i <= 5; i++) {
+            if (x['amt' + i] > 0 && !x['cat' + i]) return { key: 'cat' + i, msg: 'اختار البند' };
+            if (x['amt' + i] > 0 && !x['desc' + i]) return { key: 'desc' + i, msg: 'اكتب الوصف' };
+        }
+        return null;
+    } });
+    if (!v) return;
     const lines = [];
-    let total = 0;
-    alert(`العهدة اللي معاه: ${formatCurrency(balance)}. هتكتب المصروفات واحدة واحدة، ولما تخلص اكتب صفر في المبلغ.`);
-    const catList = expState.categories.filter(c => c.is_active);
-    while (true) {
-        const amt = uiAskAmount(`مصروف رقم ${lines.length + 1}: المبلغ (صفر = خلصت). المتبقي ${formatCurrency(balance - total)}:`, '0');
-        if (amt === null) return;
-        if (amt === 0) break;
-        const pick = prompt('البند:\n' + catList.map((c, i) => `${i + 1}. ${c.name}`).join('\n'), '1');
-        const cat = catList[parseInt(pick, 10) - 1];
-        if (!cat) return showToast('بند غير صحيح', 'error');
-        const desc = prompt('وصف المصروف / رقم الإيصال:');
-        if (!desc) return;
-        lines.push({ category_id: cat.id, amount: amt, description: desc });
-        total = round2(total + amt);
-    }
-    const returned = uiAskAmount(`الفلوس اللي رجعها (الباقي المتوقع ${formatCurrency(balance - total)}):`, String(round2(balance - total)));
-    if (returned === null) return;
-    let returnTo = 'main_cash';
-    if (returned > 0) {
-        returnTo = uiPickBox('الفلوس الراجعة هتدخل فين؟', ['main_cash', 'drawer']);
-        if (!returnTo) return;
-    }
-    const res = await uiCall('custody_settle_secure', { p_staff_id: staffId, p_lines: lines, p_returned_cash: returned, p_return_to: returnTo });
+    for (let i = 1; i <= 5; i++) if (v['amt' + i] > 0) lines.push({ category_id: v['cat' + i], amount: v['amt' + i], description: v['desc' + i] });
+    const res = await uiCall('custody_settle_secure', { p_staff_id: staffId, p_lines: lines, p_returned_cash: v.returned || 0, p_return_to: v.return_to || 'main_cash' });
     if (res) { showToast(`تمت التسوية. الباقي معاه: ${formatCurrency(res.balance)}`); expRenderCustody(); }
 }
 
@@ -139,29 +135,25 @@ async function expRenderRecurring() {
 
 async function expEditRecurring(id) {
     const r = id ? expState.recurring.find(x => x.id === id) : {};
-    const catList = expState.categories.filter(c => c.is_active);
-    const desc = prompt('الوصف (مثلاً: إيجار المحل):', r.description || '');
-    if (!desc) return;
-    const pick = prompt('البند:\n' + catList.map((c, i) => `${i + 1}. ${c.name}`).join('\n'),
-        String(Math.max(1, catList.findIndex(c => c.id === r.category_id) + 1)));
-    const cat = catList[parseInt(pick, 10) - 1];
-    if (!cat) return showToast('بند غير صحيح', 'error');
-    const amount = uiAskAmount('المبلغ الشهري:', String(r.amount || ''));
-    if (!amount) return;
-    const day = prompt('يوم الاستحقاق في الشهر (1 لـ 28):', String(r.day_of_month || 1));
-    if (!day) return;
-    const active = id ? confirm('شغال؟ (إلغاء = إيقافه)') : true;
-    if (await uiCall('recurring_secure', { p_data: { id: id || null, description: desc, category_id: cat.id, amount: String(amount), day_of_month: String(day), is_active: String(active) } }, 'تم الحفظ')) expRenderRecurring();
+    const fields = [
+        { key: 'desc', label: 'الوصف (مثلاً: إيجار المحل)', value: r.description || '', required: true, full: true },
+        { key: 'cat', label: 'البند', type: 'select', options: expState.categories.filter(c => c.is_active).map(c => [c.id, c.name]), value: r.category_id || '', required: true, placeholder: 'اختار' },
+        { key: 'amount', label: 'المبلغ الشهري', type: 'money', min: 0.01, value: r.amount || '', required: true },
+        { key: 'day', label: 'يوم الاستحقاق في الشهر', type: 'select', options: Array.from({ length: 28 }, (_, i) => [String(i + 1), String(i + 1)]), value: String(r.day_of_month || 1) }];
+    if (id) fields.push({ key: 'active', label: 'شغال', type: 'check', value: r.is_active !== false });
+    const v = await uiForm(id ? 'تعديل مصروف متكرر' : 'مصروف متكرر جديد', fields);
+    if (!v) return;
+    if (await uiCall('recurring_secure', { p_data: { id: id || null, description: v.desc, category_id: v.cat, amount: String(v.amount), day_of_month: String(v.day), is_active: String(id ? v.active : true) } }, 'تم الحفظ')) expRenderRecurring();
 }
 
 async function expPayRecurring(id) {
     const r = expState.recurring.find(x => x.id === id);
     if (!r) return;
-    const amount = uiAskAmount(`صرف "${r.description}". المبلغ:`, String(r.amount));
-    if (!amount) return;
-    const source = uiPickBox('الفلوس طالعة منين؟', ['main_cash', 'bank', 'drawer']);
-    if (!source) return;
-    await expSubmit(id, { cat: r.category_id, amount, source, desc: r.description, ref: '', vendor: '' });
+    const v = await uiForm(`صرف "${r.description}"`, [
+        { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, value: r.amount, required: true },
+        { key: 'source', label: 'الفلوس طالعة منين', type: 'select', options: UI_BOX_OPTIONS(['main_cash', 'bank', 'drawer']), required: true }], { ok: 'صرف' });
+    if (!v) return;
+    await expSubmit(id, { cat: r.category_id, amount: v.amount, source: v.source, desc: r.description, ref: '', vendor: '' });
     expState.tab = 'recurring';
     renderExpensesBody();
 }
@@ -193,13 +185,12 @@ function expRenderCategories() {
 
 async function expEditCategory(id) {
     const c = id ? expState.categories.find(x => x.id === id) : {};
-    const name = prompt('اسم البند:', c.name || '');
-    if (!name) return;
-    const pick = prompt('الحساب في دليل الحسابات:\n' + expState.accounts.map((a, i) => `${i + 1}. ${a.name}`).join('\n'),
-        String(Math.max(1, expState.accounts.findIndex(a => a.id === c.account_id) + 1)));
-    const acc = expState.accounts[parseInt(pick, 10) - 1];
-    if (!acc) return showToast('حساب غير صحيح', 'error');
-    const active = id ? confirm('البند شغال؟ (إلغاء = إيقافه)') : true;
-    const res = await uiCall('expense_categories_secure', { p_data: { id: id || null, name, account_id: acc.id, is_active: String(active) } }, 'تم الحفظ');
+    const fields = [
+        { key: 'name', label: 'اسم البند', value: c.name || '', required: true },
+        { key: 'acc', label: 'الحساب في دليل الحسابات', type: 'select', options: expState.accounts.map(a => [a.id, a.name]), value: c.account_id || '', required: true, placeholder: 'اختار' }];
+    if (id) fields.push({ key: 'active', label: 'البند شغال', type: 'check', value: c.is_active !== false });
+    const v = await uiForm(id ? 'تعديل بند' : 'بند جديد', fields);
+    if (!v) return;
+    const res = await uiCall('expense_categories_secure', { p_data: { id: id || null, name: v.name, account_id: v.acc, is_active: String(id ? v.active : true) } }, 'تم الحفظ');
     if (res) { expState.categories = res.categories || []; expRenderCategories(); }
 }

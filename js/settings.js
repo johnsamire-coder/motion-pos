@@ -113,12 +113,11 @@ function renderMenuSettings() {
 }
 
 async function addNewCategoryPrompt() {
-    const name = prompt('أدخل اسم القسم الجديد (مثال: عصائر طازجة):');
-    if (!name) return;
-
+    const v = await uiForm('قسم جديد', [{ key: 'name', label: 'اسم القسم (مثال: عصائر طازجة)', required: true }]);
+    if (!v) return;
     try {
-        if (await settingsAction('add_category', { name: name })) {
-            showToast('تمت إضافة القسم الجديد بنجاح');
+        if (await settingsAction('add_category', { name: v.name })) {
+            showToast('تمت إضافة القسم');
             await loadSettingsData();
             renderMenuSettings();
             if (typeof loadPOSMasterData === 'function') loadPOSMasterData();
@@ -129,31 +128,22 @@ async function addNewCategoryPrompt() {
 }
 
 async function addNewProductPrompt() {
-    if (settingsState.categories.length === 0) {
-        alert('يرجى إضافة قسم أولا قبل إضافة المنتجات!');
-        return;
-    }
-
-    const name = prompt('أدخل اسم الصنف الجديد (مثال: عصير مانجو طازج):');
-    if (!name) return;
-    const priceStr = prompt('أدخل سعر البيع (بالجنيه):', '50');
-    if (!priceStr) return;
-
-    let catOptions = "اختر رقم القسم Tابع له المنتج:\n";
-    settingsState.categories.forEach((c, idx) => { catOptions += `${idx + 1}. ${c.name}\n`; });
-
-    const choiceStr = prompt(catOptions, '1');
-    if (!choiceStr) return;
-
-    const choiceIdx = parseInt(choiceStr) - 1;
-    if (choiceIdx < 0 || choiceIdx >= settingsState.categories.length) return alert('اختيار غير صحيح!');
-
-    const categoryId = settingsState.categories[choiceIdx].id;
-    const price = parseFloat(priceStr) || 0;
-
+    const v = await uiForm('صنف جديد', [
+        { key: 'name', label: 'اسم الصنف (مثال: عصير مانجو)', required: true, full: true },
+        { key: 'price', label: 'سعر البيع', type: 'money', min: 0, required: true },
+        { key: 'cat', label: 'القسم', type: 'select', options: settingsState.categories.map(c => [c.id, c.name]), placeholder: 'اختار القسم', addNew: 'قسم جديد', required: true }]);
+    if (!v) return;
     try {
-        if (await settingsAction('add_product', { name: name, price: String(price), category_id: categoryId })) {
-            showToast('تمت إضافة المنتج الجديد بنجاح المنيو');
+        let categoryId = v.cat;
+        if (v.cat_new) {
+            if (!(await settingsAction('add_category', { name: v.cat }))) return;
+            await loadSettingsData();
+            const c = settingsState.categories.find(x => x.name === v.cat);
+            if (!c) return showToast('القسم الجديد متعملش', 'error');
+            categoryId = c.id;
+        }
+        if (await settingsAction('add_product', { name: v.name, price: String(v.price), category_id: categoryId })) {
+            showToast('تمت إضافة الصنف');
             await loadSettingsData();
             renderMenuSettings();
             if (typeof loadPOSMasterData === 'function') loadPOSMasterData();
@@ -164,15 +154,11 @@ async function addNewProductPrompt() {
 }
 
 async function editProductPrice(productId, currentPrice) {
-    const newPriceStr = prompt('أدخل السعر الجديد للصنف (بالجنيه):', currentPrice);
-    if (!newPriceStr) return;
-
-    const price = parseFloat(newPriceStr);
-    if (isNaN(price) || price < 0) return alert('أدخل سعر صحفي!');
-
+    const v = await uiForm('تعديل السعر', [{ key: 'price', label: 'السعر الجديد', type: 'money', min: 0, value: currentPrice, required: true }]);
+    if (!v) return;
     try {
-        if (await settingsAction('set_product_price', { product_id: productId, price: String(price) })) {
-            showToast('تم تحديث سعر المنتج بنجاح');
+        if (await settingsAction('set_product_price', { product_id: productId, price: String(v.price) })) {
+            showToast('تم تحديث السعر');
             await loadSettingsData();
             renderMenuSettings();
             if (typeof loadPOSMasterData === 'function') loadPOSMasterData();
@@ -226,14 +212,14 @@ function renderBranchesSettings() {
 }
 
 async function addNewBranchPrompt() {
-    const name = prompt('أدخل اسم الفرع الجديد (مثال: فرع مدينة نصر):');
-    if (!name) return;
-    const address = prompt('أدخل عنوان الفرع:');
-    const hasTablesConfirm = confirm('هل يدعم هذا الفرع طاولات وقعدة صالة\n(موافق = نعم إلغاء = تيك أواي فقط)');
-
+    const v = await uiForm('فرع جديد', [
+        { key: 'name', label: 'اسم الفرع (مثال: فرع مدينة نصر)', required: true },
+        { key: 'address', label: 'العنوان' },
+        { key: 'tables', label: 'الفرع فيه طاولات وصالة (لو لأ: تيك أواي بس)', type: 'check', value: true, full: true }]);
+    if (!v) return;
     try {
-        if (await settingsAction('add_branch', { name: name, address: address || '', has_tables: String(hasTablesConfirm) })) {
-            showToast('تم إضافة الفرع بنجاح'); await loadSettingsData(); renderBranchesSettings(); renderTaxSettings();
+        if (await settingsAction('add_branch', { name: v.name, address: v.address || '', has_tables: String(v.tables) })) {
+            showToast('تم إضافة الفرع'); await loadSettingsData(); renderBranchesSettings(); renderTaxSettings();
         }
     } catch (err) { console.error(err); }
 }
@@ -264,18 +250,13 @@ function renderWarehousesSettings() {
 }
 
 async function addNewWarehousePrompt() {
-    const name = prompt('أدخل اسم المخزن الجديد:');
-    if (!name) return;
-    let branchOptions = "0. مخزن رئيسي مشترك\n";
-    settingsState.branches.forEach((b, idx) => { branchOptions += `${idx + 1}. ${b.name}\n`; });
-    const choiceStr = prompt('اختر رقم الفرع التابع له المخزن:\n' + branchOptions, '0');
-    if (choiceStr === null) return;
-    const choiceIdx = parseInt(choiceStr) || 0;
-    let selectedBranchId = choiceIdx > 0 && choiceIdx <= settingsState.branches.length ? settingsState.branches[choiceIdx - 1].id : null;
-
+    const v = await uiForm('مخزن جديد', [
+        { key: 'name', label: 'اسم المخزن', required: true },
+        { key: 'branch', label: 'تابع لـ', type: 'select', options: [['', 'مخزن رئيسي مشترك'], ...settingsState.branches.map(b => [b.id, b.name])], value: '' }]);
+    if (!v) return;
     try {
-        if (await settingsAction('add_warehouse', { name: name, branch_id: selectedBranchId })) {
-            showToast('تم إضافة المخزن بنجاح'); await loadSettingsData(); renderWarehousesSettings();
+        if (await settingsAction('add_warehouse', { name: v.name, branch_id: v.branch || null })) {
+            showToast('تم إضافة المخزن'); await loadSettingsData(); renderWarehousesSettings();
         }
     } catch (err) { console.error(err); }
 }
@@ -339,23 +320,25 @@ function renderTablesSettings() {
 }
 
 async function editTableCapacity(tableId, currentCapacity) {
-    const newCap = prompt('أدخل عدد الضيوف الجديد:', currentCapacity);
-    if (!newCap) return;
-    if (await settingsAction('set_table_capacity', { table_id: tableId, capacity: String(parseInt(newCap) || 4) })) {
-        showToast('تم التعديل بنجاح'); await loadSettingsData(); renderTablesSettings();
+    const v = await uiForm('عدد الكراسي', [{ key: 'cap', label: 'عدد الضيوف', type: 'number', min: 1, max: 50, value: currentCapacity, required: true }]);
+    if (!v) return;
+    if (await settingsAction('set_table_capacity', { table_id: tableId, capacity: String(parseInt(v.cap, 10) || 4) })) {
+        showToast('تم التعديل'); await loadSettingsData(); renderTablesSettings();
     }
 }
 
 async function addNewTable(areaId) {
-    const tNum = prompt('أدخل رقم الطاولة:'); if (!tNum) return;
-    const cap = prompt('أدخل سعة الطاولة:', '4'); if (!cap) return;
-    if (await settingsAction('add_table', { area_id: areaId, table_number: tNum, capacity: String(parseInt(cap) || 4) })) {
-        showToast('تمت الإضافة بنجاح'); await loadSettingsData(); renderTablesSettings();
+    const v = await uiForm('طاولة جديدة', [
+        { key: 'num', label: 'رقم الطاولة', required: true },
+        { key: 'cap', label: 'عدد الكراسي', type: 'number', min: 1, max: 50, value: 4, required: true }]);
+    if (!v) return;
+    if (await settingsAction('add_table', { area_id: areaId, table_number: v.num, capacity: String(parseInt(v.cap, 10) || 4) })) {
+        showToast('تمت الإضافة'); await loadSettingsData(); renderTablesSettings();
     }
 }
 
 async function deleteTable(tableId) {
-    if (!confirm('حذف الطاولة')) return;
+    if (!(await uiConfirm('حذف الطاولة؟', 'حذف', true))) return;
     if (await settingsAction('delete_table', { table_id: tableId })) {
         showToast('تم الحذف'); await loadSettingsData(); renderTablesSettings();
     }

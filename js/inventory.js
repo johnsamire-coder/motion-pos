@@ -225,19 +225,15 @@ async function invTransferAction(id, action) {
         if (!pin) return;
     }
     if (action === 'receive') {
-        if (!confirm('هل الكميات وصلت كاملة؟ (لو لأ، دوس إلغاء وهتكتب اللي وصل لكل خامة)')) {
-            const res = await uiCall('inv_transfers_list_secure', {});
-            const t = res && (res.transfers || []).find(x => x.id === id);
-            if (!t) return;
-            lines = [];
-            for (const l of (t.lines || [])) {
-                const v = prompt(`${l.ingredient}: اتشحن ${Number(l.qty_shipped)}. وصل كام؟`, String(Number(l.qty_shipped)));
-                if (v === null) return;
-                lines.push({ ingredient_id: l.ingredient_id, qty: Number(v) });
-            }
-        }
+        const res = await uiCall('inv_transfers_list_secure', {});
+        const t = res && (res.transfers || []).find(x => x.id === id);
+        if (!t) return;
+        const v = await uiForm('استلام التحويل: اكتب اللي وصل فعلاً', (t.lines || []).map((l, i) => ({ key: 'q' + i,
+            label: `${l.ingredient} (اتشحن ${Number(l.qty_shipped)})`, type: 'number', min: 0, value: Number(l.qty_shipped), required: true })), { ok: 'استلام' });
+        if (!v) return;
+        lines = (t.lines || []).map((l, i) => ({ ingredient_id: l.ingredient_id, qty: Number(v['q' + i]) }));
     }
-    if (action === 'cancel' && !confirm('إلغاء طلب التحويل؟')) return;
+    if (action === 'cancel' && !(await uiConfirm('إلغاء طلب التحويل؟', 'إلغاء الطلب', true))) return;
     const res = await uiCall('inv_transfer_action_secure', { p_transfer_id: id, p_action: action, p_lines: lines, p_manager_pin: pin ? String(pin).trim() : null }, 'تم');
     if (res) {
         if (Number(res.missing_value) > 0) showToast(`العجز في الاستلام اتسجل بقيمة ${formatCurrency(res.missing_value)}`, 'error');

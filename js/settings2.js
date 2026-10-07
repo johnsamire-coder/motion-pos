@@ -225,17 +225,34 @@ async function set2RecipeSave() {
     await uiCall('settings2_secure', { p_action: 'save_recipe', p_data: { product_id: set2.recipeProduct, lines } }, 'تم حفظ الوصفة');
 }
 
+// أسماء خامات جاهزة تظهر وانت بتكتب (وتقدر تكتب غيرها)
+const SET2_INGREDIENT_CATALOG = ['بن', 'بن اسبريسو', 'بن تركي', 'نسكافيه', 'شاي', 'شاي أخضر', 'كاكاو', 'سكر', 'سكر دايت', 'لبن', 'لبن شوفان', 'كريمة خفق',
+    'شوكولاتة', 'صوص كراميل', 'صوص شوكولاتة', 'فانيليا', 'تلج', 'مياه معدنية', 'صودا', 'كولا', 'عصير برتقال', 'مانجو', 'فراولة', 'ليمون', 'نعناع', 'موز',
+    'عيش برجر', 'عيش فينو', 'عيش توست', 'لحمة برجر', 'فراخ', 'سجق', 'جبنة', 'جبنة شيدر', 'جبنة موتزاريلا', 'بيض', 'طماطم', 'خس', 'بصل', 'خيار', 'مخلل',
+    'بطاطس', 'زيت', 'زبدة', 'كاتشب', 'مايونيز', 'مستردة', 'ملح', 'فلفل', 'دقيق', 'مكرونة', 'رز', 'معسل', 'فحم', 'ولاعة', 'خرطوم شيشة',
+    'كوبايات ورق', 'غطيان كوبايات', 'شفاطات', 'مناديل', 'علب تيك أواي', 'أكياس'];
+const SET2_DEFAULT_UNITS = ['كيلو', 'جرام', 'لتر', 'مللي', 'قطعة', 'علبة', 'كرتونة', 'رغيف', 'كيس', 'زجاجة', 'باكيت'];
+
 async function set2EditIngredient(id) {
     const i = id ? (set2.data.ingredients || []).find(x => x.id === id) : {};
-    const name = prompt('اسم الخامة:', i.name || '');
-    if (!name) return;
-    const unit = prompt('الوحدة (كيلو، جرام، لتر، علبة...):', i.unit || '');
-    if (!unit) return;
-    const min = uiAskAmount('الحد الأدنى للتنبيه:', String(i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5)));
-    if (min === null) return;
-    let cost = 0;
-    if (!id) { cost = uiAskAmount('تكلفة الوحدة المبدئية (بعد كده بتتحسب من المشتريات):', '0'); if (cost === null) return; }
-    if (await uiCall('settings2_secure', { p_action: 'save_ingredient', p_data: { id: id || null, name, unit, min_stock_alert: String(min), cost_per_unit: String(cost) } }, 'تم الحفظ')) initSettings2();
+    const saved = appSet('inventory', 'units', []) || [];
+    const used = (set2.data.ingredients || []).map(x => x.unit).filter(Boolean);
+    const units = [...new Set([...SET2_DEFAULT_UNITS, ...saved, ...used])];
+    const fields = [
+        { key: 'name', label: 'اسم الخامة', value: i.name || '', required: true, list: SET2_INGREDIENT_CATALOG, help: 'اكتب حرفين وهتظهرلك أسماء جاهزة، أو اكتب اسم جديد' },
+        { key: 'unit', label: 'الوحدة', type: 'select', options: units.map(u => [u, u]), value: i.unit || '', placeholder: 'اختار الوحدة', addNew: 'وحدة جديدة', required: true },
+        { key: 'min', label: 'الحد الأدنى للتنبيه', type: 'number', min: 0, value: i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5), required: true }];
+    if (!id) fields.push({ key: 'cost', label: 'تكلفة الوحدة المبدئية', type: 'money', min: 0, value: 0, help: 'بعد كده بتتحسب لوحدها من المشتريات' });
+    const v = await uiForm(id ? 'تعديل خامة' : 'خامة جديدة', fields, { validate: x => {
+        const dup = (set2.data.ingredients || []).find(y => y.id !== id && String(y.name).trim() === x.name);
+        return dup ? { key: 'name', msg: 'الخامة دي موجودة قبل كده' } : null;
+    } });
+    if (!v) return;
+    if (v.unit_new && !saved.includes(v.unit)) {
+        try { await serverRpc('app_settings_save_secure', { p_section: 'inventory', p_data: { units: [...saved, v.unit].slice(-40) } }); } catch (err) { console.warn('unit not saved', err); }
+        if (typeof loadAppSettings === 'function') loadAppSettings();
+    }
+    if (await uiCall('settings2_secure', { p_action: 'save_ingredient', p_data: { id: id || null, name: v.name, unit: v.unit, min_stock_alert: String(v.min || 0), cost_per_unit: String(v.cost || 0) } }, 'تم الحفظ')) initSettings2();
 }
 
 // ---------------------------------------------------------------- discounts, cancel reasons, areas
@@ -254,31 +271,29 @@ function set2RenderLists() {
 
 async function set2EditDiscount(id) {
     const d = id ? set2.data.discounts.find(x => x.id === id) : {};
-    const name = prompt('اسم الخصم:', d.name || '');
-    if (!name) return;
-    const t = prompt('النوع:\n1. نسبة %\n2. مبلغ ثابت', d.discount_type === 'fixed' ? '2' : '1');
-    const type = t === '2' ? 'fixed' : (t === '1' ? 'percentage' : null);
-    if (!type) return;
-    const value = uiAskAmount(type === 'percentage' ? 'النسبة %:' : 'المبلغ:', String(d.value || ''));
-    if (!value) return;
-    const approval = confirm('الخصم ده محتاج موافقة المدير؟ (موافق = نعم)');
-    if (await uiCall('settings2_secure', { p_action: 'save_discount', p_data: { id: id || null, name, discount_type: type, value: String(value), requires_approval: String(approval) } }, 'تم الحفظ')) initSettings2();
+    const v = await uiForm(id ? 'تعديل خصم' : 'خصم جديد', [
+        { key: 'name', label: 'اسم الخصم', value: d.name || '', required: true },
+        { key: 'type', label: 'النوع', type: 'select', options: [['percentage', 'نسبة %'], ['fixed', 'مبلغ ثابت']], value: d.discount_type || 'percentage', required: true },
+        { key: 'value', label: 'القيمة (النسبة أو المبلغ)', type: 'money', min: 0.01, value: d.value || '', required: true },
+        { key: 'approval', label: 'محتاج موافقة المدير', type: 'check', value: d.requires_approval !== false }],
+        { validate: x => x.type === 'percentage' && x.value > 100 ? { key: 'value', msg: 'النسبة متزيدش عن 100' } : null });
+    if (!v) return;
+    if (await uiCall('settings2_secure', { p_action: 'save_discount', p_data: { id: id || null, name: v.name, discount_type: v.type, value: String(v.value), requires_approval: String(v.approval) } }, 'تم الحفظ')) initSettings2();
 }
 
 async function set2EditReason(id) {
     const r = id ? set2.data.cancel_reasons.find(x => x.id === id) : {};
-    const reason = prompt('السبب:', r.reason || '');
-    if (!reason) return;
-    const t = prompt('النوع:\n1. إلغاء صنف\n2. إلغاء طلب\n3. مرتجع', { void_item: '1', cancel_order: '2', return: '3' }[r.reason_type] || '1');
-    const type = { 1: 'void_item', 2: 'cancel_order', 3: 'return' }[t];
-    if (!type) return;
-    if (await uiCall('settings2_secure', { p_action: 'save_cancel_reason', p_data: { id: id || null, reason, reason_type: type } }, 'تم الحفظ')) initSettings2();
+    const v = await uiForm(id ? 'تعديل سبب' : 'سبب جديد', [
+        { key: 'reason', label: 'السبب', value: r.reason || '', required: true },
+        { key: 'type', label: 'النوع', type: 'select', options: [['void_item', 'إلغاء صنف'], ['cancel_order', 'إلغاء طلب'], ['return', 'مرتجع']], value: r.reason_type || 'void_item', required: true }]);
+    if (!v) return;
+    if (await uiCall('settings2_secure', { p_action: 'save_cancel_reason', p_data: { id: id || null, reason: v.reason, reason_type: v.type } }, 'تم الحفظ')) initSettings2();
 }
 
 async function set2AddArea() {
-    const name = prompt('اسم المنطقة (مثلاً: الدور الأول، التراس):');
-    if (!name) return;
-    if (await uiCall('settings2_secure', { p_action: 'add_area', p_data: { name } }, 'تم الحفظ')) initSettings2();
+    const v = await uiForm('منطقة جديدة', [{ key: 'name', label: 'اسم المنطقة (مثلاً: الدور الأول، التراس)', required: true }]);
+    if (!v) return;
+    if (await uiCall('settings2_secure', { p_action: 'add_area', p_data: { name: v.name } }, 'تم الحفظ')) initSettings2();
 }
 
 // ---------------------------------------------------------------- payment accounts and tax flags

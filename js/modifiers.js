@@ -128,6 +128,6 @@ async function modSave() {
 
 async function modDelete(id) {
     const g = modState.groups.find(x => x.id === id);
-    if (!g || !confirm(`مسح مجموعة "${g.name}"؟\nالفواتير القديمة مش هتتأثر.`)) return;
+    if (!g || !(await uiConfirm(`مسح مجموعة "${g.name}"؟\nالفواتير القديمة مش هتتأثر.`, 'مسح', true))) return;
     if (await uiCall('modifiers_admin_secure', { p_action: 'delete_group', p_data: { id } }, 'تم المسح')) set2RenderModifiers();
 }

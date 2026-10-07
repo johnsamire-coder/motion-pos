@@ -188,7 +188,7 @@ async function custSave(id) {
         const res = await serverRpc('customer_save2_secure', { p_data: data });
         if (!res || res.ok === false) {
             if (res && res.reason === 'phone_taken' && res.customer) {
-                if (confirm(`الرقم ده متسجل باسم "${res.customer.name}". تفتح صفحته؟`)) custOpen(res.customer.id);
+                if (await uiConfirm(`الرقم ده متسجل باسم "${res.customer.name}". تفتح صفحته؟`, 'افتح صفحته')) custOpen(res.customer.id);
                 return;
             }
             return showToast(serverReasonMessage(res, 'تعذر الحفظ'), 'error');
