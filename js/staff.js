@@ -198,13 +198,27 @@ async function stfRenderPerms() {
     if (!res) return;
     stfState.permData = res;
     const roles = Object.keys(res.roles || {});
-    const head = '<tr><th class="p-2 text-[11px] border-b">الصلاحية</th>' + roles.map(r => `<th class="p-2 text-[11px] border-b">${uiEsc(STAFF_ROLE_NAMES[r] || r)}</th>`).join('') + '</tr>';
+    const isOwner = String(currentUser?.roles?.name || '') === 'owner';
+    const builtin = ['owner', 'branch_manager', 'cashier', 'waiter', 'storekeeper'];
+    const head = '<tr><th class="p-2 text-[11px] border-b">الصلاحية</th>' + roles.map(r => `<th class="p-2 text-[11px] border-b">${uiEsc(STAFF_ROLE_NAMES[r] || r)}${isOwner && !builtin.includes(r) ? ` <button onclick="stfDeleteRole('${uiEsc(r)}')" title="حذف الدور" class="text-red-600">🗑️</button>` : ''}</th>`).join('') + '</tr>';
     const body = (res.all_perms || []).map(p => '<tr class="border-b text-xs font-bold"><td class="p-2">' + uiEsc(PERM_NAMES[p] || p) + '</td>'
         + roles.map(r => `<td class="p-2 text-center"><input type="checkbox" data-perm-role="${uiEsc(r)}" data-perm="${uiEsc(p)}" ${(res.roles[r] || []).includes(p) ? 'checked' : ''}></td>`).join('')
         + '</tr>').join('');
     document.getElementById('stf-body').innerHTML = uiCard('الصلاحيات (المالك عنده كل حاجة دايماً)',
         `<div class="overflow-x-auto"><table class="w-full text-right"><thead>${head}</thead><tbody>${body}</tbody></table></div>`,
-        uiBtn('حفظ', 'stfSavePerms()', 'green'));
+        (isOwner ? uiBtn('➕ دور جديد', 'stfAddRole()', 'blue') : '') + uiBtn('حفظ', 'stfSavePerms()', 'green'));
+}
+
+async function stfAddRole() {
+    const v = await uiForm('دور جديد', [{ key: 'name', label: 'اسم الدور (مثلاً: محاسب، مشرف صالة)', required: true },
+        { type: 'note', label: 'بعد ما يتعمل، علّم صلاحياته في الجدول ودوس حفظ. وبعدها اختاره للموظف من شاشة الموظفين.' }], { ok: 'إضافة' });
+    if (!v) return;
+    if (await uiCall('role_admin_secure', { p_action: 'add', p_name: v.name }, 'اتعمل الدور')) { stfState.tab = 'perms'; renderStaffBody(); }
+}
+
+async function stfDeleteRole(name) {
+    if (!(await uiConfirm(`تحذف الدور "${name}"؟ (مينفعش لو فيه موظفين عليه)`, 'حذف', true))) return;
+    if (await uiCall('role_admin_secure', { p_action: 'delete', p_name: name }, 'اتحذف الدور')) { stfState.tab = 'perms'; renderStaffBody(); }
 }
 
 async function stfSavePerms() {

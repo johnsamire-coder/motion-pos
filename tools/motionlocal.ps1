@@ -52,8 +52,9 @@ $Files = [ordered]@{
   'supabase\migrations\017_phase13_sync_admin.sql'                = '7acb02b62e6f7e85'
   'supabase\migrations\018_phase13_sync_heartbeat_fix.sql'        = '9d2be902543b6250'
   'supabase\migrations\019_fixes2_whatsapp.sql'                 = '917bbfa5ca0a09c2'
+  'supabase\migrations\020_fixes3_purchasing.sql'               = '3eff3525397614ba'
 }
-$LastVersion = '019'
+$LastVersion = '020'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }

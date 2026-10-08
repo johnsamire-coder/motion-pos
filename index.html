@@ -405,6 +405,8 @@
         }
 
         function switchMainTab(targetTab) {
+            if (typeof uiHasUnsaved === 'function' && uiHasUnsaved() && !confirm('فيه تعديلات مش محفوظة. تخرج من غير حفظ؟')) return;
+            document.querySelectorAll('[data-save-btn][data-dirty="1"]').forEach(b => { if (typeof uiSaveBtnStyle === 'function') uiSaveBtnStyle(b, false); });
             if (!canOpenTab(targetTab)) {
                 showToast('القسم ده مش مسموح لدورك', 'error');
                 return;

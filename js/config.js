@@ -187,6 +187,11 @@ const SERVER_REASON_MESSAGES = {
     not_enough_cash: 'المبلغ أكبر من الموجود في الدرج',
     invalid_destination: 'الجهة غير صحيحة',
     reason_required: 'لازم تكتب السبب أو الوصف',
+    role_exists: 'فيه دور بنفس الاسم',
+    role_builtin: 'الدور ده أساسي ومينفعش يتحذف',
+    role_in_use: 'فيه موظفين على الدور ده. غيّر دورهم الأول',
+    grn_not_pending: 'الاستلام ده اترحّل أو اتلغى قبل كده',
+    grn_not_found: 'الاستلام مش موجود',
     open_shifts_exist: 'في ورديات لسه مفتوحة. لازم تتقفل الأول',
     day_already_closed: 'اليوم ده اتقفل قبل كده',
     warehouse_not_allowed: 'المخزن ده مش تبع فرعك',
@@ -326,7 +331,31 @@ function uiCard(title, inner, actionsHtml = '') {
         ${inner}</section>`;
 }
 
+// زرار "حفظ": رمادي "محفوظ ✓" لما مفيش تعديل، وأخضر "حفظ" أول ما تعدّل أي خانة في نفس الكارت
+const UI_SAVE_LABELS = ['حفظ', 'حفظ الوصفة'];
+function uiSaveBtnStyle(b, dirty) {
+    b.dataset.dirty = dirty ? '1' : '0';
+    b.className = 'px-3 py-1.5 rounded-xl text-xs font-black ' + (dirty ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow' : 'bg-slate-200 text-slate-500 hover:bg-slate-300');
+    b.textContent = dirty ? b.dataset.label : 'محفوظ ✓';
+}
+function uiMarkDirty(e) {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches('input, select, textarea') || t.closest('.uif-overlay, #login-screen')) return;
+    const scope = t.closest('section') || t.closest('.fixed');
+    const btns = scope ? scope.querySelectorAll('[data-save-btn]') : [];
+    btns.forEach(b => uiSaveBtnStyle(b, true));
+}
+function uiHasUnsaved() {
+    return [...document.querySelectorAll('[data-save-btn][data-dirty="1"]')].some(b => b.offsetParent !== null);
+}
+document.addEventListener('input', uiMarkDirty, true);
+document.addEventListener('change', uiMarkDirty, true);
+window.addEventListener('beforeunload', e => { if (uiHasUnsaved()) { e.preventDefault(); e.returnValue = ''; } });
+
 function uiBtn(label, onclick, color = 'blue') {
+    if (UI_SAVE_LABELS.includes(label)) {
+        return `<button data-save-btn data-label="${uiEsc(label)}" data-dirty="0" onclick="${onclick}" class="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-200 text-slate-500 hover:bg-slate-300">محفوظ ✓</button>`;
+    }
     const colors = { blue: 'bg-blue-600 text-white hover:bg-blue-700', red: 'bg-red-600 text-white hover:bg-red-700',
         green: 'bg-emerald-600 text-white hover:bg-emerald-700', gray: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
         amber: 'bg-amber-500 text-white hover:bg-amber-600' };
