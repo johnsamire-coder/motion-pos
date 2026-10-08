@@ -433,6 +433,8 @@ server-port = $ApiPort
 
 'run' {
   # what the automatic start runs: everything up, then sync forever
+  try { Start-Transcript -Path (Join-Path $Logs 'run.log') -Append -Force | Out-Null } catch {}
+  Write-Host "===== run started $(Get-Date -Format s) by $([Security.Principal.WindowsIdentity]::GetCurrent().Name) in $((Get-Location).Path) ====="
   Use-Env; Start-Db; Start-Api; Start-Web; Invoke-SyncLoop
 }
 
