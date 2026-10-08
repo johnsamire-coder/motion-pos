@@ -6,7 +6,7 @@ let posState = {
     selectedAreaId: null,
     selectedTable: null,
     areas: [], tables: [], categories: [], products: [], waiters: [], customers: [], cancelReasons: [], discounts: [],
-    activeCategory: null, pendingModifierProduct: null, selectedModifiers: [],
+    activeCategory: undefined, pendingModifierProduct: null, selectedModifiers: [],
 
     cart: emptyCart(),
     paymentsList: [],
@@ -67,7 +67,7 @@ async function loadPOSMasterData() {
         const [waitersRes, custRes, catRes, prodRes, reasonRes, discRes] = await Promise.all([
             _supabase.rpc('list_branch_staff', { p_token: staffSessionToken }),
             serverRpc('list_customers_secure').then(data => ({ data: (data && data.customers) || [] }), error => ({ error })),
-            _supabase.from('categories').select('*'),
+            _supabase.from('categories').select('*').order('sort_order').order('name'),
             _supabase.from('products').select('id, category_id, name, price, is_available, brand_id, name_en, sort_order, show_in_menu').order('sort_order').order('name'),
             _supabase.from('cancel_reasons').select('*'),
             _supabase.from('discounts').select('*')
@@ -288,25 +288,45 @@ async function selectPosTable(tableId) {
     renderOrderCartTicket();
 }
 
+// الأقسام: الزرار المختار بيبان أزرق. المنيو الكبير: أول قسم بيتفتح لوحده، والبحث بيدوّر في كل الأصناف.
 function renderCategoriesPills() {
     const container = document.getElementById('category-pills');
     if (!container) return;
-    container.innerHTML = `<button onclick="filterPosProducts(null)" class="shrink-0 whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-xl text-xs font-bold shadow">الكل</button>` +
-        posState.categories.map(c => `<button onclick="filterPosProducts('${c.id}')" class="shrink-0 whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200">${uiEsc(c.name)}</button>`).join('');
+    const cats = posState.categories.filter(c => posState.products.some(p => p.category_id === c.id && p.is_available !== false));
+    if (posState.activeCategory === undefined || (posState.activeCategory && !cats.some(c => c.id === posState.activeCategory))) {
+        posState.activeCategory = posState.products.length > 40 && cats.length ? cats[0].id : null;
+    }
+    const pill = (id, label) => `<button onclick="filterPosProducts(${id ? `'${id}'` : 'null'})" class="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-black ${posState.activeCategory === id ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">${uiEsc(label)}</button>`;
+    container.innerHTML = pill(null, 'الكل') + cats.map(c => pill(c.id, c.name)).join('');
 }
 
-function filterPosProducts(catId) { posState.activeCategory = catId; renderProductsGrid(); }
+function filterPosProducts(catId) {
+    posState.activeCategory = catId;
+    posState.productSearch = '';
+    const s = document.getElementById('pos-product-search');
+    if (s) s.value = '';
+    renderCategoriesPills();
+    renderProductsGrid();
+}
+
+function posSearchProducts(v) { posState.productSearch = String(v || '').trim(); renderProductsGrid(); }
 
 function renderProductsGrid() {
     const grid = document.getElementById('products-grid');
     if (!grid) return;
     let filtered = posState.products.filter(product => product.is_available !== false);
-    if (posState.activeCategory) filtered = filtered.filter(p => p.category_id === posState.activeCategory);
-    grid.innerHTML = filtered.map(p => `
-        <div onclick="checkAndAddProduct('${p.id}')" class="p-4 border rounded-2xl bg-slate-50 hover:border-blue-500 hover:shadow-md cursor-pointer transition flex flex-col justify-between h-28">
-            <h4 class="font-extrabold text-slate-800 text-xs">${p.name}</h4><span class="text-blue-600 font-extrabold text-sm">${formatCurrency(p.price)}</span>
-        </div>
-    `).join('');
+    const q = posState.productSearch || '';
+    if (q) filtered = filtered.filter(p => String(p.name).includes(q));
+    else if (posState.activeCategory) filtered = filtered.filter(p => p.category_id === posState.activeCategory);
+    else {
+        // "الكل": بترتيب الأقسام زي المنيو
+        const order = Object.fromEntries(posState.categories.map((c, i) => [c.id, i]));
+        filtered = filtered.slice().sort((a, b) => (order[a.category_id] ?? 999) - (order[b.category_id] ?? 999));
+    }
+    grid.innerHTML = filtered.length ? filtered.map(p => `
+        <button onclick="checkAndAddProduct('${p.id}')" class="text-right px-2.5 py-2 border rounded-xl bg-slate-50 hover:border-blue-500 hover:bg-blue-50 active:scale-95 transition flex flex-col justify-between gap-1 min-h-[58px] min-w-0">
+            <span class="font-extrabold text-slate-800 text-[11px] leading-snug line-clamp-2 break-words">${uiEsc(p.name)}</span><span class="text-blue-600 font-black text-[11px]">${formatCurrency(p.price)}</span>
+        </button>`).join('') : `<p class="col-span-full text-center text-slate-400 font-bold text-xs py-8">${q ? 'مفيش صنف بالاسم ده' : 'مفيش أصناف'}</p>`;
 }
 
 async function checkAndAddProduct(productId) {
