@@ -6,7 +6,18 @@ function setStaffTab(tab) { stfState.tab = tab; renderStaffBody(); }
 const STAFF_ROLE_NAMES = { owner: 'المالك', branch_manager: 'مدير فرع', cashier: 'كاشير', waiter: 'ويتر', storekeeper: 'أمين مخزن', kitchen: 'المطبخ' };
 const PERM_NAMES = { pos: 'البيع', kds: 'المطبخ', shift: 'الوردية', inventory: 'المخازن', inventory_approve: 'موافقات المخازن',
     purchasing: 'المشتريات', treasury: 'الخزينة', expenses: 'المصروفات', staff: 'الموظفين', payroll: 'المرتبات',
-    reports: 'التقارير', settings: 'الإعدادات', accounting: 'الحسابات', sales: 'المبيعات', customers: 'العملاء', dashboard: 'لوحة التحكم', feedback: 'الشكاوي والاقتراحات' };
+    reports: 'التقارير', settings: 'الإعدادات', accounting: 'الحسابات', sales: 'المبيعات', customers: 'العملاء', dashboard: 'لوحة التحكم', feedback: 'الشكاوي والاقتراحات',
+    // جوه الشاشات
+    po_create: 'عمل أمر شراء (وإلغاؤه وقفله)', po_approve: 'اعتماد أو رفض أمر الشراء', po_receive: 'الاستلام الفعلي وصورة الفاتورة',
+    po_post: 'الترحيل للمخازن', po_invoice: 'تسجيل فاتورة المورد', supplier_pay: 'الدفع للموردين', suppliers_manage: 'إضافة وتعديل الموردين',
+    inv_waste: 'تسجيل هالك', inv_transfer: 'تحويل بين المخازن', inv_stocktake: 'الجرد',
+    treasury_transfer: 'تحويل بين الخزن', day_close: 'قفل اليوم',
+    exp_record: 'تسجيل مصروف', exp_recurring: 'المصروفات المتكررة (المرتبات والإيجار...)', exp_categories: 'بنود المصروفات', exp_custody: 'العهد',
+    staff_manage: 'إضافة وتعديل الموظفين وأرقامهم السرية', payroll_approve: 'اعتماد المرتبات', payroll_pay: 'صرف المرتبات والسلف',
+    acc_manual: 'قيود يدوية وعكس القيود', settings_menu: 'تعديل المنيو والوصفات والإضافات' };
+const PERM_SUBS = new Set(['po_create', 'po_approve', 'po_receive', 'po_post', 'po_invoice', 'supplier_pay', 'suppliers_manage', 'inv_waste', 'inv_transfer',
+    'inv_stocktake', 'treasury_transfer', 'day_close', 'exp_record', 'exp_recurring', 'exp_categories', 'exp_custody', 'staff_manage', 'payroll_approve',
+    'payroll_pay', 'acc_manual', 'settings_menu']);
 
 async function loadStaffScreen() {
     renderStaffBody();
@@ -201,11 +212,11 @@ async function stfRenderPerms() {
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
     const builtin = ['owner', 'branch_manager', 'cashier', 'waiter', 'storekeeper'];
     const head = '<tr><th class="p-2 text-[11px] border-b">الصلاحية</th>' + roles.map(r => `<th class="p-2 text-[11px] border-b">${uiEsc(STAFF_ROLE_NAMES[r] || r)}${isOwner && !builtin.includes(r) ? ` <button onclick="stfDeleteRole('${uiEsc(r)}')" title="حذف الدور" class="text-red-600">🗑️</button>` : ''}</th>`).join('') + '</tr>';
-    const body = (res.all_perms || []).map(p => '<tr class="border-b text-xs font-bold"><td class="p-2">' + uiEsc(PERM_NAMES[p] || p) + '</td>'
+    const body = (res.all_perms || []).map(p => (PERM_SUBS.has(p) ? '<tr class="border-b text-[11px] font-bold text-slate-600"><td class="p-2 pr-6">↳ ' : '<tr class="border-b text-xs font-black bg-slate-50"><td class="p-2">📂 ') + uiEsc(PERM_NAMES[p] || p) + '</td>'
         + roles.map(r => `<td class="p-2 text-center"><input type="checkbox" data-perm-role="${uiEsc(r)}" data-perm="${uiEsc(p)}" ${(res.roles[r] || []).includes(p) ? 'checked' : ''}></td>`).join('')
         + '</tr>').join('');
     document.getElementById('stf-body').innerHTML = uiCard('الصلاحيات (المالك عنده كل حاجة دايماً)',
-        `<div class="overflow-x-auto"><table class="w-full text-right"><thead>${head}</thead><tbody>${body}</tbody></table></div>`,
+        `<p class="text-[11px] font-bold text-slate-500 mb-2">📂 = الشاشة نفسها تفتح ولا لأ. ↳ = اللي يقدر يعمله جوه الشاشة. مثال: مدير الفرع يفتح المشتريات ويعمل أمر شراء ويستلم، والاعتماد والترحيل للمالك بس.</p><div class="overflow-x-auto"><table class="w-full text-right"><thead>${head}</thead><tbody>${body}</tbody></table></div>`,
         (isOwner ? uiBtn('➕ دور جديد', 'stfAddRole()', 'blue') : '') + uiBtn('حفظ', 'stfSavePerms()', 'green'));
 }
 

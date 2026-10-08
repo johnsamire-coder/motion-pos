@@ -20,8 +20,11 @@ async function loadPurchasingScreen() {
 function renderPurchasingBody() {
     const root = document.getElementById('purchase-root');
     if (!root) return;
-    root.innerHTML = uiTabs('pur', [['orders', 'أوامر الشراء'], ['new', 'أمر شراء جديد'], ['receive', 'الاستلام الفعلي'], ['post', 'الترحيل للمخازن'],
-        ['suppliers', 'الموردين'], ['prices', 'تاريخ الأسعار']], purState.tab, 'setPurchasingTab') + '<div id="pur-body"></div>';
+    // كل تبويب بيظهر لصاحب صلاحيته بس (الموظفين ← الصلاحيات)
+    const tabs = [['orders', 'أوامر الشراء'], canDo('po_create') && ['new', 'أمر شراء جديد'], canDo('po_receive') && ['receive', 'الاستلام الفعلي'],
+        (canDo('po_post') || canDo('po_receive')) && ['post', 'الترحيل للمخازن'], ['suppliers', 'الموردين'], ['prices', 'تاريخ الأسعار']].filter(Boolean);
+    if (!tabs.some(t => t[0] === purState.tab)) purState.tab = 'orders';
+    root.innerHTML = uiTabs('pur', tabs, purState.tab, 'setPurchasingTab') + '<div id="pur-body"></div>';
     ({ orders: purRenderOrders, new: purRenderNew, receive: purRenderReceive, post: purRenderPost, suppliers: purRenderSuppliers, prices: purRenderPrices }[purState.tab] || purRenderOrders)();
 }
 
@@ -44,10 +47,11 @@ async function purRenderOrders() {
 
 function purOrderButtons(o) {
     const b = [];
-    if (o.status === 'draft') b.push(uiBtn('مراجعة وموافقة', `purReview('${o.id}')`, 'green'));
-    if (['partially_received', 'fully_received', 'closed'].includes(o.status) && Number(o.received_value) > Number(o.invoiced_value)) b.push(uiBtn('فاتورة المورد', `purInvoice('${o.id}')`, 'amber'));
-    if (o.status === 'partially_received' || o.status === 'fully_received') b.push(uiBtn('قفل', `purAction('${o.id}','close')`, 'gray'));
-    if (o.status === 'draft' || o.status === 'approved') b.push(uiBtn('إلغاء', `purAction('${o.id}','cancel')`, 'gray'));
+    if (o.status === 'draft' && canDo('po_approve')) b.push(uiBtn('مراجعة وموافقة', `purReview('${o.id}')`, 'green'));
+    if (o.status === 'draft' && !canDo('po_approve')) b.push('<span class="text-[11px] font-bold text-amber-700">مستني اعتماد المالك</span>');
+    if (['partially_received', 'fully_received', 'closed'].includes(o.status) && Number(o.received_value) > Number(o.invoiced_value) && canDo('po_invoice')) b.push(uiBtn('فاتورة المورد', `purInvoice('${o.id}')`, 'amber'));
+    if ((o.status === 'partially_received' || o.status === 'fully_received') && canDo('po_create')) b.push(uiBtn('قفل', `purAction('${o.id}','close')`, 'gray'));
+    if ((o.status === 'draft' || o.status === 'approved') && canDo('po_create')) b.push(uiBtn('إلغاء', `purAction('${o.id}','cancel')`, 'gray'));
     return '<div class="flex flex-wrap gap-1">' + b.join('') + '</div>';
 }
 
@@ -97,7 +101,54 @@ async function purReceive(id) {
     if (!v) return;
     const lines = open.map((x, i) => ({ po_item_id: x.l.id, qty: Number(v['q' + i]), unit_cost: Number(v['c' + i]) })).filter(l => l.qty > 0);
     const res = await uiCall('po_receive_secure', { p_po_id: id, p_lines: lines, p_notes: v.notes || '' });
-    if (res) { showToast(`اتسجل الاستلام ${res.grn_number} بقيمة ${formatCurrency(res.value)}. المخزن هيزيد بعد ما المدير يرحّله.`); purRenderReceive(); }
+    if (res) {
+        showToast(`اتسجل الاستلام ${res.grn_number} بقيمة ${formatCurrency(res.value)}. المخزن هيزيد بعد الترحيل.`);
+        purRenderReceive();
+        if (await uiConfirm(`تصوّر فاتورة المورد وترفعها مع الاستلام ${res.grn_number}؟\n(اللي بيرحّل للمخازن هيشوفها قبل الترحيل)`, '📷 صوّر الفاتورة')) purAddPhoto(res.grn_id);
+    }
+}
+
+// ---------------------------------------------------------------- صور فاتورة المورد (بتتصغّر قبل الرفع)
+function purAddPhoto(grnId) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.onchange = () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = async () => {
+                const max = 1400;
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                let url = canvas.toDataURL('image/jpeg', 0.7);
+                if (url.length > 590000) url = canvas.toDataURL('image/jpeg', 0.5);
+                if (url.length > 590000) return showToast('الصورة كبيرة جداً', 'error');
+                if (await uiCall('gr_files_secure', { p_action: 'add', p_data: { grn_id: grnId, image: url } }, `اترفعت صورة الفاتورة (${Math.round(url.length / 1024)} كيلو)`)) {
+                    if (purState.tab === 'post') purRenderPost();
+                }
+            };
+            img.onerror = () => showToast('الملف ده مش صورة', 'error');
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+async function purShowPhotos(grnId, canAdd) {
+    const res = await uiCall('gr_files_secure', { p_action: 'list', p_data: { grn_id: grnId } });
+    if (!res) return;
+    const imgs = [];
+    for (const f of res.files || []) {
+        const g = await uiCall('gr_files_secure', { p_action: 'get', p_data: { id: f.id } });
+        if (g && g.image) imgs.push(`<a href="${uiEsc(g.image)}" target="_blank" rel="noopener"><img src="${uiEsc(g.image)}" class="w-full rounded-xl border mb-2"></a><p class="text-[10px] text-slate-500 mb-3">${uiEsc(f.by || '')} | ${uiEsc(uiDate(f.created_at))}</p>`);
+    }
+    const v = await uiForm('📎 صور فاتورة المورد', [{ type: 'note', html: imgs.join('') || '<p class="text-sm">لسه مفيش صور.</p>' }], { ok: canAdd ? '📷 إضافة صورة' : 'قفل' });
+    if (v && canAdd) purAddPhoto(grnId);
 }
 
 // ---------------------------------------------------------------- الاستلام الفعلي (أمين المخزن): بيكتب اللي وصل، والمخزن لسه ما اتحرّكش
@@ -125,10 +176,12 @@ async function purRenderPost(status) {
         + uiTable(g.lines, [{ label: 'الخامة', render: l => `${uiEsc(l.ingredient)} (${uiEsc(l.unit)})` }, { label: 'المطلوب', render: l => uiEsc(Number(l.ordered)) },
             { label: 'وصل', render: l => uiEsc(Number(l.qty)) }, { label: 'سعر الوحدة', render: l => formatCurrency(l.unit_cost) }, { label: 'الإجمالي', render: l => formatCurrency(l.total) }])
         + `<p class="text-sm font-black mt-2">القيمة: ${formatCurrency(g.value)} | ${uiEsc(names[g.status] || g.status)}</p>`,
-        g.status === 'pending' && res.can_post ? uiBtn('ترحيل للمخزن ✅', `purPostGrn('${g.id}','post')`, 'green') + uiBtn('إلغاء الاستلام', `purPostGrn('${g.id}','void')`, 'gray') : '')).join('');
+        uiBtn(`📎 صور الفاتورة (${Number(g.files) || 0})`, `purShowPhotos('${g.id}', ${!!(res.can_receive || res.can_post)})`, Number(g.files) ? 'blue' : 'gray')
+        + (g.status === 'pending' && res.can_post ? uiBtn('ترحيل للمخزن ✅', `purPostGrn('${g.id}','post')`, 'green') : '')
+        + (g.status === 'pending' && res.can_receive ? uiBtn('إلغاء الاستلام', `purPostGrn('${g.id}','void')`, 'gray') : ''))).join('');
     document.getElementById('pur-body').innerHTML =
         `<div class="flex gap-2 mb-3">${uiBtn('مستني ترحيل', "purRenderPost('pending')", purState.postFilter === 'pending' ? 'blue' : 'gray')}${uiBtn('الكل', "purRenderPost('all')", purState.postFilter === 'all' ? 'blue' : 'gray')}</div>`
-        + (res.can_post ? '' : '<p class="text-[11px] text-amber-700 font-bold mb-2">الترحيل للمدير بس (صلاحية موافقات المخازن).</p>')
+        + (res.can_post ? '' : '<p class="text-[11px] text-amber-700 font-bold mb-2">الترحيل لصاحب صلاحية "الترحيل للمخازن" بس. تقدر ترفع صورة الفاتورة عشان يراجعها.</p>')
         + (cards || '<p class="text-center text-slate-400 font-bold text-xs py-6">مفيش استلامات هنا</p>');
 }
 
@@ -259,8 +312,8 @@ function purRenderSuppliers() {
         { label: 'الرصيد', render: s => `<b class="${Number(s.balance) > 0 ? 'text-red-600' : (Number(s.balance) < 0 ? 'text-emerald-700' : '')}">${formatCurrency(Math.abs(Number(s.balance) || 0))}${Number(s.balance) > 0 ? ' ليه' : (Number(s.balance) < 0 ? ' لينا' : '')}</b>` },
         { label: 'الحالة', render: s => s.is_active === false ? 'موقوف' : 'شغال' },
         { label: '', render: s => '<div class="flex flex-wrap gap-1">' + uiBtn('كشف حساب', `purStatement('${s.id}')`, 'gray')
-            + uiBtn('سداد', `purPay('${s.id}')`, 'green') + uiBtn('تعديل', `purEditSupplier('${s.id}')`, 'gray') + '</div>' }], 'مفيش موردين'),
-        uiBtn('إضافة مورد', 'purEditSupplier(null)', 'blue')) + '<div id="pur-statement"></div>';
+            + (canDo('supplier_pay') ? uiBtn('سداد', `purPay('${s.id}')`, 'green') : '') + (canDo('suppliers_manage') ? uiBtn('تعديل', `purEditSupplier('${s.id}')`, 'gray') : '') + '</div>' }], 'مفيش موردين'),
+        canDo('suppliers_manage') ? uiBtn('إضافة مورد', 'purEditSupplier(null)', 'blue') : '') + '<div id="pur-statement"></div>';
 }
 
 async function purEditSupplier(id) {

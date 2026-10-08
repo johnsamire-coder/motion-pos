@@ -273,6 +273,12 @@ async function loadAppLinks() {
     return appLinks;
 }
 
+// صلاحية جوه الشاشة (المالك عنده كل حاجة). السيرفر هو اللي بيمنع فعلاً، والزرار بيستخبى بس عشان الشاشة تبقى أوضح.
+function canDo(perm) {
+    if (String(currentUser?.roles?.name || '') === 'owner') return true;
+    return Array.isArray(currentUser?.perms) && currentUser.perms.includes(perm);
+}
+
 function serverReasonMessage(res, fallback) {
     const reason = res && res.reason;
     return SERVER_REASON_MESSAGES[reason] || fallback || ('تعذر تنفيذ العملية' + (reason ? ` (${reason})` : ''));
