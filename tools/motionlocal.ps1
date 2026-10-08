@@ -118,7 +118,7 @@ function Start-Db {
   Ok "Database running (port $DbPort)"
 }
 function Get-ApiExe { Get-ChildItem $ApiDir -Recurse -Filter 'postgrest.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 }
-function Test-ApiUp { (Get-Code "http://127.0.0.1:$ApiPort/") -eq 200 }
+function Test-ApiUp { try { $null = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$ApiPort/rpc/motionpos_version_public" -Body '{}' -ContentType 'application/json' -TimeoutSec 10 -ErrorAction Stop; $true } catch { $false } }
 function Start-Api {
   if (Test-ApiUp) { Ok "API running (port $ApiPort)"; return }
   $exe = Get-ApiExe; $conf = Join-Path $Root 'api\postgrest.conf'
