@@ -6,6 +6,7 @@ let kdsPollTimer = null;
 let kdsStation = 'kitchen';
 let kdsKnownIds = new Set();
 let kdsWarnMinutes = null;
+let kdsRush = null;
 const KDS_STATION_NAMES = { kitchen: 'المطبخ 👨‍🍳', bar: 'البار 🍹', shisha: 'الشيشة 💨' };
 
 function subscribeToKDSRealtime() {
@@ -48,6 +49,7 @@ async function loadKDSOrders() {
         if (kdsKnownIds.size && fresh.length) kdsBeep();
         kdsOrders = res.orders || [];
         kdsWarnMinutes = Number(res.warn_minutes) || null;
+        kdsRush = res.rush || null;
         kdsKnownIds = new Set(kdsOrders.map(o => o.id));
         renderKDSCards();
     } catch (err) {
@@ -58,6 +60,10 @@ async function loadKDSOrders() {
 function renderKDSCards() {
     const grid = document.getElementById('kds-cards-grid');
     if (!grid) return;
+    const rushBox = document.getElementById('kds-rush');
+    const rushHtml = kdsRush && kdsRush.on ? `🔥 زحمة دلوقتي: ${uiEsc(kdsRush.open)} طلب مفتوح. الطلبات الجديدة واخدة ${uiEsc(kdsRush.extra)} دقايق زيادة.`
+        : (kdsRush && Number(kdsRush.limit) > 0 ? `الطلبات المفتوحة ${uiEsc(kdsRush.open)} من ${uiEsc(kdsRush.limit)} (عند ${uiEsc(kdsRush.limit)} بتبقى زحمة)` : '');
+    if (rushBox) { rushBox.innerHTML = rushHtml; rushBox.className = 'text-xs font-black rounded-xl px-3 py-1.5 ' + (kdsRush && kdsRush.on ? 'bg-red-600 text-white animate-pulse' : (rushHtml ? 'bg-slate-100 text-slate-600' : 'hidden')); }
     if (kdsOrders.length === 0) {
         grid.innerHTML = `<div class="col-span-3 text-center py-16 bg-white rounded-3xl border border-slate-200"><p class="text-slate-400 font-extrabold text-base">🎉 لا توجد طلبات معلقة هنا الآن!</p></div>`;
         return;
@@ -65,7 +71,8 @@ function renderKDSCards() {
     const warn = kdsWarnMinutes || Number(appSet('kds', 'warn_' + kdsStation + '_minutes', kdsStation === 'kitchen' ? 20 : 10)) || 15;
     grid.innerHTML = kdsOrders.map(ord => {
         const minutes = Math.max(0, Math.floor((Date.now() - new Date(ord.since || ord.created_at).getTime()) / 60000));
-        const late = minutes >= warn;
+        const limit = warn + (Number(ord.extra_minutes) || 0);
+        const late = minutes >= limit;
         const isPreparing = ord.status === 'preparing';
         const cardBg = late ? 'bg-red-50 border-red-300' : (isPreparing ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200');
         const itemsHtml = (ord.items || []).map(i => `
@@ -79,12 +86,12 @@ function renderKDSCards() {
             <div class="p-5 rounded-3xl border ${cardBg} shadow-sm flex flex-col justify-between min-h-[260px]">
                 <div>
                     <div class="flex justify-between items-center text-sm font-extrabold mb-2 pb-2 border-b">
-                        <span>${uiEsc(ord.order_number || '')}${ord.table_number ? ' - طاولة ' + uiEsc(ord.table_number) : ''}</span>
+                        <span>${uiEsc(ord.order_number || '')}${ord.table_number ? ' - طاولة ' + uiEsc(ord.table_number) : ''}${ord.source === 'qr' ? ' <span class="text-[10px] bg-violet-100 text-violet-700 rounded px-1">📱 QR</span>' : ''}</span>
                         <span class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-[11px]">${uiEsc(PRINT_TYPE_NAMES[ord.order_type] || ord.order_type)}</span>
                     </div>
                     <div class="flex justify-between items-center mb-2 text-[11px] font-bold">
                         <span>${isPreparing ? '👨‍🍳 قيد التحضير' : '⏳ في الانتظار'}${ord.waiter ? ' | ' + uiEsc(ord.waiter) : ''}</span>
-                        <span class="${late ? 'text-red-600 font-black' : 'text-slate-400'}">⏰ ${minutes} دقيقة${late ? ' (متأخر)' : ` / ${warn}`}</span>
+                        <span class="${late ? 'text-red-600 font-black' : 'text-slate-400'}">⏰ ${minutes} دقيقة${late ? ' (متأخر)' : ` / ${limit}`}${Number(ord.extra_minutes) ? ' 🔥' : ''}</span>
                     </div>
                     <div class="space-y-1 mb-3">${itemsHtml}</div>
                 </div>

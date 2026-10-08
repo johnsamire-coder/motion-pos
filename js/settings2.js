@@ -3,7 +3,7 @@
 // الأقسام دي بتتضاف جنب أقسام الإعدادات القديمة (الضرائب والطاولات، الفروع والمخازن، المنيو).
 
 const SET2_SECTIONS = [['general', 'الشركة واللوجو'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
-    ['qr', 'الويتر والـ QR'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
+    ['qr', 'الويتر ومنيو الـ QR'], ['loyalty', 'خصم الانتماء والسوشيال'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
     ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب']];
 
 let set2 = { settings: null, data: null, recipeProduct: '', recipeLines: [], products: [] };
@@ -54,7 +54,8 @@ function set2RenderAll() {
     set2Form('receipt', 'الطباعة والفاتورة', [['header', 'سطر فوق الفاتورة', 'text'], ['footer', 'سطر تحت الفاتورة (رسالة شكر)', 'text'],
         ['show_logo', 'اللوجو يظهر في الفاتورة', 'bool'], ['show_tax_number', 'الرقم الضريبي يظهر في الفاتورة', 'bool'],
         ['paper_mm', 'مقاس الورق', 'select', [[58, '58 مم'], [80, '80 مم']]], ['copies', 'عدد النسخ', 'number'],
-        ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool']],
+        ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool'],
+        ['show_feedback_qr', 'كود QR لصفحة الشكاوي والاقتراحات في آخر الفاتورة', 'bool']],
         '<p class="text-[11px] text-slate-500 font-bold mt-2">ورقة المطبخ والبار بتتطبع من شاشة التحضير نفسها بزرار 🖨️ على كل طلب.</p>');
     set2Form('whatsapp', 'رسايل الواتساب', [['customer_message', 'الرسالة اللي بتتبعت من شاشة العملاء (زرار 💬)', 'text'],
         ['thanks_enabled', 'بعد الدفع: الكاشير يشوف زرار "ابعت رسالة شكر" لو الطلب عليه عميل بموبايل', 'bool'],
@@ -67,14 +68,27 @@ function set2RenderAll() {
         ['quick_notes', 'الملاحظات الجاهزة اللي بتظهر للكاشير (كل ملاحظة في سطر، مثلاً: بدون بصل)', 'lines']], '', '', 'poscfg');
     set2Form('kds', 'شاشة التحضير', [['stations', 'الأماكن المفعّلة', 'multi', [['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']]],
         ['warn_kitchen_minutes', 'المطبخ: الطلب يبقى متأخر بعد كام دقيقة', 'number'], ['warn_bar_minutes', 'البار: متأخر بعد كام دقيقة', 'number'],
-        ['warn_shisha_minutes', 'الشيشة: متأخر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number']],
-        `<div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
+        ['warn_shisha_minutes', 'الشيشة: متأخر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number'],
+        ['rush_kitchen_orders', '🔥 زحمة المطبخ: لما يبقى فيه كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_kitchen_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة المطبخ', 'number'],
+        ['rush_bar_orders', '🔥 زحمة البار: لما يبقى فيه كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_bar_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة البار', 'number'],
+        ['rush_shisha_orders', '🔥 زحمة الشيشة: كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_shisha_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة الشيشة', 'number']],
+        `<p class="text-[11px] text-slate-500 font-bold mt-2">🔥 الزحمة: أول ما عدد الطلبات المفتوحة في المكان يوصل للرقم ده، أي طلب جديد بياخد الدقايق الزيادة دي قبل ما يتحسب متأخر، والشاشة بتكتب "زحمة". مثال: البار 8 طلبات و5 دقايق.</p>
+         <div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
          ${uiTable(set2.data.categories, [{ label: 'القسم', key: 'name' }, { label: 'المكان', render: c => `<select onchange="set2Station('${c.id}', this.value)" class="${uiInputClass()}">
             ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].filter(([v]) => (set2.settings.kds.stations || []).includes(v) || c.station === v).map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}${(set2.settings.kds.stations || []).includes(v) ? '' : ' (مقفول! الأصناف مش هتظهر)'}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
-    set2Form('waiter_qr', 'الويتر والـ QR', [['qr_enabled', 'منيو الـ QR شغال', 'bool'], ['qr_call_waiter', 'زرار نداء الويتر', 'bool'],
-        ['qr_request_bill', 'زرار طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في المنيو', 'bool']],
+    set2Form('waiter_qr', 'الويتر ومنيو الـ QR', [['qr_enabled', 'منيو الـ QR شغال', 'bool'], ['qr_ordering', 'العميل يقدر يطلب بنفسه من المنيو (والويتر يأكّد)', 'bool'],
+        ['qr_call_waiter', 'زرار نداء الويتر', 'bool'], ['qr_request_bill', 'زرار طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في المنيو', 'bool'],
+        ['qr_welcome', 'جملة الترحيب أول المنيو', 'text'],
+        ['qr_privacy_note', 'الجملة اللي بتطمّن العميل لما نطلب اسمه ورقمه وميلاده', 'text']],
         `<div class="mt-4 border-t pt-3">${uiBtn('طباعة أكواد الطاولات (QR)', 'set2PrintQr()', 'blue')}
          <p class="text-[11px] text-slate-500 font-bold mt-2">كل طاولة ليها كود سري مختلف. اطبعهم وحط كل واحد على طاولته.</p></div>`, '', 'qr');
+    set2Form('loyalty', '⭐ خصم الانتماء (للعميل الدايم)', [['enabled', 'شغال', 'bool'], ['min_spent', 'لو اشترى بمبلغ (جنيه) أو أكتر', 'number'],
+        ['period_days', 'خلال آخر كام يوم (365 = سنة)', 'number'], ['percent', 'ياخد خصم كام %', 'number'], ['label', 'اسم الخصم على الفاتورة', 'text']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">بيتطبّق لوحده أول ما الكاشير يختار العميل بالموبايل (أو العميل يطلب من الـ QR)، ويظهر في الفاتورة سطر لوحده. بيتحسب من الطلبات المدفوعة بس.</p>', '', 'loyalty');
+    set2Form('social', '📣 السوشيال والشكاوي', [['facebook_url', 'لينك صفحة الفيسبوك', 'text'], ['instagram_url', 'لينك الإنستجرام', 'text'],
+        ['feedback_enabled', 'صفحة الشكاوي والاقتراحات شغالة', 'bool'], ['links_in_thanks', 'اللينكات دي تتبعت مع رسالة الشكر على الواتساب بعد الدفع', 'bool'],
+        ['feedback_intro', 'الجملة اللي أول صفحة الشكاوي', 'text']],
+        `<p class="text-[11px] text-slate-500 font-bold mt-2">صفحة الشكاوي: <span class="text-blue-700 select-all">${uiEsc((typeof appLinks !== 'undefined' && appLinks.feedback) || 'بتظهر بعد الحفظ')}</span> | الشكاوي بتوصل للمدير في تبويب "الشكاوي والاقتراحات".</p>`, '', 'loyalty', true);
     const work = document.getElementById('set-section-work');
     if (work) {
         work.innerHTML = '';
@@ -268,28 +282,10 @@ async function set2RenderRecipes() {
     const box = document.getElementById('set-section-recipes');
     if (!box) return;
     const ings = set2.data.ingredients || [];
-    let recipeHtml = '';
-    if (set2.recipeProduct) {
-        const names = Object.fromEntries(ings.map(i => [i.id, i]));
-        const cost = set2.recipeLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(names[l.ingredient_id]?.cost_per_unit) || 0), 0);
-        const product = set2.products.find(p => p.id === set2.recipeProduct) || {};
-        recipeHtml = `${uiTable(set2.recipeLines.map((l, i) => ({ ...l, i })), [
-            { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id] ? `${names[l.ingredient_id].name} (${names[l.ingredient_id].unit})` : '') },
-            { label: 'الكمية', render: l => `<input type="number" min="0" step="any" value="${uiEsc(l.qty)}" onchange="set2.recipeLines[${l.i}].qty = this.value; set2RenderRecipes()" class="${uiInputClass()} w-28">` },
-            { label: 'التكلفة', render: l => formatCurrency((Number(l.qty) || 0) * (Number(names[l.ingredient_id]?.cost_per_unit) || 0)) },
-            { label: '', render: l => uiBtn('شيل', `set2.recipeLines.splice(${l.i},1); set2RenderRecipes()`, 'gray') }], 'الوصفة فاضية')}
-            <div class="flex flex-wrap gap-2 mt-2"><select id="set2-rec-ing" class="${uiInputClass()}">${uiOptions(ings, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
-            <input id="set2-rec-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()} w-28">${uiBtn('إضافة', 'set2RecipeAdd()', 'gray')}</div>
-            <p class="text-xs font-black mt-3">تكلفة الصنف: ${formatCurrency(cost)} من سعر ${formatCurrency(product.price)} (${product.price ? (100 * cost / product.price).toFixed(1) : 0}%)</p>
-            <div class="mt-2">${uiBtn('حفظ الوصفة', 'set2RecipeSave()', 'green')}</div>`;
-    }
-    box.innerHTML = uiCard('الوصفات (الريسبي)', `<div class="flex gap-2 mb-3"><select onchange="set2RecipeLoad(this.value)" class="${uiInputClass()}">
-        ${uiOptions(set2.products, 'id', p => p.name, 'اختار الصنف')}</select></div>${recipeHtml}`)
+    box.innerHTML = uiCard('الوصفات (الريسبي)', `<p class="text-xs font-bold text-slate-600">الوصفات بقت جوه كل صنف في <button onclick="switchSettingsSection('menu')" class="text-blue-700 underline font-black">المنيو والوصفات 🍽️</button>: افتح الصنف، وضيف الخامات والكميات، وتقدر تعمل خامة جديدة من نفس المكان.</p>`)
         + uiCard('الخامات', uiTable(ings, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
             { label: 'التكلفة (من المشتريات)', render: i => formatCurrency(i.cost_per_unit) }, { label: 'الحد الأدنى', key: 'min_stock_alert' },
             { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'مفيش خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
-    const sel = box.querySelector('select');
-    if (sel) sel.value = set2.recipeProduct;
 }
 
 async function set2RecipeLoad(productId) {

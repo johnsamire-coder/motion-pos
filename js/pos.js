@@ -28,7 +28,7 @@ function emptyCart() {
         id: null, order_number: 'طلب جديد', status: 'draft', kitchen_status: 'pending',
         items: [], guest_count: 1, waiter_id: null, customer_id: null,
         enable_vat: true, enable_service: true,
-        discount_id: null, discount_percent: 0, order_discount_amount: 0,
+        discount_id: null, discount_percent: 0, order_discount_amount: 0, loyalty_percent: 0,
         server_total: 0, paid_amount: 0
     };
 }
@@ -68,7 +68,7 @@ async function loadPOSMasterData() {
             _supabase.rpc('list_branch_staff', { p_token: staffSessionToken }),
             serverRpc('list_customers_secure').then(data => ({ data: (data && data.customers) || [] }), error => ({ error })),
             _supabase.from('categories').select('*'),
-            _supabase.from('products').select('*'),
+            _supabase.from('products').select('id, category_id, name, price, is_available, brand_id, name_en, sort_order, show_in_menu').order('sort_order').order('name'),
             _supabase.from('cancel_reasons').select('*'),
             _supabase.from('discounts').select('*')
         ]);
@@ -230,6 +230,7 @@ async function loadOrderIntoCart(orderId, keepUnsent = false) {
         discount_id: ord.discount_id || null,
         discount_percent: Number(ord.discount_percent) || 0,
         order_discount_amount: Number(ord.order_discount_amount) || 0,
+        loyalty_percent: Number(ord.loyalty_percent) || 0,
         server_total: Number(ord.total_amount) || 0,
         paid_amount: Number(ord.paid_amount) || 0
     };
@@ -445,7 +446,14 @@ function addItemToCart(product, selectedModifiers = [], notes = '') {
 
 // ---------------------------------------------------------------- رسالة شكر على الواتساب بعد الدفع (ضغطة واحدة)
 async function posAskThanks(c) {
-    const msg = waFill(appSet('whatsapp', 'thanks_message', ''), c.name);
+    let msg = waFill(appSet('whatsapp', 'thanks_message', ''), c.name);
+    if (msg && appSet('social', 'links_in_thanks', true)) {
+        const extra = [];
+        if (appSet('social', 'facebook_url', '')) extra.push('📘 فيسبوك: ' + appSet('social', 'facebook_url', ''));
+        if (appSet('social', 'instagram_url', '')) extra.push('📸 إنستجرام: ' + appSet('social', 'instagram_url', ''));
+        if (appSet('social', 'feedback_enabled', true) && typeof appLinks !== 'undefined' && appLinks.feedback) extra.push('💬 رأيك أو شكوتك أو اقتراحك يهمنا: ' + appLinks.feedback);
+        if (extra.length) msg += '\n\n' + extra.join('\n');
+    }
     if (!msg) return;
     if (!(await uiConfirm(`تبعت رسالة شكر على الواتساب لـ ${c.name}؟\n\n${msg}`, 'ابعت 💬'))) return;
     waOpen(c.phone, msg);
@@ -464,6 +472,18 @@ function posSetCustomer(c) {
     if (sel) sel.value = c.id;
     posState.lastCustomerInfo = c;
     renderPosCustomerInfo();
+    posSaveCustomerOnOrder();
+}
+
+// لو الطلب متسجّل، العميل بيتحفظ عليه على طول (عشان خصم الانتماء يتحسب ويبان)
+async function posSaveCustomerOnOrder() {
+    if (!posState.cart.id) return;
+    try {
+        const res = await serverRpc('update_order_info_secure', {
+            p_order_id: posState.cart.id, p_waiter_id: document.getElementById('select-waiter')?.value || null,
+            p_customer_id: posState.cart.customer_id || null, p_guest_count: parseInt(posState.cart.guest_count, 10) || 1 });
+        if (res && res.ok) { await loadOrderIntoCart(posState.cart.id, true); renderOrderCartTicket(); }
+    } catch (err) { console.warn('customer save', err); }
 }
 
 function posClearCustomer() {
@@ -473,6 +493,7 @@ function posClearCustomer() {
     const input = document.getElementById('pos-cust-phone');
     if (input) input.value = '';
     renderPosCustomerInfo();
+    posSaveCustomerOnOrder();
 }
 
 function renderPosCustomerInfo() {
@@ -484,7 +505,8 @@ function renderPosCustomerInfo() {
     const extra = posState.lastCustomerInfo && posState.lastCustomerInfo.id === id ? posState.lastCustomerInfo : null;
     box.innerHTML = `👤 <span class="text-slate-800">${uiEsc(c.name || '')}</span> ${c.phone ? '| ' + uiEsc(c.phone) : ''}`
         + (extra && extra.orders_count !== undefined ? ` | ${uiEsc(extra.orders_count)} طلب قبل كده` : '')
-        + (extra && extra.notes ? `<div class="text-amber-700">📝 ${uiEsc(extra.notes)}</div>` : '');
+        + (extra && extra.notes ? `<div class="text-amber-700">📝 ${uiEsc(extra.notes)}</div>` : '')
+        + (extra && Number(extra.loyalty_percent) > 0 ? `<div class="text-emerald-700 font-black">⭐ عميل انتماء: خصم ${uiEsc(extra.loyalty_percent)}% بيتطبّق لوحده</div>` : '');
 }
 
 async function posFindCustomer() {
@@ -517,7 +539,8 @@ function calculateCartTotals() {
     const orderDiscount = cart.discount_percent > 0
         ? round2(Math.max(0, subtotal - itemDiscounts) * Math.min(cart.discount_percent, 100) / 100)
         : Math.max(0, Number(cart.order_discount_amount) || 0);
-    const discountTotal = Math.min(subtotal, itemDiscounts + orderDiscount);
+    const loyalty = round2(Math.max(0, subtotal - itemDiscounts - orderDiscount) * Math.min(Number(cart.loyalty_percent) || 0, 100) / 100);
+    const discountTotal = Math.min(subtotal, itemDiscounts + orderDiscount + loyalty);
     const net = subtotal - discountTotal;
     const r = (Number(taxSettings.vat_percentage) || 0) / 100;
     const base = taxSettings.is_vat_inclusive ? round2(net / (1 + r)) : net;
@@ -526,7 +549,7 @@ function calculateCartTotals() {
     const vatAmount = cart.enable_vat
         ? round2((taxSettings.is_vat_inclusive ? net - base : base * r) + (taxSettings.is_service_taxable !== false ? serviceAmount * r : 0))
         : 0;
-    return { subtotal, discountTotal, vatAmount, serviceAmount, finalTotal: round2(base + serviceAmount + vatAmount) };
+    return { subtotal, discountTotal, loyalty, vatAmount, serviceAmount, finalTotal: round2(base + serviceAmount + vatAmount) };
 }
 
 function renderOrderCartTicket() {
@@ -539,7 +562,8 @@ function renderOrderCartTicket() {
     if (statusBadgeElem) {
         const discountText = posState.cart.discount_percent > 0 ? ` | خصم ${posState.cart.discount_percent}%`
             : (posState.cart.order_discount_amount > 0 ? ` | خصم ${formatCurrency(posState.cart.order_discount_amount)}` : '');
-        statusBadgeElem.innerText = `حالة: ${posState.cart.status}${discountText}`;
+        const loyaltyText = posState.cart.loyalty_percent > 0 ? ` | ⭐ ${appSet('loyalty', 'label', 'خصم انتماء')} ${posState.cart.loyalty_percent}% (${formatCurrency(totals.loyalty)})` : '';
+        statusBadgeElem.innerText = `حالة: ${posState.cart.status}${discountText}${loyaltyText}`;
     }
     if (tableInfoElem) tableInfoElem.innerText = `الطاولة: ${posState.selectedTable ? posState.selectedTable.table_number : '---'}`;
     const typeInfoElem = document.getElementById('ticket-type-info');
@@ -570,6 +594,13 @@ function renderOrderCartTicket() {
         }).join('');
     }
     document.getElementById('summary-subtotal').innerText = formatCurrency(totals.subtotal);
+    const discRow = document.getElementById('summary-discount-row');
+    if (discRow) {
+        discRow.classList.toggle('hidden', !(totals.discountTotal > 0));
+        document.getElementById('summary-discount').innerText = '-' + formatCurrency(totals.discountTotal);
+        document.getElementById('summary-discount-label').innerText = totals.loyalty > 0
+            ? `الخصم (فيه ⭐ ${appSet('loyalty', 'label', 'خصم انتماء')} ${posState.cart.loyalty_percent}%):` : 'الخصم:';
+    }
     document.getElementById('summary-tax').innerText = formatCurrency(totals.vatAmount) + (posState.cart.enable_vat ? '' : ' (متشالة)');
     document.getElementById('summary-service').innerText = formatCurrency(totals.serviceAmount) + (posState.cart.enable_service ? '' : ' (متشالة)');
     document.getElementById('summary-total').innerText = formatCurrency(totals.finalTotal);
@@ -767,6 +798,10 @@ async function openMultiplePaymentsModal() {
         if (!(await sendOrderToKitchen())) return;
     } else {
         try {
+            // العميل والويتر بيتحفظوا الأول، عشان الإجمالي اللي هيتدفع يبقى فيه خصم الانتماء لو العميل يستحقه
+            await serverRpc('update_order_info_secure', {
+                p_order_id: posState.cart.id, p_waiter_id: document.getElementById('select-waiter')?.value || null,
+                p_customer_id: document.getElementById('select-customer')?.value || null, p_guest_count: parseInt(posState.cart.guest_count, 10) || 1 });
             await loadOrderIntoCart(posState.cart.id, false);
         } catch (err) {
             return showToast('تعذر قراءة الطلب من السيرفر: ' + (err.message || ''), 'error');

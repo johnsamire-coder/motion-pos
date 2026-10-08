@@ -126,6 +126,7 @@
                 </div>
             </div>
             <nav class="flex flex-wrap gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 w-full lg:w-auto lg:max-w-[60%] order-3 lg:order-none">
+                <button onclick="switchMainTab('dashboard')" id="tab-btn-dashboard" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">لوحة التحكم 📈</button>
                 <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
                 <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨‍🍳</button>
                 <button onclick="switchMainTab('shift')" id="tab-btn-shift" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الوردية 💵</button>
@@ -137,6 +138,7 @@
                 <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول</button>
                 <button onclick="switchMainTab('sales')" id="tab-btn-sales" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المبيعات 🧾</button>
                 <button onclick="switchMainTab('customers')" id="tab-btn-customers" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">العملاء 👤</button>
+                <button onclick="switchMainTab('feedback')" id="tab-btn-feedback" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الشكاوي والاقتراحات 💬 <span id="feedback-badge" class="hidden bg-red-600 text-white rounded-full px-1.5 text-[10px]"></span></button>
                 <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊</button>
                 <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات</button>
                 <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات ⚙️</button>
@@ -202,7 +204,7 @@
                         </div>
                         <div>
                             <label for="select-customer" class="block text-[10px] text-slate-400 font-bold mb-0.5">العميل</label>
-                            <select id="select-customer" onchange="posState.cart.customer_id = this.value || null; renderPosCustomerInfo()" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
+                            <select id="select-customer" onchange="posState.cart.customer_id = this.value || null; renderPosCustomerInfo(); posSaveCustomerOnOrder()" class="w-full bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]"></select>
                         </div>
                         <div>
                             <label for="input-guests" class="block text-[10px] text-slate-400 font-bold mb-0.5">عدد الضيوف</label>
@@ -221,6 +223,7 @@
                 <div class="border-t pt-3 space-y-2">
                     <div class="space-y-1 text-xs font-bold text-slate-600">
                         <div class="flex justify-between"><span>المجموع الفرعي:</span><span id="summary-subtotal">0.00 ج.م</span></div>
+                        <div id="summary-discount-row" class="hidden flex justify-between text-emerald-700"><span id="summary-discount-label">الخصم:</span><span id="summary-discount">0.00 ج.م</span></div>
                         <div class="flex justify-between items-center">
                             <button onclick="toggleVatTax()" class="text-[10px] bg-slate-100 px-2 py-0.5 rounded-lg border hover:bg-slate-200">الضريبة (14% VAT) ⚙️</button>
                             <span id="summary-tax">0.00 ج.م</span>
@@ -254,7 +257,7 @@
 
         <div id="view-kds-workspace" class="hidden space-y-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
-                <div class="flex flex-wrap items-center gap-2"><h2 class="font-black text-slate-800 text-sm">شاشة التحضير</h2><div id="kds-station-tabs" class="flex flex-wrap gap-1.5"></div></div>
+                <div class="flex flex-wrap items-center gap-2"><h2 class="font-black text-slate-800 text-sm">شاشة التحضير</h2><div id="kds-station-tabs" class="flex flex-wrap gap-1.5"></div><span id="kds-rush" class="hidden"></span></div>
                 <button onclick="loadKDSOrders()" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">تحديث 🔄</button>
             </div>
             <div id="kds-cards-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
@@ -275,6 +278,10 @@
         <div id="view-sales-workspace" class="hidden space-y-4"><div id="sales-root"></div></div>
 
         <div id="view-customers-workspace" class="hidden space-y-4"><div id="customers-root"></div></div>
+
+        <div id="view-dashboard-workspace" class="hidden space-y-4"><div id="dashboard-root"></div></div>
+
+        <div id="view-feedback-workspace" class="hidden space-y-4"><div id="feedback-root"></div></div>
 
         <div id="view-cost-workspace" class="hidden space-y-4">
             <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -314,7 +321,7 @@
                     <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ أقسام الإعدادات</h3>
                     <button onclick="switchSettingsSection('pos')" id="btn-set-pos" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 mb-2">الضرائب والطاولات</button>
                     <button onclick="switchSettingsSection('inventory')" id="btn-set-inventory" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">الفروع والمخازن</button>
-                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">إدارة المنيو</button>
+                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">المنيو والوصفات 🍽️</button>
                 </aside>
                 <div class="lg:col-span-3 space-y-4">
                     <div id="set-section-pos" class="set-section space-y-4">
@@ -322,16 +329,7 @@
                         <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"><h3 class="font-black text-sm mb-4 border-b pb-2">إدارة الطاولات والمناطق</h3><div id="settings-tables-container"></div></section>
                     </div>
                     <div id="set-section-inventory" class="set-section hidden space-y-4"><div id="settings-branches-container"></div><div id="settings-warehouses-container"></div></div>
-                    <div id="set-section-menu" class="set-section hidden space-y-4">
-                        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                            <div class="flex justify-between items-center mb-4 border-b pb-3"><h3 class="font-black text-sm">أقسام المنيو</h3><button onclick="addNewCategoryPrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold">إضافة قسم ➕</button></div>
-                            <div id="settings-categories-list" class="flex flex-wrap gap-2"></div>
-                        </section>
-                        <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                            <div class="flex justify-between items-center mb-4 border-b pb-3"><h3 class="font-black text-sm">الأصناف والأسعار</h3><button onclick="addNewProductPrompt()" class="bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold">إضافة صنف ➕</button></div>
-                            <div class="overflow-x-auto"><table class="w-full text-right"><tbody id="settings-products-table-body"></tbody></table></div>
-                        </section>
-                    </div>
+                    <div id="set-section-menu" class="set-section hidden space-y-4"><div id="menuadmin-root"></div></div>
                 </div>
             </div>
         </div>
@@ -357,6 +355,9 @@
     <script src="js/modifiers.js"></script>
     <script src="js/sales.js"></script>
     <script src="js/customers.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/menuadmin.js"></script>
+    <script src="js/feedback.js"></script>
 
     <script>
         let pendingTabTarget = null;
@@ -368,9 +369,9 @@
         }
 
         // كل تبويب مربوط بصلاحية. السيرفر هو اللي بيمنع فعلاً، والتبويب بيستخبى بس عشان الشاشة تبقى أوضح.
-        const TAB_PERMS = { pos: 'pos', kds: 'kds', shift: 'shift', inventory: 'inventory', purchase: 'purchasing',
+        const TAB_PERMS = { dashboard: 'dashboard', pos: 'pos', kds: 'kds', shift: 'shift', inventory: 'inventory', purchase: 'purchasing',
             treasury: 'treasury', expenses: 'expenses', staff: 'staff', cost: 'reports', reports: 'reports',
-            accounting: 'accounting', settings: 'settings', sales: 'sales', customers: 'customers' };
+            accounting: 'accounting', settings: 'settings', sales: 'sales', customers: 'customers', feedback: 'feedback' };
 
         function canOpenTab(tab) {
             const perms = currentUser?.perms;
@@ -397,8 +398,12 @@
             const payBtn = document.getElementById('pos-pay-btn');
             if (payBtn) payBtn.classList.toggle('hidden', !canOpenTab('shift'));
             if (typeof startWaiterFeed === 'function') startWaiterFeed();
+            if (typeof startFeedbackBadge === 'function') startFeedbackBadge();
+            // المالك بيفتح على لوحة التحكم
+            if (String(currentUser?.roles?.name || '') === 'owner' && canOpenTab('dashboard')) {
+                switchMainTab('dashboard');
             // اللي معندوش شاشة البيع (زي دور المطبخ) بيفتح على أول شاشة مسموحة، والمطبخ أولاً
-            if (!canOpenTab('pos')) {
+            } else if (!canOpenTab('pos')) {
                 const first = ['kds', ...Object.keys(TAB_PERMS)].find(t => canOpenTab(t));
                 if (first) switchMainTab(first);
             }
@@ -429,7 +434,7 @@
             }
             const loaders = { shift: 'loadShiftScreen', treasury: 'loadTreasuryScreen', inventory: 'loadInventoryScreen',
                 purchase: 'loadPurchasingScreen', expenses: 'loadExpensesScreen', staff: 'loadStaffScreen',
-                sales: 'loadSalesScreen', customers: 'loadCustomersScreen' };
+                sales: 'loadSalesScreen', customers: 'loadCustomersScreen', dashboard: 'loadDashboardScreen', feedback: 'loadFeedbackScreen' };
             if (loaders[targetTab] && typeof window[loaders[targetTab]] === 'function') window[loaders[targetTab]]();
             if (targetTab === 'cost') {
                 if (typeof loadCostAnalysis === 'function') loadCostAnalysis();

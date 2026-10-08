@@ -2,77 +2,439 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1c1410">
     <title>المنيو</title>
-    <script src="vendor/tailwind.js"></script>
+    <link rel="stylesheet" href="vendor/fonts/cairo.css">
     <script src="vendor/supabase.js"></script>
+    <style>
+        :root {
+            --bg: #f7f2ea; --card: #ffffff; --ink: #1f1a17; --ink2: #6b625a; --muted: #a39a90; --line: #ece4d8;
+            --brand: #1c1410; --brand2: #3a2a20; --gold: #c08a3e; --gold-soft: #f6ead6; --ok: #0f7a3d; --bad: #c23b3b;
+            --radius: 18px; --shadow: 0 6px 24px rgba(28, 20, 16, .08);
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Cairo', system-ui, sans-serif; }
+        body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+        button { font-family: inherit; cursor: pointer; border: 0; }
+        input, textarea { font-family: inherit; }
+        .wrap { max-width: 640px; margin: 0 auto; }
+        .hero { background: radial-gradient(120% 140% at 100% 0%, #5a3d28 0%, var(--brand2) 35%, var(--brand) 75%); color: #fff; padding: 26px 18px 54px; position: relative; overflow: hidden; }
+        .hero::after { content: ''; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%; background: rgba(192, 138, 62, .18); }
+        .hero .logo { width: 74px; height: 74px; border-radius: 22px; background: #fff; object-fit: contain; padding: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+        .hero h1 { margin: 10px 0 2px; font-size: 26px; font-weight: 900; letter-spacing: -.3px; }
+        .hero .sub { color: #e8d9c4; font-size: 13px; font-weight: 700; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 800; }
+        .welcome { margin-top: 12px; font-size: 15px; font-weight: 700; color: #f7ecdc; line-height: 1.7; }
+        .modebar { display: flex; gap: 8px; margin-top: 14px; position: relative; z-index: 1; }
+        .modebtn { flex: 1; border-radius: 14px; padding: 10px; font-weight: 900; font-size: 14px; background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.18); }
+        .modebtn.on { background: var(--gold); border-color: var(--gold); color: #1c1410; }
+        .cats { position: sticky; top: 0; z-index: 20; background: rgba(247, 242, 234, .94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); margin-top: -26px; border-radius: 22px 22px 0 0; }
+        .cats .row { display: flex; gap: 8px; overflow-x: auto; padding: 14px 14px 10px; scrollbar-width: none; }
+        .cats .row::-webkit-scrollbar { display: none; }
+        .cat { white-space: nowrap; padding: 8px 16px; border-radius: 999px; background: #fff; color: var(--ink2); font-weight: 800; font-size: 14px; border: 1px solid var(--line); }
+        .cat.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+        .search { margin: 0 14px 10px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+        .search input { border: 0; outline: 0; flex: 1; font-size: 15px; background: transparent; }
+        section.menu-sec { padding: 6px 14px 4px; scroll-margin-top: 120px; }
+        section.menu-sec h2 { font-size: 19px; font-weight: 900; margin: 16px 2px 10px; display: flex; align-items: center; gap: 8px; }
+        section.menu-sec h2::before { content: ''; width: 6px; height: 20px; border-radius: 4px; background: var(--gold); }
+        .item { display: flex; gap: 12px; background: var(--card); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid #f1ebe2; align-items: stretch; }
+        .item .ph { width: 92px; height: 92px; border-radius: 14px; flex: none; background: linear-gradient(135deg, var(--gold-soft), #efe2cc); display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 900; color: var(--gold); overflow: hidden; }
+        .item .ph img { width: 100%; height: 100%; object-fit: cover; }
+        .item .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .item .name { font-weight: 900; font-size: 16px; line-height: 1.4; }
+        .item .desc { color: var(--ink2); font-size: 13px; font-weight: 600; line-height: 1.6; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .item .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 6px; }
+        .price { font-weight: 900; font-size: 16px; color: var(--brand); }
+        .price small { font-size: 12px; color: var(--ink2); font-weight: 700; }
+        .add { background: var(--brand); color: #fff; border-radius: 12px; min-width: 40px; height: 36px; font-size: 20px; font-weight: 900; padding: 0 12px; }
+        .incart { background: var(--gold); color: #1c1410; font-size: 14px; }
+        .bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(247,242,234,0), var(--bg) 30%); }
+        .bottom .inner { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; }
+        .cartbar { flex: 1; background: var(--brand); color: #fff; border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 15px; box-shadow: 0 10px 30px rgba(28,20,16,.35); }
+        .cartbar .count { background: var(--gold); color: #1c1410; border-radius: 10px; padding: 2px 10px; margin-left: 8px; }
+        .svc { flex: 1; background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 12px; font-weight: 900; font-size: 14px; box-shadow: var(--shadow); }
+        .sheet-bg { position: fixed; inset: 0; background: rgba(20, 14, 10, .55); z-index: 40; display: none; }
+        .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: #fff; border-radius: 26px 26px 0 0; max-height: 92vh; overflow-y: auto; transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom); }
+        .sheet.open { transform: translateY(0); }
+        .sheet .in { max-width: 640px; margin: 0 auto; padding: 8px 18px 20px; }
+        .grab { width: 44px; height: 5px; border-radius: 9px; background: #ddd3c6; margin: 6px auto 10px; }
+        .sheet h3 { margin: 6px 0 4px; font-size: 21px; font-weight: 900; }
+        .bigimg { width: 100%; height: 220px; object-fit: cover; border-radius: 18px; background: var(--gold-soft); }
+        .grp { border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin-top: 12px; }
+        .grp .t { display: flex; justify-content: space-between; font-weight: 900; font-size: 15px; }
+        .grp .t span { font-size: 12px; color: var(--ink2); font-weight: 700; background: var(--gold-soft); border-radius: 8px; padding: 1px 8px; }
+        .opt { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px dashed var(--line); font-weight: 700; font-size: 15px; }
+        .opt:last-child { border-bottom: 0; }
+        .opt input { width: 20px; height: 20px; accent-color: var(--brand); }
+        .field { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 15px; font-weight: 700; background: #fffdf9; outline: none; }
+        .field:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(192,138,62,.15); }
+        label.l { display: block; font-weight: 900; font-size: 14px; margin: 12px 0 6px; }
+        .qty { display: inline-flex; align-items: center; gap: 4px; background: var(--bg); border-radius: 14px; padding: 4px; }
+        .qty button { width: 36px; height: 36px; border-radius: 10px; background: #fff; font-size: 20px; font-weight: 900; color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .qty b { min-width: 30px; text-align: center; font-size: 17px; }
+        .primary { width: 100%; background: var(--brand); color: #fff; border-radius: 16px; padding: 15px; font-weight: 900; font-size: 16px; margin-top: 14px; }
+        .primary:disabled { opacity: .5; }
+        .ghost { width: 100%; background: var(--bg); color: var(--ink); border-radius: 16px; padding: 13px; font-weight: 900; font-size: 15px; margin-top: 8px; }
+        .note { background: var(--gold-soft); border-radius: 14px; padding: 12px; font-size: 13px; font-weight: 700; color: #6a4a1e; line-height: 1.8; display: flex; gap: 8px; }
+        .cline { display: flex; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+        .cline .n { flex: 1; min-width: 0; font-weight: 900; font-size: 15px; }
+        .cline .n small { display: block; color: var(--ink2); font-weight: 700; font-size: 12px; }
+        .tot { display: flex; justify-content: space-between; font-weight: 900; font-size: 18px; margin-top: 12px; }
+        .muted { color: var(--ink2); font-size: 12px; font-weight: 700; }
+        .status { text-align: center; padding: 18px 6px; }
+        .status .ic { font-size: 56px; }
+        .status h3 { font-size: 22px; }
+        .spinner { width: 34px; height: 34px; border: 4px solid var(--gold-soft); border-top-color: var(--gold); border-radius: 50%; animation: sp 1s linear infinite; margin: 10px auto; }
+        @keyframes sp { to { transform: rotate(360deg); } }
+        .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 80; background: var(--brand); color: #fff; padding: 12px 18px; border-radius: 14px; font-weight: 800; font-size: 14px; box-shadow: var(--shadow); max-width: 90%; text-align: center; display: none; }
+        .footer { text-align: center; padding: 24px 14px 10px; color: var(--ink2); font-size: 13px; font-weight: 700; }
+        .footer a { color: var(--brand); font-weight: 900; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; margin: 4px; }
+        .center-msg { text-align: center; padding: 90px 20px; font-weight: 800; color: var(--ink2); }
+        .err { color: var(--bad); font-size: 13px; font-weight: 800; margin-top: 6px; display: none; }
+        .tag-off { background: #fdecec; color: var(--bad); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 800; margin: 10px 14px 0; text-align: center; }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-    <!-- صفحة الزبون: بتتفتح من كود الـ QR على الطاولة. من غير تسجيل دخول: منيو + نداء ويتر + طلب الحساب -->
-    <div id="menu-app" class="max-w-xl mx-auto p-4 pb-28">
-        <p class="text-center text-slate-400 font-bold py-20">جاري التحميل...</p>
-    </div>
-    <div id="menu-actions" class="hidden fixed bottom-0 inset-x-0 bg-white border-t shadow-lg p-3">
-        <div class="max-w-xl mx-auto grid grid-cols-2 gap-2">
-            <button id="btn-call" onclick="menuRequest('waiter')" class="bg-blue-600 text-white py-3 rounded-2xl font-black text-sm">🙋 نداء الويتر</button>
-            <button id="btn-bill" onclick="menuRequest('bill')" class="bg-emerald-600 text-white py-3 rounded-2xl font-black text-sm">🧾 طلب الحساب</button>
-        </div>
-    </div>
+<body>
+    <!-- صفحة الزبون: بتتفتح من كود الـ QR على الطاولة. من غير تسجيل دخول.
+         يتفرج على المنيو، أو يطلب بنفسه (الطلب بيستنى الويتر يأكّده)، ونداء الويتر وطلب الحساب. -->
+    <div id="app"><p class="center-msg">جاري تحميل المنيو... ☕</p></div>
+    <div class="bottom" id="bottom" style="display:none"><div class="inner" id="bottom-inner"></div></div>
+    <div class="sheet-bg" id="sheet-bg" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet"><div class="in" id="sheet-in"></div></div>
+    <div class="toast" id="toast"></div>
     <script src="js/config.js"></script>
     <script>
-        const qrToken = new URLSearchParams(location.search).get('t') || '';
-        let menuData = null;
+        const params = new URLSearchParams(location.search);
+        const qrToken = params.get('t') || '';
+        const KEY = 'motion_menu_' + qrToken;
+        let M = null;                 // menu data
+        let products = {};            // id -> product
+        let cart = [];                // [{key, product_id, qty, mods: [ids], note}]
+        let mode = null;              // 'order' | 'browse'
+        let current = null;           // item being added
+        let imgCache = {};
+        let statusTimer = null;
 
-        async function loadMenu() {
-            const app = document.getElementById('menu-app');
+        function esc(v) { return uiEsc(v); }
+        function money(v) { const n = Math.round((Number(v) || 0) * 100) / 100; return n.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+        function cur() { return (M && M.currency) || 'ج.م'; }
+        function toast(msg, ms = 2600) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms); }
+        function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+        function canOrder() { return M && M.ordering && !M.store_offline && mode === 'order'; }
+
+        async function rpc(name, args) {
+            const { data, error } = await _supabase.rpc(name, args);
+            if (error) throw error;
+            return data;
+        }
+
+        async function load() {
+            const app = document.getElementById('app');
             try {
-                const { data, error } = await _supabase.rpc('qr_menu_public', { p_qr: qrToken });
-                if (error || !data || !data.ok) {
-                    app.innerHTML = `<p class="text-center text-slate-500 font-bold py-20">${data && data.reason === 'qr_disabled' ? 'المنيو مش متاح دلوقتي' : 'الكود ده مش صحيح'}</p>`;
+                const data = await rpc('qr_menu_public', { p_qr: qrToken });
+                if (!data || !data.ok) {
+                    app.innerHTML = `<p class="center-msg">${data && data.reason === 'qr_disabled' ? 'المنيو مش متاح دلوقتي 🙏' : 'الكود ده مش صحيح. امسح الكود اللي على الطرابيزة تاني.'}</p>`;
                     return;
                 }
-                menuData = data;
-                document.title = data.company_name || 'المنيو';
-                const cur = uiEsc(data.currency || '');
-                app.innerHTML = `
-                    <div class="text-center mb-5">
-                        ${data.logo ? `<img src="${uiEsc(data.logo)}" class="mx-auto max-h-24 mb-2 object-contain">` : ''}
-                        <h1 class="font-black text-2xl text-slate-800">${uiEsc(data.company_name || '')}</h1>
-                        <p class="text-sm font-bold text-slate-500">${uiEsc(data.branch || '')} | طاولة ${uiEsc(data.table_number)}</p>
+                M = data;
+                (M.categories || []).forEach(c => (c.products || []).forEach(p => { products[p.id] = p; }));
+                document.title = M.company_name || 'المنيو';
+                cart = (store(KEY + '_cart') || []).filter(l => products[l.product_id]);
+                mode = M.ordering ? (sessionStorage.getItem(KEY + '_mode') || null) : 'browse';
+                render();
+                const last = store(KEY + '_last');
+                if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) pollStatus(last.ref, false);
+                if (!mode) chooseMode();
+            } catch (err) {
+                app.innerHTML = '<p class="center-msg">في مشكلة في الاتصال بالنت. حاول تاني 🙏</p>';
+            }
+        }
+
+        function setMode(m) {
+            mode = m;
+            try { sessionStorage.setItem(KEY + '_mode', m); } catch (e) { /* private mode */ }
+            closeSheet();
+            render();
+        }
+
+        function chooseMode() {
+            openSheet(`<div style="text-align:center">
+                ${M.logo ? `<img src="${esc(M.logo)}" style="height:60px;margin:6px auto 4px;display:block;object-fit:contain">` : ''}
+                <h3>أهلاً بيك في ${esc(M.company_name || '')} 👋</h3>
+                <p class="muted" style="font-size:14px">طاولة ${esc(M.table_number)} | تحب تعمل إيه؟</p></div>
+                <button class="primary" onclick="setMode('order')">🛒 أطلب بنفسي من الموبايل</button>
+                <button class="ghost" onclick="setMode('browse')">👀 أتفرّج على المنيو بس (والويتر ياخد الطلب)</button>
+                <p class="muted" style="text-align:center;margin-top:10px">تقدر تغيّر اختيارك في أي وقت من فوق.</p>`);
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            const cats = M.categories || [];
+            const taxNote = M.vat_inclusive ? '' : [Number(M.vat_percentage) ? `ضريبة ${Number(M.vat_percentage)}%` : '', Number(M.service_percentage) ? `خدمة ${Number(M.service_percentage)}% على الصالة` : ''].filter(Boolean).join(' و');
+            app.innerHTML = `
+                <header class="hero"><div class="wrap" style="position:relative;z-index:1">
+                    ${M.logo ? `<img class="logo" src="${esc(M.logo)}" alt="">` : ''}
+                    <h1>${esc(M.company_name || '')}</h1>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub">${esc(M.branch)}</span>` : ''}</div>
+                    ${M.welcome ? `<p class="welcome">${esc(M.welcome)}</p>` : ''}
+                    ${M.ordering ? `<div class="modebar"><button class="modebtn ${mode === 'order' ? 'on' : ''}" onclick="setMode('order')">🛒 هطلب بنفسي</button>
+                        <button class="modebtn ${mode !== 'order' ? 'on' : ''}" onclick="setMode('browse')">👀 بتفرّج بس</button></div>` : ''}
+                </div></header>
+                <div class="cats"><div class="wrap">
+                    <div class="row" id="cat-row">${cats.map((c, i) => `<button class="cat ${i === 0 ? 'on' : ''}" data-cat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')">${esc(c.name)}</button>`).join('')}</div>
+                    <div class="search"><span>🔍</span><input id="q" placeholder="دوّر على اللي نفسك فيه" oninput="filter(this.value)"></div>
+                </div></div>
+                <div class="wrap">
+                    ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الموبايل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.</div>' : ''}
+                    ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2>${esc(c.name)}</h2>
+                        ${(c.products || []).map(itemHtml).join('')}</section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
+                    ${M.show_prices && taxNote ? `<p class="muted" style="text-align:center;padding:4px 14px">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
+                    <div class="footer">
+                        ${M.facebook_url ? `<a href="${esc(M.facebook_url)}" target="_blank" rel="noopener">📘 فيسبوك</a>` : ''}
+                        ${M.instagram_url ? `<a href="${esc(M.instagram_url)}" target="_blank" rel="noopener">📸 إنستجرام</a>` : ''}
+                        ${M.feedback_token ? `<a href="feedback.html?b=${esc(M.feedback_token)}">💬 رأيك يهمنا</a>` : ''}
+                        ${M.phone ? `<div style="margin-top:8px">☎️ ${esc(M.phone)}</div>` : ''}
                     </div>
-                    ${(data.categories || []).map(cat => `
-                        <section class="mb-4">
-                            <h2 class="font-black text-lg text-blue-700 mb-2 border-b pb-1">${uiEsc(cat.name)}</h2>
-                            <div class="space-y-2">${(cat.products || []).map(p => `
-                                <div class="bg-white rounded-2xl border p-3 flex justify-between items-center">
-                                    <span class="font-bold text-slate-800">${uiEsc(p.name)}</span>
-                                    ${data.show_prices ? `<span class="font-black text-emerald-700">${(Number(p.price) || 0).toFixed(2)} ${cur}</span>` : ''}
-                                </div>`).join('')}</div>
-                        </section>`).join('')}`;
-                document.getElementById('btn-call').classList.toggle('hidden', !data.call_waiter);
-                document.getElementById('btn-bill').classList.toggle('hidden', !data.request_bill);
-                document.getElementById('menu-actions').classList.toggle('hidden', !data.call_waiter && !data.request_bill);
-            } catch (err) {
-                app.innerHTML = '<p class="text-center text-slate-500 font-bold py-20">في مشكلة في الاتصال. حاول تاني.</p>';
-            }
+                </div>`;
+            renderBottom();
+            observeImages();
+            spyCats();
         }
 
-        async function menuRequest(type) {
+        function itemHtml(p) {
+            const inCart = cart.filter(l => l.product_id === p.id).reduce((s, l) => s + l.qty, 0);
+            return `<div class="item" data-name="${esc(p.name)}" onclick="openItem('${esc(p.id)}')">
+                <div class="ph">${p.has_image ? `<img data-img="${esc(p.id)}" alt="">` : esc(String(p.name).trim().charAt(0))}</div>
+                <div class="info"><div class="name">${esc(p.name)}</div>
+                    ${p.description ? `<div class="desc">${esc(p.description)}</div>` : ''}
+                    <div class="foot">${M.show_prices ? `<span class="price">${money(p.price)} <small>${esc(cur())}</small></span>` : '<span></span>'}
+                        ${canOrder() ? `<button class="add ${inCart ? 'incart' : ''}" onclick="event.stopPropagation(); openItem('${esc(p.id)}')">${inCart ? '✓ ' + inCart : '+'}</button>` : ''}</div></div></div>`;
+        }
+
+        function observeImages() {
+            const imgs = document.querySelectorAll('img[data-img]');
+            const load1 = async img => {
+                const id = img.dataset.img;
+                if (imgCache[id] === undefined) {
+                    imgCache[id] = '';
+                    try { imgCache[id] = await rpc('qr_image_public', { p_qr: qrToken, p_product_id: id }) || ''; } catch (e) { imgCache[id] = ''; }
+                }
+                if (imgCache[id]) img.src = imgCache[id];
+            };
+            if (!('IntersectionObserver' in window)) { imgs.forEach(load1); return; }
+            const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { io.unobserve(e.target); load1(e.target); } }), { rootMargin: '300px' });
+            imgs.forEach(i => { if (imgCache[i.dataset.img]) i.src = imgCache[i.dataset.img]; else io.observe(i); });
+        }
+
+        function goCat(id) { const s = document.getElementById('sec-' + id); if (s) window.scrollTo({ top: s.getBoundingClientRect().top + window.scrollY - 118, behavior: 'smooth' }); }
+        function spyCats() {
+            const secs = [...document.querySelectorAll('[data-sec]')];
+            const onScroll = () => {
+                let curId = secs.length ? secs[0].dataset.sec : null;
+                secs.forEach(s => { if (s.getBoundingClientRect().top < 140) curId = s.dataset.sec; });
+                document.querySelectorAll('.cat').forEach(b => {
+                    const on = b.dataset.cat === curId;
+                    if (on && !b.classList.contains('on')) b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+                    b.classList.toggle('on', on);
+                });
+            };
+            window.onscroll = onScroll;
+        }
+        function filter(q) {
+            q = String(q || '').trim();
+            document.querySelectorAll('.item').forEach(el => { el.style.display = !q || el.dataset.name.includes(q) ? '' : 'none'; });
+            document.querySelectorAll('[data-sec]').forEach(s => { s.style.display = [...s.querySelectorAll('.item')].some(i => i.style.display !== 'none') ? '' : 'none'; });
+        }
+
+        function cartCount() { return cart.reduce((s, l) => s + l.qty, 0); }
+        function lineUnit(l) { const p = products[l.product_id]; return (Number(p.price) || 0) + l.mods.reduce((s, id) => s + (Number(modById(p, id)?.price) || 0), 0); }
+        function cartTotal() { return cart.reduce((s, l) => s + lineUnit(l) * l.qty, 0); }
+        function modById(p, id) { for (const g of (p.groups || [])) for (const m of g.modifiers) if (m.id === id) return m; return null; }
+        function saveCart() { store(KEY + '_cart', cart); }
+
+        function renderBottom() {
+            const box = document.getElementById('bottom'), inner = document.getElementById('bottom-inner');
+            const n = cartCount();
+            let html = '';
+            if (canOrder() && n) html = `<button class="cartbar" onclick="openCart()"><span><span class="count">${n}</span>اعرض طلبك</span><span>${money(cartTotal())} ${esc(cur())}</span></button>`;
+            else {
+                if (M.call_waiter) html += `<button class="svc" onclick="svc('waiter')">🙋 نادي الويتر</button>`;
+                if (M.request_bill) html += `<button class="svc" onclick="svc('bill')">🧾 الحساب</button>`;
+                const last = store(KEY + '_last');
+                if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) html += `<button class="svc" onclick="pollStatus('${esc(last.ref)}', true)">📦 طلبي</button>`;
+            }
+            inner.innerHTML = html;
+            box.style.display = html ? '' : 'none';
+        }
+
+        function openSheet(html) {
+            document.getElementById('sheet-in').innerHTML = '<div class="grab"></div>' + html;
+            document.getElementById('sheet-bg').style.display = 'block';
+            requestAnimationFrame(() => document.getElementById('sheet').classList.add('open'));
+        }
+        function closeSheet() {
+            document.getElementById('sheet').classList.remove('open');
+            document.getElementById('sheet-bg').style.display = 'none';
+            clearInterval(statusTimer);
+        }
+
+        // ---------------- صنف واحد: الإضافات والكمية والملاحظة
+        function openItem(id) {
+            const p = products[id];
+            if (!p) return;
+            current = { product_id: id, qty: 1, mods: [], note: '' };
+            const groups = p.groups || [];
+            const img = p.has_image ? `<img class="bigimg" id="big-img" src="${imgCache[id] ? esc(imgCache[id]) : ''}" alt="">` : '';
+            openSheet(`${img}<h3>${esc(p.name)}</h3>
+                ${p.description ? `<p class="muted" style="font-size:14px;line-height:1.8">${esc(p.description)}</p>` : ''}
+                ${M.show_prices ? `<div class="price" style="font-size:19px">${money(p.price)} <small>${esc(cur())}</small></div>` : ''}
+                ${canOrder() ? `
+                ${groups.map((g, gi) => `<div class="grp"><div class="t">${esc(g.name)} <span>${g.min > 0 ? (g.max === 1 ? 'اختار واحد' : `اختار ${g.min} على الأقل`) : 'اختياري'}${g.max > 1 ? ` (لحد ${g.max})` : ''}</span></div>
+                    ${g.modifiers.map(m => `<label class="opt"><span>${esc(m.name)} ${Number(m.price) ? `<small class="muted">+${money(m.price)}</small>` : ''}</span>
+                        <input type="${g.max === 1 ? 'radio' : 'checkbox'}" name="g${gi}" value="${esc(m.id)}" onchange="pickMod(${gi}, this)"></label>`).join('')}</div>`).join('')}
+                <label class="l">ملاحظة (اختياري)</label><input class="field" id="item-note" maxlength="200" placeholder="مثلاً: سكر خفيف، من غير بصل">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+                    <div class="qty"><button onclick="setQty(-1)">−</button><b id="item-qty">1</b><button onclick="setQty(1)">+</button></div>
+                    <span class="price" id="item-total"></span></div>
+                <p class="err" id="item-err"></p>
+                <button class="primary" onclick="addCurrent()">أضف للطلب 🛒</button>` : (M.ordering && !M.store_offline ? `<button class="primary" onclick="setMode('order'); openItem('${esc(id)}')">🛒 أطلب ده بنفسي</button>` : '')}
+                <button class="ghost" onclick="closeSheet()">رجوع</button>`);
+            if (p.has_image && !imgCache[id]) rpc('qr_image_public', { p_qr: qrToken, p_product_id: id }).then(x => { imgCache[id] = x || ''; const b = document.getElementById('big-img'); if (b && x) b.src = x; }).catch(() => {});
+            itemTotal();
+        }
+        function pickMod(gi, el) {
+            const p = products[current.product_id], g = p.groups[gi];
+            const ids = new Set(g.modifiers.map(m => m.id));
+            if (el.type === 'radio') current.mods = current.mods.filter(x => !ids.has(x));
+            if (el.checked) {
+                const picked = current.mods.filter(x => ids.has(x)).length;
+                if (el.type !== 'radio' && g.max > 0 && picked >= g.max) { el.checked = false; return toast(`أقصى عدد ${g.max} في "${g.name}"`); }
+                current.mods.push(el.value);
+            } else current.mods = current.mods.filter(x => x !== el.value);
+            itemTotal();
+        }
+        function setQty(d) { current.qty = Math.max(1, Math.min(20, current.qty + d)); document.getElementById('item-qty').textContent = current.qty; itemTotal(); }
+        function itemTotal() { const el = document.getElementById('item-total'); if (el && M.show_prices) el.textContent = `${money(lineUnit(current) * current.qty)} ${cur()}`; }
+        function addCurrent() {
+            const p = products[current.product_id];
+            for (const g of (p.groups || [])) {
+                const n = current.mods.filter(id => g.modifiers.some(m => m.id === id)).length;
+                if (n < g.min) { const e = document.getElementById('item-err'); e.textContent = `لازم تختار من "${g.name}"`; e.style.display = 'block'; return; }
+            }
+            current.note = (document.getElementById('item-note')?.value || '').trim();
+            const key = current.product_id + '|' + [...current.mods].sort().join(',') + '|' + current.note;
+            const ex = cart.find(l => l.key === key);
+            if (ex) ex.qty = Math.min(20, ex.qty + current.qty); else cart.push({ key, ...current });
+            saveCart();
+            closeSheet();
+            toast(`✅ ${p.name} اتضاف للطلب`);
+            render();
+        }
+
+        // ---------------- الطلب كله
+        function openCart() {
+            if (!cart.length) { closeSheet(); return render(); }
+            openSheet(`<h3>🛒 طلبك (طاولة ${esc(M.table_number)})</h3>
+                ${cart.map((l, i) => { const p = products[l.product_id]; const mods = l.mods.map(id => modById(p, id)?.name).filter(Boolean);
+                    return `<div class="cline"><div class="n">${esc(p.name)}${mods.length ? `<small>+ ${esc(mods.join('، '))}</small>` : ''}${l.note ? `<small>📝 ${esc(l.note)}</small>` : ''}
+                        ${M.show_prices ? `<small>${money(lineUnit(l) * l.qty)} ${esc(cur())}</small>` : ''}</div>
+                        <div class="qty"><button onclick="lineQty(${i},-1)">${l.qty === 1 ? '🗑' : '−'}</button><b>${l.qty}</b><button onclick="lineQty(${i},1)">+</button></div></div>`; }).join('')}
+                <label class="l">ملاحظة للطلب كله (اختياري)</label><input class="field" id="order-note" maxlength="300" value="${esc(store(KEY + '_note') || '')}" oninput="store(KEY + '_note', this.value)">
+                ${M.show_prices ? `<div class="tot"><span>المجموع</span><span>${money(cartTotal())} ${esc(cur())}</span></div>
+                    <p class="muted">${M.vat_inclusive ? '' : 'الضريبة والخدمة بتتحسب على الفاتورة.'} الويتر هيأكّد طلبك قبل ما يدخل المطبخ.</p>` : ''}
+                <button class="primary" onclick="askInfo()">إرسال الطلب ✈️</button>
+                <button class="ghost" onclick="closeSheet()">أضيف حاجة تانية</button>`);
+        }
+        function lineQty(i, d) {
+            cart[i].qty += d;
+            if (cart[i].qty <= 0) cart.splice(i, 1);
+            saveCart(); render();
+            if (cart.length) openCart(); else closeSheet();
+        }
+
+        function askInfo() {
+            const me = store('motion_menu_me') || {};
+            openSheet(`<h3>آخر خطوة 🙌</h3>
+                <div class="note"><span style="font-size:20px">🔒</span><span>${esc(M.privacy_note || '')}</span></div>
+                <label class="l">اسمك *</label><input class="field" id="c-name" maxlength="80" value="${esc(me.name || '')}" autocomplete="name">
+                <label class="l">رقم موبايلك *</label><input class="field" id="c-phone" type="tel" inputmode="tel" maxlength="16" dir="ltr" style="text-align:right" value="${esc(me.phone || '')}" autocomplete="tel" placeholder="01xxxxxxxxx">
+                <label class="l">تاريخ ميلادك (اختياري) 🎂</label><input class="field" id="c-bd" type="date" value="${esc(me.birthday || '')}">
+                <label class="opt" style="border:0;margin-top:6px"><span class="muted" style="font-size:13px">افتكر بياناتي على الموبايل ده</span><input type="checkbox" id="c-remember" ${me.name ? 'checked' : 'checked'}></label>
+                <p class="err" id="c-err"></p>
+                <button class="primary" id="send-btn" onclick="sendOrder()">تأكيد وإرسال للويتر ✅</button>
+                <button class="ghost" onclick="openCart()">رجوع للطلب</button>`);
+        }
+
+        async function sendOrder() {
+            const name = document.getElementById('c-name').value.trim();
+            const phone = document.getElementById('c-phone').value.trim();
+            const bd = document.getElementById('c-bd').value;
+            const err = document.getElementById('c-err');
+            const digits = phone.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g, '');
+            if (!name) { err.textContent = 'اكتب اسمك من فضلك'; err.style.display = 'block'; return; }
+            if (digits.length < 8) { err.textContent = 'رقم الموبايل مش مظبوط'; err.style.display = 'block'; return; }
+            if (document.getElementById('c-remember').checked) store('motion_menu_me', { name, phone, birthday: bd }); else store('motion_menu_me', {});
+            const btn = document.getElementById('send-btn'); btn.disabled = true; btn.textContent = 'جاري الإرسال...';
             try {
-                const { data, error } = await _supabase.rpc('qr_request_public', { p_qr: qrToken, p_type: type });
-                if (error || !data || !data.ok) {
-                    alert(data && data.reason === 'too_many' ? 'طلبات كتير. الويتر جاي حالاً.'
-                        : data && data.reason === 'store_offline' ? 'النت في المحل واقف دلوقتي 🙏 من فضلك نادي الويتر بإيدك.'
-                        : 'تعذر الإرسال. حاول تاني.');
+                const res = await rpc('qr_order_public', { p_qr: qrToken, p_items: cart.map(l => ({ product_id: l.product_id, quantity: l.qty, modifier_ids: l.mods, item_notes: l.note || null })),
+                    p_name: name, p_phone: phone, p_birthday: bd || null, p_note: (store(KEY + '_note') || '').trim() || null });
+                if (!res || !res.ok) {
+                    const m = { too_many: 'عندك طلب لسه مستني الويتر. استنى ثانية لحد ما يأكّده 🙏', store_offline: 'النت في المحل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.',
+                        product_not_available: 'صنف من اللي اخترتهم خلص دلوقتي. شيله وجرّب تاني.', invalid_phone: 'رقم الموبايل مش مظبوط', invalid_name: 'اكتب اسمك من فضلك',
+                        invalid_date: 'تاريخ الميلاد مش مظبوط', required_modifier_missing: 'في صنف محتاج تختار له إضافة', qr_disabled: 'الطلب من الموبايل متوقف دلوقتي' }[res && res.reason];
+                    err.textContent = m || 'تعذر الإرسال. حاول تاني.'; err.style.display = 'block';
+                    btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
                     return;
                 }
-                alert(type === 'bill' ? 'تم طلب الحساب ✅ الويتر جاي بالفاتورة' : 'تم النداء ✅ الويتر جاي حالاً');
-            } catch (err) {
-                alert('في مشكلة في الاتصال. حاول تاني.');
+                store(KEY + '_last', { ref: res.ref, at: Date.now() });
+                cart = []; saveCart(); store(KEY + '_note', '');
+                render();
+                pollStatus(res.ref, true);
+            } catch (e) {
+                err.textContent = 'في مشكلة في النت. حاول تاني.'; err.style.display = 'block';
+                btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
             }
         }
 
-        loadMenu();
+        async function pollStatus(ref, show) {
+            clearInterval(statusTimer);
+            const draw = (st) => {
+                if (!show && st.status === 'pending') { show = true; }
+                if (!show) return;
+                const body = st.status === 'accepted'
+                    ? `<div class="status"><div class="ic">🎉</div><h3>طلبك اتأكد!</h3><p class="muted" style="font-size:15px">رقم طلبك <b>${esc(st.order_number || '')}</b> والمطبخ بيجهّزه دلوقتي. بالهنا والشفا ❤️</p></div>`
+                    : st.status === 'rejected'
+                        ? `<div class="status"><div class="ic">🙏</div><h3>الطلب ماتأكدش</h3><p class="muted" style="font-size:15px">${esc(st.reject_reason || '')}</p></div>`
+                        : `<div class="status"><div class="spinner"></div><h3>طلبك وصل للويتر ✅</h3><p class="muted" style="font-size:15px">مستنيين الويتر يأكّده (ثواني). سيب الصفحة دي مفتوحة.</p></div>`;
+                openSheet(body + `<button class="ghost" onclick="closeSheet()">تمام</button>`);
+            };
+            const tick = async () => {
+                try {
+                    const st = await rpc('qr_order_status_public', { p_qr: qrToken, p_ref: ref });
+                    if (!st || !st.ok) { clearInterval(statusTimer); return; }
+                    draw(st);
+                    if (st.status !== 'pending') { clearInterval(statusTimer); if (st.status === 'rejected') store(KEY + '_last', null); }
+                } catch (e) { /* try again next tick */ }
+            };
+            await tick();
+            statusTimer = setInterval(tick, 6000);
+        }
+
+        async function svc(type) {
+            try {
+                const data = await rpc('qr_request_public', { p_qr: qrToken, p_type: type });
+                if (!data || !data.ok) {
+                    toast(data && data.reason === 'too_many' ? 'طلبات كتير. الويتر جاي حالاً 🙏'
+                        : data && data.reason === 'store_offline' ? 'النت في المحل واقف دلوقتي 🙏 من فضلك نادي الويتر بإيدك.' : 'تعذر الإرسال. حاول تاني.', 3500);
+                    return;
+                }
+                toast(type === 'bill' ? '🧾 تم طلب الحساب، الويتر جاي بالفاتورة' : '🙋 تم النداء، الويتر جاي حالاً', 3500);
+            } catch (err) { toast('في مشكلة في الاتصال. حاول تاني.'); }
+        }
+
+        load();
     </script>
 </body>
 </html>

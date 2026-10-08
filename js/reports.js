@@ -23,7 +23,7 @@ async function loadFinancialDashboard() {
 
 async function loadCostAnalysis() {
     try {
-        const { data: prods } = await _supabase.from('products').select('*');
+        const { data: prods } = await _supabase.from('products').select('id, category_id, name, price, is_available, brand_id, name_en, sort_order, show_in_menu');
         const { data: recipes } = await _supabase.from('recipes').select('*, ingredients(*)');
 
         const tbody = document.getElementById('cost-table-body');

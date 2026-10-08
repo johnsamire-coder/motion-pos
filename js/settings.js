@@ -63,7 +63,7 @@ async function loadSettingsData() {
         const { data: cData } = await _supabase.from('categories').select('*');
         settingsState.categories = cData || [];
 
-        const { data: pData } = await _supabase.from('products').select('*, categories(name)');
+        const { data: pData } = await _supabase.from('products').select('id, category_id, name, price, is_available, brand_id, name_en, sort_order, show_in_menu, categories(name)');
         settingsState.products = pData || [];
     } catch (err) {
         console.error('Error loading settings data:', err);

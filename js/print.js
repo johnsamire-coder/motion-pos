@@ -62,14 +62,17 @@ function buildReceiptHtml(o, s) {
         <div class="line"></div>
         <table>
             <tr><td>المجموع</td><td class="num">${money(o.sub_total)}</td></tr>
-            ${Number(o.discount_amount) ? `<tr><td>الخصم</td><td class="num">-${money(o.discount_amount)}</td></tr>` : ''}
+            ${Number(o.discount_amount) - (Number(o.loyalty_amount) || 0) > 0.004 ? `<tr><td>الخصم</td><td class="num">-${money(Number(o.discount_amount) - (Number(o.loyalty_amount) || 0))}</td></tr>` : ''}
+            ${Number(o.loyalty_amount) ? `<tr><td>⭐ ${uiEsc((s.loyalty && s.loyalty.label) || 'خصم انتماء')} ${uiEsc(Number(o.loyalty_percent))}%</td><td class="num">-${money(o.loyalty_amount)}</td></tr>` : ''}
             ${Number(o.service_charge_amount) ? `<tr><td>الخدمة</td><td class="num">${money(o.service_charge_amount)}</td></tr>` : ''}
             ${Number(o.tax_amount) ? `<tr><td>ضريبة القيمة المضافة</td><td class="num">${money(o.tax_amount)}</td></tr>` : ''}
             <tr class="b big"><td>الإجمالي</td><td class="num">${money(o.total_amount)} ${uiEsc(g.currency || '')}</td></tr>
         </table>
         ${pays ? `<div class="line"></div><table>${pays}</table>` : ''}
         <div class="line"></div>
-        ${r.footer ? `<div class="c">${uiEsc(r.footer)}</div>` : ''}`;
+        ${r.footer ? `<div class="c">${uiEsc(r.footer)}</div>` : ''}
+        ${Number(o.loyalty_amount) ? `<div class="c">شكراً إنك من عملائنا الدايمين ⭐</div>` : ''}
+        ${o._fbqr ? `<div class="line"></div><div class="c">رأيك يهمنا 🙏 امسح الكود واكتبلنا</div><div class="c"><img src="${o._fbqr}" style="width:28mm;height:28mm"></div>` : ''}`;
 }
 
 function buildKitchenTicketHtml(o, station) {
@@ -93,6 +96,15 @@ async function loadPrintData(orderId) {
 async function printOrderReceipt(orderId) {
     const res = await loadPrintData(orderId);
     if (!res) return;
+    // كود QR لصفحة الشكاوي والاقتراحات في آخر الفاتورة
+    const soc = (res.settings && res.settings.social) || {};
+    if (res.order.feedback_token && appSet('receipt', 'show_feedback_qr', true) && soc.feedback_enabled !== false) {
+        try {
+            await loadScriptOnce('vendor/qrcode.min.js');
+            const qr = qrcode(0, 'M'); qr.addData(motionPublicUrl('feedback.html?b=' + res.order.feedback_token + '&o=' + encodeURIComponent(res.order.order_number || ''))); qr.make();
+            res.order._fbqr = qr.createDataURL(4, 1);
+        } catch (e) { /* the bill prints without the code */ }
+    }
     const copies = Math.max(1, Math.min(5, Number(appSet('receipt', 'copies', 1)) || 1));
     const one = buildReceiptHtml(res.order, res.settings);
     printHtml(Array.from({ length: copies }, () => one).join('<div style="page-break-after:always"></div>'), receiptPageCss());
@@ -159,13 +171,16 @@ function reportTotals(rep) {
     return Object.keys(t).length ? t : null;
 }
 
+const _motionScripts = {};
 function loadScriptOnce(src) {
-    return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    if (_motionScripts[src]) return _motionScripts[src];
+    _motionScripts[src] = new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('تعذر تحميل مكتبة التصدير.'));
+        s.src = src; s.onload = resolve;
+        s.onerror = () => { delete _motionScripts[src]; s.remove(); reject(new Error('تعذر تحميل مكتبة من الموقع. اعمل تحديث للصفحة.')); };
         document.head.appendChild(s);
     });
+    return _motionScripts[src];
 }
 
 async function exportReportExcel(rep) {

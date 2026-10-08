@@ -232,7 +232,12 @@ const SERVER_REASON_MESSAGES = {
     modifier_not_found: 'الإضافة غير موجودة',
     invalid_selection_limits: 'أقل وأكتر عدد غلط: الأقل ميزيدش عن الأكتر، والأكتر ميزيدش عن عدد الإضافات',
     too_many: 'طلبات كتير. حاول بعد شوية',
-    invalid_status: 'حالة غير صحيحة'
+    invalid_status: 'حالة غير صحيحة',
+    name_taken: 'الاسم ده موجود قبل كده',
+    category_not_empty: 'القسم فيه أصناف. انقلها أو امسحها الأول',
+    invalid_image: 'الصورة لازم تكون PNG أو JPG أو WEBP ومش كبيرة',
+    qr_handled: 'الطلب ده اتأكد أو اترفض قبل كده',
+    invalid_url: 'اللينك لازم يبدأ بـ https://'
 };
 
 // إعدادات الشركة والشاشات (بتتحمّل بعد الدخول)
@@ -246,11 +251,26 @@ async function loadAppSettings() {
             const logo = document.getElementById('main-brand-logo');
             if (logo) logo.innerHTML = g.logo ? `<img src="${uiEsc(g.logo)}" class="h-8 max-w-[120px] object-contain">` : uiEsc(g.company_name || 'Motion POS');
             if (g.company_name) document.title = g.company_name;
+            loadAppLinks();
         }
     } catch (err) {
         console.error('Settings load error:', err);
     }
     return appSettings;
+}
+
+// لينكات الصفحات العامة (منيو الـ QR وصفحة الشكاوي) لازم تفتح الموقع على النت دايماً، حتى لو الشاشة مفتوحة من كمبيوتر المحل
+function motionPublicUrl(path) {
+    const base = MOTION_LOCAL ? CLOUD_SITE : location.origin + location.pathname.replace(/[^/]*$/, '');
+    return base + path;
+}
+let appLinks = { feedback: '' };
+async function loadAppLinks() {
+    try {
+        const res = await serverRpc('branch_links_secure');
+        if (res && res.ok && res.public_token) appLinks.feedback = motionPublicUrl('feedback.html?b=' + res.public_token);
+    } catch (err) { console.warn('links', err); }
+    return appLinks;
 }
 
 function serverReasonMessage(res, fallback) {
