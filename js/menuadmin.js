@@ -91,7 +91,7 @@ async function renderMenuAdmin() {
         ${ma.cat !== 'all' && ma.cat !== 'norecipe' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم ده', `maEditCategory('${ma.cat}')`, 'gray')}
             ${(cats.find(c => c.id === ma.cat) || {}).products ? '' : uiBtn('🗑️ مسح القسم', `maDeleteCategory('${ma.cat}')`, 'red')}</div>` : ''}
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards || '<p class="text-center text-slate-400 font-bold text-xs py-8 sm:col-span-2 xl:col-span-3">مفيش أصناف هنا. دوس "➕ صنف جديد".</p>'}</div>`,
-        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')}`);
+        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')}`);
 }
 
 async function maEditCategory(id) {
@@ -422,6 +422,49 @@ async function maImport() {
     if (!ok) return;
     const res = await maCall('import', { rows });
     if (res) { showToast(`اتسجل ${res.created} صنف جديد، واتعدل ${res.updated}`); ma.cat = 'all'; renderMenuAdmin(); }
+}
+
+// ---------------------------------------------------------------- الوصفات لأصناف كتير مرة واحدة (لصق)
+// كل سطر: الصنف - الخامة - الكمية - الوحدة. الصنف اللي ليه وصفة قبل كده بيفضل زي ما هو إلا لو اخترت "استبدال".
+async function maImportRecipes() {
+    let suggested = '';
+    try { const r = await fetch('recipes_suggested.txt', { cache: 'no-store' }); if (r.ok) suggested = await r.text(); } catch (e) { /* empty box */ }
+    const v = await uiForm('🧪 إدخال الوصفات مرة واحدة', [
+        { type: 'note', html: `<p class="text-sm">كل سطر خامة واحدة في صنف: <b>الصنف - الخامة - الكمية - الوحدة</b> (الكمية للكوباية أو الطبق الواحد)<br>مثال:<br>كابتشينو - بن اسبريسو - 0.018 - كيلو<br>كابتشينو - لبن - 0.15 - لتر<br>
+            ${suggested ? '<b class="text-emerald-700">الصندوق فيه وصفات مقترحة لأصناف المنيو، راجعها وعدّل اللي محتاجه.</b><br>' : ''}الخامة اللي مش موجودة بتتعمل لوحدها بتكلفة صفر (التكلفة بتتحدّث من المشتريات). والسطور اللي بتبدأ بـ # مش بتتحسب.</p>` },
+        { key: 'text', label: 'الوصفات', type: 'textarea', rows: 14, full: true, required: true, value: suggested },
+        { key: 'overwrite', label: 'الأصناف اللي ليها وصفة قبل كده', type: 'select', options: [['keep', 'سيبها زي ما هي'], ['replace', 'استبدلها بالجديدة']], value: 'keep' }], { ok: 'معاينة' });
+    if (!v) return;
+    const toNum = s => Number(String(s).replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace('٫', '.').replace(/[^0-9.]/g, ''));
+    const rows = [], bad = [];
+    String(v.text).split('\n').map(x => x.trim()).filter(x => x && !x.startsWith('#')).forEach((line, i) => {
+        const parts = line.split(/\s+-\s+|\s*\|\s*|\t/).map(x => x.trim()).filter(Boolean);
+        if (parts.length < 4) { bad.push(line); return; }
+        const unit = parts[parts.length - 1], qty = toNum(parts[parts.length - 2]), ingredient = parts[parts.length - 3];
+        const product = parts.slice(0, parts.length - 3).join(' - ');
+        if (!(qty > 0) || !/[0-9٠-٩]/.test(parts[parts.length - 2])) { bad.push(line); return; }
+        rows.push({ product, ingredient, qty: String(qty), unit });
+    });
+    if (!rows.length) return showToast('مفيش ولا سطر مظبوط', 'error');
+    const d = ma.data || {};
+    const prodByName = new Map((d.products || []).map(p => [String(p.name).trim(), p]));
+    const ingByName = new Map((d.ingredients || []).map(i => [String(i.name).trim(), i]));
+    const products = [...new Set(rows.map(r => r.product))];
+    const missing = products.filter(n => !prodByName.has(n));
+    const hasRecipe = products.filter(n => prodByName.has(n) && (prodByName.get(n).recipe || []).length);
+    const newIngs = [...new Set(rows.filter(r => !ingByName.has(r.ingredient)).map(r => r.ingredient))];
+    const unitClash = [...new Set(rows.filter(r => ingByName.has(r.ingredient) && String(ingByName.get(r.ingredient).unit || '').trim() !== r.unit)
+        .map(r => `${r.ingredient}: موجودة بـ"${ingByName.get(r.ingredient).unit}" والوصفة مكتوبة بـ"${r.unit}"`))];
+    const replace = v.overwrite === 'replace';
+    const msg = [`${products.length - missing.length} صنف هتتسجل وصفته${!replace && hasRecipe.length ? ` (منهم ${hasRecipe.length} ليهم وصفة قبل كده وهيفضلوا زي ما هما)` : ''}.`,
+        replace && hasRecipe.length ? `⚠️ ${hasRecipe.length} صنف وصفتهم القديمة هتتمسح وتتحط الجديدة.` : '',
+        newIngs.length ? `خامات جديدة هتتعمل (${newIngs.length}): ${newIngs.slice(0, 15).join('، ')}${newIngs.length > 15 ? '...' : ''}` : '',
+        unitClash.length ? `⚠️ انتبه للوحدة (الكمية بتتحسب بوحدة الخامة الموجودة):\n${unitClash.slice(0, 8).join('\n')}` : '',
+        missing.length ? `أصناف مش موجودة في المنيو ومش هتتسجل (${missing.length}): ${missing.slice(0, 10).join('، ')}` : '',
+        bad.length ? `سطور فيها غلط (${bad.length}):\n${bad.slice(0, 6).join('\n')}` : ''].filter(Boolean).join('\n\n');
+    if (!(await uiConfirm(msg, 'سجّل الوصفات'))) return;
+    const res = await maCall('import_recipes', { rows: rows.filter(r => prodByName.has(r.product)), overwrite: replace });
+    if (res) { showToast(`اتسجلت وصفات ${res.imported} صنف، و${res.new_ingredients} خامة جديدة${res.skipped ? `، و${res.skipped} صنف فضل زي ما هو` : ''}`); renderMenuAdmin(); }
 }
 
 // شاشة الإعدادات: قسم "المنيو والوصفات" بيترسم أول ما الإعدادات تفتح

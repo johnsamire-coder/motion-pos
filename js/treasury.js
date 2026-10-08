@@ -64,7 +64,7 @@ async function shiftCashIn() {
 
 async function shiftClose() {
     const v = await uiForm('قفل الوردية', [
-        { type: 'note', label: 'اعدّ الفلوس اللي في الدرج كلها (من غير الإكراميات، السيستم هيصرفها).' },
+        { type: 'note', label: 'اعدّ كل الفلوس اللي في الدرج (والإكراميات الكاش معاها). الإكراميات بتروح لصندوق الإكراميات، ولو فيه عجز بيتغطّى منه الأول.' },
         { key: 'counted', label: 'إجمالي الفلوس اللي عدّيتها', type: 'money', min: 0, required: true },
         { key: 'notes', label: 'ملاحظات (اختياري)', type: 'textarea' }], { ok: 'قفل الوردية', danger: true });
     if (!v) return;
@@ -75,24 +75,87 @@ async function shiftClose() {
     if (box) box.innerHTML = renderShiftReport(res.report);
 }
 
+const SHIFT_METHODS = [['cash', 'نقدي'], ['card', 'فيزا / كارت'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'آجل (على الحساب)']];
+let shiftLastReport = null;
+
+// بيان قفل الوردية: المبيعات بكل طريقة دفع + الإكراميات + الدرج + العجز اتغطّى منين
 function renderShiftReport(r) {
     if (!r) return '';
+    shiftLastReport = r;
     const diff = Number(r.difference) || 0;
-    const diffText = diff === 0 ? 'مظبوط ✅' : (diff < 0 ? `عجز ${formatCurrency(-diff)} ❌` : `زيادة ${formatCurrency(diff)}`);
-    const methods = Object.entries(r.payments_by_method || {}).map(([m, t]) => ({ m, t }));
-    return uiCard(`تقرير وردية ${r.staff || ''}`, `
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-bold mb-3">
-            <div class="bg-slate-50 p-3 rounded-xl border">العهدة: ${formatCurrency(r.opening_float)}</div>
-            <div class="bg-slate-50 p-3 rounded-xl border">المفروض: ${r.expected_cash === null ? '-' : formatCurrency(r.expected_cash)}</div>
-            <div class="bg-slate-50 p-3 rounded-xl border">المعدود: ${r.counted_cash === null ? '-' : formatCurrency(r.counted_cash)}</div>
-            <div class="p-3 rounded-xl border ${diff < 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}">${r.status === 'closed' ? diffText : 'لسه مفتوحة'}</div>
+    const closed = r.status === 'closed';
+    const pm = r.payments_by_method || {}, tm = r.tips_by_method || {};
+    const known = SHIFT_METHODS.map(([k]) => k);
+    const others = Object.keys(pm).filter(k => !known.includes(k)).map(k => [k, k]);
+    const rows = SHIFT_METHODS.concat(others).map(([k, label]) => ({ label, sales: Number(pm[k]) || 0, tips: Number(tm[k]) || 0 }));
+    const tipsTotal = rows.reduce((s, x) => s + x.tips, 0);
+    const fromTips = Number(r.shortage_from_tips) || 0, onCashier = Number(r.shortage_on_cashier) || 0;
+    const diffBox = !closed ? '<div class="p-3 rounded-xl border bg-slate-50">لسه مفتوحة</div>'
+        : diff === 0 ? '<div class="p-3 rounded-xl border bg-emerald-50 text-emerald-700">الدرج مظبوط ✅</div>'
+        : diff > 0 ? `<div class="p-3 rounded-xl border bg-emerald-50 text-emerald-700">زيادة ${formatCurrency(diff)}</div>`
+        : `<div class="p-3 rounded-xl border bg-red-50 text-red-700">عجز ${formatCurrency(-diff)} ❌</div>`;
+    const shortageHtml = closed && diff < 0 ? `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold mb-3">
+            <div class="p-3 rounded-xl border bg-amber-50 text-amber-800">اتغطّى من صندوق الإكراميات: <b>${formatCurrency(fromTips)}</b></div>
+            <div class="p-3 rounded-xl border ${onCashier > 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}">على الكاشير: <b>${formatCurrency(onCashier)}</b></div>
+        </div>` : '';
+    return uiCard(`بيان وردية ${r.staff || ''}`, `
+        <p class="text-[11px] font-bold text-slate-500 mb-2">من ${uiEsc(uiDate(r.opened_at))}${r.closed_at ? ' لحد ' + uiEsc(uiDate(r.closed_at)) : ''} | طلبات اتدفعت: ${uiEsc(r.orders_paid)}</p>
+        ${uiTable(rows, [{ label: 'طريقة الدفع', key: 'label' }, { label: 'المبيعات', render: x => formatCurrency(x.sales) },
+            { label: 'الإكراميات', render: x => formatCurrency(x.tips) }, { label: 'الإجمالي', render: x => `<b>${formatCurrency(x.sales + x.tips)}</b>` }])}
+        <div class="grid grid-cols-2 gap-3 text-xs font-black my-3">
+            <div class="bg-emerald-50 p-3 rounded-xl border">إجمالي المبيعات: ${formatCurrency(r.sales_total)}</div>
+            <div class="bg-amber-50 p-3 rounded-xl border">إجمالي الإكراميات: ${formatCurrency(tipsTotal)}</div>
         </div>
-        <p class="text-xs font-bold mb-2">الإكراميات المصروفة: ${formatCurrency(r.tips_paid)} | طلبات: ${uiEsc(r.orders_paid)}</p>
-        ${uiTable(methods, [{ label: 'طريقة الدفع', key: 'm' }, { label: 'المبلغ', render: x => formatCurrency(x.t) }], 'مفيش مدفوعات')}
+        <h4 class="font-black text-xs mb-1">الدرج (الكاش بس)</h4>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-bold mb-3">
+            <div class="bg-slate-50 p-3 rounded-xl border">العهدة (الفكة): ${formatCurrency(r.opening_float)}</div>
+            <div class="bg-slate-50 p-3 rounded-xl border">المفروض يكون: ${r.expected_cash === null ? '-' : formatCurrency(r.expected_cash)}</div>
+            <div class="bg-slate-50 p-3 rounded-xl border">اللي اتعدّ: ${r.counted_cash === null ? '-' : formatCurrency(r.counted_cash)}</div>
+            ${diffBox}
+        </div>
+        ${shortageHtml}
+        <p class="text-xs font-bold text-amber-700 mb-2">💰 صندوق الإكراميات دلوقتي: ${formatCurrency(r.tips_pool)}</p>
         <h4 class="font-black text-xs mt-3 mb-1">حركات الدرج</h4>
-        ${uiTable(r.cash_moves, [{ label: 'النوع', key: 'type' }, { label: 'المبلغ', render: x => formatCurrency(x.amount) },
+        ${uiTable(r.cash_moves, [{ label: 'النوع', render: x => uiEsc(SHIFT_MOVE_NAMES[x.type] || x.type) }, { label: 'المبلغ', render: x => formatCurrency(x.amount) },
             { label: 'الجهة', render: x => uiEsc(UI_BOX_NAMES[x.destination] || x.destination || '') }, { label: 'السبب', key: 'reason' },
-            { label: 'الوقت', render: x => uiEsc(uiDate(x.at)) }], 'مفيش حركات')}`);
+            { label: 'الوقت', render: x => uiEsc(uiDate(x.at)) }], 'مفيش حركات')}`,
+        uiBtn('🖨️ طباعة البيان', 'printShiftStatement()', 'gray'));
+}
+
+const SHIFT_MOVE_NAMES = { float: 'عهدة', cash_in: 'فكة داخلة', drop: 'توريد', tips_payout: 'صرف إكراميات', expense: 'مصروف', close_handover: 'تسليم آخر الوردية',
+    shortage: 'عجز', overage: 'زيادة', supplier_payment: 'دفع مورد', custody: 'عهدة موظف', advance: 'سلفة', payroll: 'مرتبات' };
+
+function printShiftStatement() {
+    const r = shiftLastReport;
+    if (!r) return;
+    const g = (typeof appSettings !== 'undefined' && appSettings && appSettings.general) || {};
+    const m = v => (Number(v) || 0).toFixed(2);
+    const pm = r.payments_by_method || {}, tm = r.tips_by_method || {};
+    const diff = Number(r.difference) || 0;
+    const rows = SHIFT_METHODS.map(([k, l]) => `<tr><td>${uiEsc(l)}</td><td class="num">${m(pm[k])}</td><td class="num">${m(tm[k])}</td></tr>`).join('');
+    const tips = Object.values(tm).reduce((s, v) => s + (Number(v) || 0), 0);
+    printHtml(`
+        ${g.logo ? `<div class="c"><img class="logo" src="${uiEsc(g.logo)}"></div>` : ''}
+        <div class="c b big">${uiEsc(g.company_name || '')}</div>
+        <div class="c b">بيان قفل وردية</div>
+        <div>الكاشير: ${uiEsc(r.staff || '')}</div>
+        <div>من: ${uiEsc(uiDate(r.opened_at))}</div><div>لحد: ${uiEsc(uiDate(r.closed_at))}</div>
+        <div class="line"></div>
+        <table><tr class="b"><td>الطريقة</td><td class="num">مبيعات</td><td class="num">إكرامية</td></tr>${rows}</table>
+        <div class="line"></div>
+        <table><tr class="b"><td>إجمالي المبيعات</td><td class="num">${m(r.sales_total)}</td></tr>
+            <tr class="b"><td>إجمالي الإكراميات</td><td class="num">${m(tips)}</td></tr></table>
+        <div class="line"></div>
+        <table><tr><td>العهدة</td><td class="num">${m(r.opening_float)}</td></tr>
+            <tr><td>المفروض في الدرج</td><td class="num">${m(r.expected_cash)}</td></tr>
+            <tr><td>اللي اتعدّ</td><td class="num">${m(r.counted_cash)}</td></tr>
+            <tr class="b"><td>${diff < 0 ? 'العجز' : diff > 0 ? 'الزيادة' : 'الفرق'}</td><td class="num">${m(Math.abs(diff))}</td></tr>
+            ${diff < 0 ? `<tr><td>اتغطّى من الإكراميات</td><td class="num">${m(r.shortage_from_tips)}</td></tr>
+            <tr class="b"><td>على الكاشير</td><td class="num">${m(r.shortage_on_cashier)}</td></tr>` : ''}</table>
+        <div class="line"></div>
+        <div>صندوق الإكراميات دلوقتي: ${m(r.tips_pool)}</div>
+        <div class="line"></div><div>توقيع الكاشير: ..............</div><div>توقيع المدير: ..............</div>`, receiptPageCss());
 }
 
 async function attendancePunch() {
@@ -113,7 +176,10 @@ function setTreasuryTab(tab) { treasuryTab = tab; loadTreasuryScreen(); }
 async function loadTreasuryScreen() {
     const root = document.getElementById('treasury-root');
     if (!root) return;
-    const tabs = uiTabs('treasury', [['balances', 'أرصدة الخزن'], ['shifts', 'الورديات'], ['day', 'تقرير وتقفيل اليوم']], treasuryTab, 'setTreasuryTab');
+    const list = [['balances', 'أرصدة الخزن'], ['shifts', 'الورديات'], ['day', 'تقرير وتقفيل اليوم']];
+    if (canDo('tips_distribute')) list.push(['tips', 'الإكراميات 💰']);
+    if (!list.some(t => t[0] === treasuryTab)) treasuryTab = 'balances';
+    const tabs = uiTabs('treasury', list, treasuryTab, 'setTreasuryTab');
     root.innerHTML = tabs + '<div id="treasury-body"><p class="text-xs text-slate-400 font-bold">جاري التحميل...</p></div>';
     const body = document.getElementById('treasury-body');
 
@@ -134,6 +200,8 @@ async function loadTreasuryScreen() {
             { label: 'الفرق', render: x => x.difference === null ? '-' : `<span class="${Number(x.difference) < 0 ? 'text-red-600' : 'text-emerald-600'}">${formatCurrency(x.difference)}</span>` },
             { label: '', render: x => uiBtn('التقرير', `treasuryShowShift('${x.id}')`, 'gray') }]))
             + '<div id="treasury-shift-report"></div>';
+    } else if (treasuryTab === 'tips') {
+        await tipsRender(body);
     } else {
         const date = (document.getElementById('treasury-day-date')?.value) || uiToday();
         const res = await uiCall('day_report_secure', { p_date: date });
@@ -181,4 +249,66 @@ async function treasuryTransfer() {
         { ok: 'تحويل', validate: x => x.from === x.to ? { key: 'to', msg: 'لازم يبقى مكان تاني' } : null });
     if (!v) return;
     if (await uiCall('treasury_transfer_secure', { p_from: v.from, p_to: v.to, p_amount: v.amount, p_reason: v.reason, p_manager_pin: v.pin }, 'تم التحويل')) loadTreasuryScreen();
+}
+
+// -----------------------------------------
+// صندوق الإكراميات: بيتجمع من كل الفواتير، ويتوزع بالتساوي على اللي المدير يختارهم
+// -----------------------------------------
+let tipsState = null;
+
+async function tipsRender(body) {
+    const res = await uiCall('tips_secure', { p_action: 'status', p_data: {} });
+    if (!res) return;
+    tipsState = res;
+    const anyCame = (res.staff || []).some(s => s.came_today);
+    const staffHtml = (res.staff || []).map(s => `
+        <label class="flex items-center gap-2 bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold cursor-pointer">
+            <input type="checkbox" class="tips-staff" value="${uiEsc(s.id)}" ${(!anyCame || s.came_today) ? 'checked' : ''} onchange="tipsPreview()">
+            ${uiEsc(s.name)} ${s.came_today ? '<span class="text-emerald-600">(حضر النهارده)</span>' : ''}
+        </label>`).join('') || '<p class="text-xs text-slate-400 font-bold">مفيش موظفين في الفرع</p>';
+    body.innerHTML = uiCard('صندوق الإكراميات', `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold mb-4">
+            <div class="bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-900">في الصندوق دلوقتي<div class="text-xl font-black">${formatCurrency(res.pool)}</div></div>
+            <div class="bg-slate-50 p-3 rounded-xl border">اتجمع النهارده<div class="text-lg font-black">${formatCurrency(res.collected_today)}</div></div>
+            <div class="bg-red-50 p-3 rounded-xl border text-red-700">اتغطّى منه عجز النهارده<div class="text-lg font-black">${formatCurrency(res.covered_shortages_today)}</div></div>
+        </div>
+        <h4 class="font-black text-xs mb-2">هتتوزع على مين؟ (بالتساوي)</h4>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">${staffHtml}</div>
+        <div class="flex flex-wrap items-end gap-3 mb-2">
+            <label class="text-xs font-bold">المبلغ اللي هيتوزع
+                <input id="tips-amount" type="number" min="0" step="0.01" value="${uiEsc(Number(res.pool) || 0)}" oninput="tipsPreview()" class="${uiInputClass()} w-32 block mt-1"></label>
+            <label class="text-xs font-bold">الفلوس هتطلع منين
+                <select id="tips-source" class="${uiInputClass()} block mt-1"><option value="main_cash">الخزينة الرئيسية</option><option value="drawer">درج ورديتي</option></select></label>
+            ${uiBtn('توزيع 💰', 'tipsDistribute()', 'green')}
+        </div>
+        <p id="tips-preview" class="text-xs font-black text-emerald-700"></p>
+        <p class="text-[11px] font-bold text-slate-400 mt-1">الكسور اللي ماتتقسمش بالتساوي بتفضل في الصندوق للمرة الجاية.</p>`)
+        + uiCard('آخر التوزيعات', uiTable(res.history, [
+            { label: 'الوقت', render: x => uiEsc(uiDate(x.at)) }, { label: 'الإجمالي', render: x => formatCurrency(x.total) },
+            { label: 'لكل واحد', render: x => formatCurrency(x.each) }, { label: 'العدد', key: 'count' }, { label: 'الأسماء', key: 'names' },
+            { label: 'من', render: x => x.source === 'drawer' ? 'الدرج' : 'الخزينة' }, { label: 'وزّعها', key: 'by' }], 'لسه مفيش توزيع'));
+    tipsPreview();
+}
+
+function tipsSelected() { return [...document.querySelectorAll('.tips-staff:checked')].map(x => x.value); }
+
+function tipsPreview() {
+    const box = document.getElementById('tips-preview');
+    if (!box) return;
+    const n = tipsSelected().length;
+    const amount = Number(document.getElementById('tips-amount')?.value) || 0;
+    const each = n ? Math.floor(amount * 100 / n) / 100 : 0;
+    box.textContent = n && each > 0 ? `كل واحد هياخد ${formatCurrency(each)} (${n} موظف)` : 'اختار الموظفين واكتب المبلغ';
+}
+
+async function tipsDistribute() {
+    const ids = tipsSelected();
+    const amount = Number(document.getElementById('tips-amount')?.value) || 0;
+    const source = document.getElementById('tips-source')?.value || 'main_cash';
+    if (!ids.length) return showToast('اختار موظف واحد على الأقل', 'error');
+    if (amount <= 0 || amount > (Number(tipsState?.pool) || 0) + 0.001) return showToast('المبلغ لازم يكون أكبر من صفر ومش أكتر من اللي في الصندوق', 'error');
+    const each = Math.floor(amount * 100 / ids.length) / 100;
+    if (!(await uiConfirm(`توزيع ${formatCurrency(each * ids.length)} على ${ids.length} موظف؟\nكل واحد ${formatCurrency(each)}.`, 'توزيع'))) return;
+    const res = await uiCall('tips_secure', { p_action: 'distribute', p_data: { staff_ids: ids, amount, source } }, 'تم توزيع الإكراميات ✅');
+    if (res) loadTreasuryScreen();
 }

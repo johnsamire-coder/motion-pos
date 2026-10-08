@@ -69,10 +69,21 @@ function buildReceiptHtml(o, s) {
             <tr class="b big"><td>الإجمالي</td><td class="num">${money(o.total_amount)} ${uiEsc(g.currency || '')}</td></tr>
         </table>
         ${pays ? `<div class="line"></div><table>${pays}</table>` : ''}
+        ${receiptPayInfoHtml(s, o)}
         <div class="line"></div>
         ${r.footer ? `<div class="c">${uiEsc(r.footer)}</div>` : ''}
         ${Number(o.loyalty_amount) ? `<div class="c">شكراً إنك من عملائنا الدايمين ⭐</div>` : ''}
         ${o._fbqr ? `<div class="line"></div><div class="c">رأيك يهمنا 🙏 امسح الكود واكتبلنا</div><div class="c"><img src="${o._fbqr}" style="width:28mm;height:28mm"></div>` : ''}`;
+}
+
+// أرقام الدفع (إنستاباي والمحفظة) عشان العميل يقدر يحوّل
+function receiptPayInfoHtml(s, o) {
+    const p = (s && s.payinfo) || {};
+    if (p.show_on_receipt === false || (!p.instapay && !p.wallet)) return '';
+    return `<div class="line"></div><div class="c b">${o.status === 'closed' ? 'للدفع المرة الجاية' : 'تقدر تدفع بتحويل'}</div>
+        ${p.instapay ? `<div class="c">إنستاباي: <b>${uiEsc(p.instapay)}</b></div>` : ''}
+        ${p.wallet ? `<div class="c">${uiEsc(p.wallet_name || 'محفظة')}: <b>${uiEsc(p.wallet)}</b></div>` : ''}
+        ${o._payqr ? `<div class="c"><img src="${o._payqr}" style="width:24mm;height:24mm"></div><div class="c">امسح الكود للدفع بإنستاباي</div>` : ''}`;
 }
 
 function buildKitchenTicketHtml(o, station) {
@@ -103,6 +114,15 @@ async function printOrderReceipt(orderId) {
             await loadScriptOnce('vendor/qrcode.min.js');
             const qr = qrcode(0, 'M'); qr.addData(motionPublicUrl('feedback.html?b=' + res.order.feedback_token + '&o=' + encodeURIComponent(res.order.order_number || ''))); qr.make();
             res.order._fbqr = qr.createDataURL(4, 1);
+        } catch (e) { /* the bill prints without the code */ }
+    }
+    // كود QR للينك إنستاباي على الحساب (لو متسجّل)
+    const pay = (res.settings && res.settings.payinfo) || {};
+    if (pay.instapay_link && pay.show_on_receipt !== false && res.order.status !== 'closed') {
+        try {
+            await loadScriptOnce('vendor/qrcode.min.js');
+            const qr = qrcode(0, 'M'); qr.addData(pay.instapay_link); qr.make();
+            res.order._payqr = qr.createDataURL(4, 1);
         } catch (e) { /* the bill prints without the code */ }
     }
     const copies = Math.max(1, Math.min(5, Number(appSet('receipt', 'copies', 1)) || 1));

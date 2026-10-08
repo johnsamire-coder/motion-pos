@@ -11,12 +11,12 @@ const PERM_NAMES = { pos: 'البيع', kds: 'المطبخ', shift: 'الورد�
     po_create: 'عمل أمر شراء (وإلغاؤه وقفله)', po_approve: 'اعتماد أو رفض أمر الشراء', po_receive: 'الاستلام الفعلي وصورة الفاتورة',
     po_post: 'الترحيل للمخازن', po_invoice: 'تسجيل فاتورة المورد', supplier_pay: 'الدفع للموردين', suppliers_manage: 'إضافة وتعديل الموردين',
     inv_waste: 'تسجيل هالك', inv_transfer: 'تحويل بين المخازن', inv_stocktake: 'الجرد',
-    treasury_transfer: 'تحويل بين الخزن', day_close: 'قفل اليوم',
+    treasury_transfer: 'تحويل بين الخزن', day_close: 'قفل اليوم', tips_distribute: 'توزيع الإكراميات',
     exp_record: 'تسجيل مصروف', exp_recurring: 'المصروفات المتكررة (المرتبات والإيجار...)', exp_categories: 'بنود المصروفات', exp_custody: 'العهد',
     staff_manage: 'إضافة وتعديل الموظفين وأرقامهم السرية', payroll_approve: 'اعتماد المرتبات', payroll_pay: 'صرف المرتبات والسلف',
     acc_manual: 'قيود يدوية وعكس القيود', settings_menu: 'تعديل المنيو والوصفات والإضافات' };
 const PERM_SUBS = new Set(['po_create', 'po_approve', 'po_receive', 'po_post', 'po_invoice', 'supplier_pay', 'suppliers_manage', 'inv_waste', 'inv_transfer',
-    'inv_stocktake', 'treasury_transfer', 'day_close', 'exp_record', 'exp_recurring', 'exp_categories', 'exp_custody', 'staff_manage', 'payroll_approve',
+    'inv_stocktake', 'treasury_transfer', 'day_close', 'tips_distribute', 'exp_record', 'exp_recurring', 'exp_categories', 'exp_custody', 'staff_manage', 'payroll_approve',
     'payroll_pay', 'acc_manual', 'settings_menu']);
 
 async function loadStaffScreen() {

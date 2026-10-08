@@ -19,6 +19,11 @@
         button { font-family: inherit; cursor: pointer; border: 0; }
         input, textarea { font-family: inherit; }
         .wrap { max-width: 640px; margin: 0 auto; }
+        .paybox { margin: 18px 14px 4px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+        .paybox h3 { margin: 0 0 8px; font-size: 16px; font-weight: 900; }
+        .payrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #f1ebe2; }
+        .payval { font-weight: 900; font-size: 17px; direction: ltr; text-align: right; word-break: break-all; }
+        .paybtn { background: var(--brand); color: #fff; border-radius: 10px; padding: 7px 14px; font-weight: 900; font-size: 13px; text-decoration: none; border: 0; }
         .hero { background: radial-gradient(120% 140% at 100% 0%, #5a3d28 0%, var(--brand2) 35%, var(--brand) 75%); color: #fff; padding: 26px 18px 54px; position: relative; overflow: hidden; }
         .hero::after { content: ''; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%; background: rgba(192, 138, 62, .18); }
         .hero .logo { width: 74px; height: 74px; border-radius: 22px; background: #fff; object-fit: contain; padding: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
@@ -191,6 +196,7 @@
                     ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2>${esc(c.name)}</h2>
                         ${(c.products || []).map(itemHtml).join('')}</section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
                     ${M.show_prices && taxNote ? `<p class="muted" style="text-align:center;padding:4px 14px">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
+                    ${payInfoHtml()}
                     <div class="footer">
                         ${M.facebook_url ? `<a href="${esc(M.facebook_url)}" target="_blank" rel="noopener">📘 فيسبوك</a>` : ''}
                         ${M.instagram_url ? `<a href="${esc(M.instagram_url)}" target="_blank" rel="noopener">📸 إنستجرام</a>` : ''}
@@ -201,6 +207,26 @@
             renderBottom();
             observeImages();
             spyCats();
+        }
+
+        // أرقام الدفع: إنستاباي والمحفظة، بزرار نسخ
+        function payInfoHtml() {
+            const p = M.payinfo || {};
+            if (!p.instapay && !p.wallet) return '';
+            const row = (label, val, link) => `<div class="payrow"><div><div class="muted" style="font-size:12px">${esc(label)}</div><div class="payval">${esc(val)}</div></div>
+                <div style="display:flex;gap:6px">${link ? `<a class="paybtn" href="${esc(link)}" target="_blank" rel="noopener">ادفع</a>` : ''}<button class="paybtn" onclick="copyText('${esc(val)}', this)">نسخ</button></div></div>`;
+            return `<div class="paybox"><h3>💳 تقدر تدفع بتحويل</h3>
+                ${p.instapay ? row('إنستاباي', p.instapay, /^https?:\/\//.test(p.instapay_link || '') ? p.instapay_link : '') : ''}
+                ${p.wallet ? row(p.wallet_name || 'محفظة', p.wallet, '') : ''}
+                <p class="muted" style="font-size:12px;margin:6px 2px 0">بعد التحويل وري الويتر أو الكاشير رسالة التحويل 🙏</p></div>`;
+        }
+        function copyText(t, btn) {
+            const done = () => { if (btn) { btn.textContent = 'اتنسخ ✓'; setTimeout(() => { btn.textContent = 'نسخ'; }, 1500); } };
+            try { navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done)); } catch (e) { fallbackCopy(t, done); }
+        }
+        function fallbackCopy(t, done) {
+            const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* nothing */ } a.remove();
         }
 
         function itemHtml(p) {

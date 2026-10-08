@@ -856,12 +856,6 @@ async function openMultiplePaymentsModal() {
     const tipInput = document.getElementById('input-tip-amount');
     if (tipInput) tipInput.value = '0';
 
-    const tipWaiterSelect = document.getElementById('tip-waiter-select');
-    if (tipWaiterSelect) {
-        populateSelectOptions('tip-waiter-select', posState.waiters, 'اختر موظف الإكرامية', 'لا يوجد موظفون لهذا الفرع');
-        if (posState.cart.waiter_id) tipWaiterSelect.value = String(posState.cart.waiter_id);
-    }
-
     renderPaymentLines();
     document.getElementById('payments-modal').classList.remove('hidden');
 }
@@ -918,13 +912,9 @@ async function confirmMultiplePaymentsAndClose() {
     const due = round2(posState.cart.server_total);
     const tipValue = Number(document.getElementById('input-tip-amount')?.value ?? 0);
     const tip = Number.isFinite(tipValue) && tipValue >= 0 ? round2(tipValue) : NaN;
-    const tipWaiterId = document.getElementById('tip-waiter-select')?.value || null;
 
     if (posState.paymentsList.some(p => !Number.isFinite(Number(p.amount)) || Number(p.amount) < 0) || !Number.isFinite(tip)) {
         return showToast('أدخل مبالغ مدفوعات وإكرامية صحيحة (صفر أو أكثر)', 'error');
-    }
-    if (tip > 0 && !tipWaiterId) {
-        return showToast('اختر موظفًا لتخصيص الإكرامية له', 'error');
     }
     const payments = posState.paymentsList
         .filter(p => Number(p.amount) > 0)
@@ -954,7 +944,7 @@ async function confirmMultiplePaymentsAndClose() {
             p_order_id: posState.cart.id,
             p_payments: payments,
             p_tip_amount: tip,
-            p_tip_staff_id: tip > 0 ? tipWaiterId : null
+            p_tip_staff_id: null
         });
         if (!res || !res.ok) {
             let message = serverReasonMessage(res, 'تعذر إغلاق الطلب');

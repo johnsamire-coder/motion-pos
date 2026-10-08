@@ -56,8 +56,9 @@ $Files = [ordered]@{
   'supabase\migrations\021_phase15_owner_features.sql'         = '9fea412cddc412a4'
   'supabase\migrations\022_permissions_detail.sql'               = '5f5026cd4dd66de1'
   'supabase\migrations\023_setup_edit.sql'                     = '0de907f0e36082e7'
+  'supabase\migrations\024_tips_pool_payinfo_recipes.sql'     = '183c8dbd70e8527b'
 }
-$LastVersion = '023'
+$LastVersion = '024'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }
