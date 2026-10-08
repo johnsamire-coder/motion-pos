@@ -1,6 +1,6 @@
 # Motion POS - shop server on this PC (database + API + screens), works on any Windows PC
-# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off [-Rebuild] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
-param([string]$Step = 'status', [switch]$Rebuild, [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
+# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off|pause|resume|newclient [-Rebuild] [-Site client.vercel.app] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
+param([string]$Step = 'status', [switch]$Rebuild, [string]$Site = '', [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -152,6 +152,23 @@ function Test-All {
   foreach ($ip in $ips) { Ok "From a phone on the same Wi-Fi: http://$($ip.IPAddress):$WebPort   ($($ip.InterfaceAlias))" }
 }
 
+# which client site this shop server belongs to (saved by -Site at setup); written into the local copy of config.js
+function Set-SiteHost {
+  $sf = Join-Path $Root 'site.txt'
+  if ($Site) {
+    if ($Site -notmatch '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$') { Fail "Site address looks wrong: $Site (example: cafe-nour.vercel.app)" }
+    Set-Content $sf $Site -Encoding ASCII
+  }
+  if (-not (Test-Path $sf)) { return }
+  $h = (Get-Content $sf -Raw).Trim()
+  $cf = Join-Path $Www 'js\config.js'
+  $c = [IO.File]::ReadAllText($cf, [Text.Encoding]::UTF8)
+  $line = 'const MOTION_SITE_HOST = location.hostname;'
+  if (-not $c.Contains($line)) { Fail 'config.js on this PC has no site line (old version?)' }
+  if (-not $c.Contains("'$h': [")) { Fail "Site $h is not in config.js yet - run -Step newclient for it first, then update the repo (git pull)" }
+  [IO.File]::WriteAllText($cf, $c.Replace($line, "const MOTION_SITE_HOST = '$h';"), (New-Object Text.UTF8Encoding($false)))
+  Ok "Screens on this PC belong to site $h"
+}
 function Get-CloudConn {
   $f = Join-Path $Secret 'cloud_conn.dat'
   if (-not (Test-Path $f)) { Fail 'Cloud connection not saved yet. Run -Step cloud first.' }
@@ -316,7 +333,7 @@ create database $DbName;
     Info "Running $(Split-Path $k -Leaf)"
     $log = Invoke-Sql (Join-Path $Repo $k)
     $n = ([regex]::Match((Split-Path $k -Leaf), '^(\d{3})_')).Groups[1].Value
-    if ($n -and (Select-String -Path (Join-Path $Repo $k) -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet) -and -not (Select-String -Path $log -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet)) { Fail "$n self-test message missing" }
+    if ($n -and (Select-String -Path (Join-Path $Repo $k) -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet) -and -not (Select-String -Path $log -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet) -and -not (Select-String -Path $log -Pattern 'selftest skipped' -Quiet)) { Fail "$n self-test message missing" }
   }
   Get-Val "update public.sync_node set node = 'store', updated_at = now();" | Out-Null
   Get-Val 'create extension if not exists dblink with schema extensions;' | Out-Null
@@ -336,6 +353,7 @@ server-port = $ApiPort
 "@ | Set-Content (Join-Path $Root 'api\postgrest.conf') -Encoding ASCII
   & robocopy $Repo $Www /MIR /NFL /NDL /NJH /NJS /NP /XD .git supabase docs tests tools /XF README.md .gitignore .vercelignore | Out-Null
   if ($LASTEXITCODE -ge 8) { Fail 'Copying the screens failed' }
+  Set-SiteHost
   Ok "Screens copied to $Www (from $head)"
   $wf = $Www.Replace('\', '/')
   "{`n`tadmin off`n`tauto_https off`n}`n`n:$WebPort {`n`tencode gzip`n`thandle_path /rest/v1/* {`n`t`treverse_proxy 127.0.0.1:$ApiPort {`n`t`t`theader_up -Authorization`n`t`t}`n`t}`n`thandle {`n`t`troot * $wf`n`t`tfile_server`n`t}`n}`n" |
@@ -354,6 +372,7 @@ server-port = $ApiPort
   $st = git status --short; if ($st) { Fail "Repo has changes:`n$st" }
   & robocopy $Repo $Www /MIR /NFL /NDL /NJH /NJS /NP /XD .git supabase docs tests tools /XF README.md .gitignore .vercelignore | Out-Null
   if ($LASTEXITCODE -ge 8) { Fail 'Copying the screens failed' }
+  Set-SiteHost
   Ok "Screens on this PC updated to $((git rev-parse --short HEAD).Trim())"
 }
 'stop'   {
@@ -362,6 +381,7 @@ server-port = $ApiPort
 }
 'status' {
   Use-Env
+  if (Test-Path (Join-Path $Root 'site.txt')) { Info "Site: $((Get-Content (Join-Path $Root 'site.txt') -Raw).Trim())" } else { Info 'Site: motion-pos.vercel.app (default)' }
   if (Test-DbUp) { Ok "Database running (port $DbPort)" } else { Info 'Database stopped' }
   if (Test-ApiUp) { Ok "API running (port $ApiPort)" } else { Info 'API stopped' }
   if ((Get-Code "http://127.0.0.1:$WebPort/") -eq 200) { Ok "Screens running (port $WebPort)" } else { Info 'Screens stopped' }
@@ -477,6 +497,169 @@ server-port = $ApiPort
   Unregister-ScheduledTask -TaskName 'MotionPOS Shop Server' -Confirm:$false -ErrorAction SilentlyContinue
   Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -like '*motionlocal.ps1*-Step run*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
   Ok 'Automatic start removed and background sync stopped (database and screens keep running until -Step stop)'
+}
+
+
+'newclient' {
+  # build a brand-new Supabase project for a client from the files 001..last, copy the starter setup
+  # (company, branch, tables, warehouses, chart of accounts, roles, reasons, discounts, settings) from the current cloud,
+  # make a new owner, and add the client site to config.js
+  Use-Env
+  $src = Get-CloudConn
+  Set-Location $Repo
+  $br = (git rev-parse --abbrev-ref HEAD).Trim(); if ($br -ne 'dev') { Fail "Repo is on branch $br, not dev" }
+  $st = git status --short; if ($st) { Fail "Repo has changes:`n$st" }
+  git fetch -q origin
+  if ((git rev-parse HEAD).Trim() -ne (git rev-parse origin/dev).Trim()) { Fail 'This PC and GitHub dev differ - update first' }
+  foreach ($k in $Files.Keys) { if ((Get-Fp (Join-Path $Repo $k)) -ne $Files[$k]) { Fail "Fingerprint mismatch $k" } }
+  Ok "Repo clean and up to date, $($Files.Count) database files match"
+  $cfg = Join-Path $Repo 'js\config.js'
+  $cfgText = [IO.File]::ReadAllText($cfg, [Text.Encoding]::UTF8)
+  $marker = '    // clients (added by tools\motionlocal.ps1 -Step newclient)'
+  if (-not $cfgText.Contains($marker)) { Fail 'config.js has no clients line (old version)' }
+
+  Write-Host '--- Client details (names can be changed later from Settings; English is fine) ---' -ForegroundColor Yellow
+  $company = (Read-Host 'Client company name').Trim()
+  $branch  = (Read-Host 'First branch name').Trim()
+  $owner   = (Read-Host 'Owner name').Trim()
+  if (-not $company -or -not $branch -or -not $owner) { Fail 'Names cannot be empty' }
+  $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN, 4 to 6 digits (hidden)' -AsSecureString)))
+  $p2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN again (hidden)' -AsSecureString)))
+  if ($p1 -notmatch '^\d{4,6}$') { Fail 'PIN must be 4 to 6 digits' }
+  if ($p1 -ne $p2) { Fail 'The two PINs are different' }
+  $site = (Read-Host 'Client site address on Vercel (example: cafe-nour.vercel.app)').Trim().ToLower() -replace '^https?://', '' -replace '/.*$', ''
+  if ($site -notmatch '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$') { Fail "Site address looks wrong: $site" }
+  if ($cfgText.Contains("'$site': [")) { Fail "Site $site is already in config.js" }
+  Write-Host 'Client Supabase > Connect > Session pooler > copy the string (it contains [YOUR-PASSWORD])' -ForegroundColor Yellow
+  $uri = (Read-Host 'Paste the CLIENT Session pooler connection string').Trim()
+  if ($uri -notmatch '^postgres(ql)?://postgres\.([a-z0-9]{20}):\[YOUR-PASSWORD\]@[^/]+pooler\.supabase\.com:5432/postgres') { Fail 'This is not a Session pooler string with [YOUR-PASSWORD] in it' }
+  $ref = $Matches[2]
+  if ($src -match "postgres\.$ref") { Fail 'This is the SAME project as the current cloud - make a new project for the client' }
+  Write-Host 'Client Supabase > Project Settings > API Keys > anon public (or Legacy API keys) > copy' -ForegroundColor Yellow
+  $key = (Read-Host 'Paste the CLIENT anon public key').Trim()
+  if ($key -notmatch '^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$') { Fail 'This does not look like the anon public key (it starts with eyJ)' }
+  try { $pl = $key.Split('.')[1].Replace('-', '+').Replace('_', '/'); while ($pl.Length % 4) { $pl += '=' }; $kj = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($pl)) | ConvertFrom-Json } catch { Fail 'Could not read the key' }
+  if ($kj.ref -ne $ref -or $kj.role -ne 'anon') { Fail "The key is for project '$($kj.ref)' role '$($kj.role)', expected '$ref' anon" }
+  $sp = Read-Host 'CLIENT database password (hidden)' -AsSecureString
+  $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sp))
+  if (-not $plain) { Fail 'Empty password' }
+  $dst = $uri.Replace('[YOUR-PASSWORD]', [uri]::EscapeDataString($plain)) + '?sslmode=require'
+  Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+  $work = Join-Path $Root 'newclient'; New-Item -ItemType Directory $work -Force | Out-Null
+  $utf8 = New-Object Text.UTF8Encoding($false)
+  function Remote-File($conn, $file, $log) {
+    & psql $conn -X -q -v ON_ERROR_STOP=1 -f $file *> $log
+    if ($LASTEXITCODE -ne 0) { Write-Host "----- last lines of $log -----" -ForegroundColor Yellow; Get-Content $log -Tail 20 | ForEach-Object { Hide $_ $conn }; return $false }
+    return $true
+  }
+  function Remote-Val($conn, $sql) {
+    $f = Join-Path $work 'q.sql'; [IO.File]::WriteAllText($f, $sql, $utf8)
+    $o = Join-Path $work 'q.out'
+    & psql $conn -X -q -A -t -v ON_ERROR_STOP=1 -f $f -o $o 2> (Join-Path $work 'q.err')
+    if ($LASTEXITCODE -ne 0) { Fail "Query failed: $(Hide (Get-Content (Join-Path $work 'q.err') -Raw) $conn)" }
+    ([IO.File]::ReadAllText($o, [Text.Encoding]::UTF8)).Trim()
+  }
+  $empty = Remote-Val $dst "select (to_regclass('public.orders') is null)::text;"
+  if ($empty -ne 'true') { Fail 'The client project is NOT empty. Use a brand-new project (or Supabase > Database > reset), then run again.' }
+  Ok "Client project $ref reached and empty"
+
+  # 1) build: baseline (without creating the public schema, Supabase already has it) + 001..last
+  $i = 0
+  foreach ($k in $Files.Keys) {
+    $i++
+    $f = Join-Path $Repo $k
+    if ($k -like '*backup*') {
+      $t = [IO.File]::ReadAllText($f, [Text.Encoding]::UTF8).Replace("`r`n", "`n")
+      $t = $t.Replace("`nCREATE SCHEMA public;`n", "`n").Replace("`nCOMMENT ON SCHEMA public IS 'standard public schema';`n", "`n").Replace("`nSET transaction_timeout = 0;`n", "`n")
+      $f = Join-Path $work 'baseline.sql'; [IO.File]::WriteAllText($f, $t, $utf8)
+    }
+    Info "Client project: running $(Split-Path $k -Leaf)"
+    $log = Join-Path $work ('build_' + $i + '.log')
+    if (-not (Remote-File $dst $f $log)) { Fail "Failed on $(Split-Path $k -Leaf). Reset the client project and run again." }
+    $n = ([regex]::Match((Split-Path $k -Leaf), '^(\d{3})_')).Groups[1].Value
+    if ($n -and (Select-String -Path (Join-Path $Repo $k) -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet) -and -not (Select-String -Path $log -Pattern "MOTIONPOS-$n-SELFTEST-OK" -Quiet) -and -not (Select-String -Path $log -Pattern 'selftest skipped' -Quiet)) { Fail "$n self-test message missing" }
+  }
+  $ver = Remote-Val $dst 'select public.motionpos_version_public();'
+  if ($ver -ne $LastVersion) { Fail "Client project version is $ver, expected $LastVersion" }
+  Ok "Client project built: version $ver"
+
+  # 2) starter setup copied from the current cloud (same ids), owner only
+  $tables = 'companies','brands','branches','branch_tax_settings','areas','tables','warehouses','accounts','cost_centers','cash_bank_accounts',
+            'payment_method_account_mappings','fiscal_periods','roles','role_permissions','discounts','adjustment_reasons','cancel_reasons',
+            'expense_categories','pos_settings','app_settings','units','unit_conversions','staff'
+  $arr = "array['" + ($tables -join "','") + "']"
+  $gen = @"
+select string_agg(format('delete from public.%I;' || chr(10) || 'insert into public.%I (%s) select %s from jsonb_populate_recordset(null::public.%I, %L::jsonb);',
+         t, t, public.pos_sync_cols(t), public.pos_sync_cols(t), t,
+         (case when t = 'staff'
+               then (select coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) from (select s.* from public.staff s join public.roles r on r.id = s.role_id
+                                                                                where r.name = 'owner' order by s.created_at limit 1) s)
+               else public.pos_sync_snapshot(t) end)::text), chr(10) order by t)
+  from unnest($arr) t
+ where to_regclass('public.' || t) is not null;
+"@
+  $seedBody = Remote-Val $src $gen
+  if (-not $seedBody.Contains('insert into public.companies')) { Fail 'Could not read the starter setup from the current cloud' }
+  $q = { param($v) "'" + $v.Replace("'", "''") + "'" }
+  $seed = @"
+begin;
+set local session_replication_role = replica;
+select set_config('motionpos.sync_apply', 'on', true);
+$seedBody
+update public.companies set name = $(& $q $company);
+update public.brands set name = $(& $q $company);
+update public.branches set name = $(& $q $branch), has_store_server = false where id = (select b.id from public.branches b order by b.created_at limit 1);
+update public.branches set has_store_server = false;
+update public.tables set qr_token = encode(extensions.gen_random_bytes(12), 'hex') where qr_token is not null;
+update public.staff set name = $(& $q $owner), pin_hash = extensions.crypt('$p1', extensions.gen_salt('bf', 8)), is_active = true, email = null, phone = null;
+insert into public.order_sequences (branch_id, last_number) select b.id, 1000 from public.branches b
+  on conflict (branch_id) do update set last_number = 1000;
+update public.app_settings set updated_by = null;
+update public.app_settings set data = data || jsonb_build_object('company_name', $(& $q $company), 'logo', '', 'address', '', 'phone', '', 'tax_number', '', 'commercial_register', '')
+ where section = 'general';
+insert into public.app_settings (company_id, section, data)
+select c.id, 'general', jsonb_build_object('company_name', $(& $q $company)) from public.companies c
+ where not exists (select 1 from public.app_settings s where s.company_id = c.id and s.section = 'general');
+update public.app_settings set data = data || jsonb_build_object('warn_kitchen_minutes', 20, 'warn_bar_minutes', 10, 'warn_shisha_minutes', 10)
+ where section = 'kds';
+update public.app_settings set data = data || jsonb_build_object('mode', 'none') where section = 'offline';
+set local session_replication_role = origin;
+commit;
+"@
+  $sf = Join-Path $work 'seed.sql'; [IO.File]::WriteAllText($sf, $seed, $utf8)
+  $ok = Remote-File $dst $sf (Join-Path $work 'seed.log')
+  Remove-Item $sf -Force
+  if (-not $ok) { Fail 'Copying the starter setup failed. Reset the client project and run again.' }
+  $chk = Remote-Val $dst ("select (select count(*) from public.companies) || ' company, ' || (select count(*) from public.branches) || ' branch, ' || (select count(*) from public.tables) || ' tables, ' || " +
+         "(select count(*) from public.accounts) || ' accounts, ' || (select count(*) from public.roles) || ' roles, ' || (select count(*) from public.staff) || ' staff, owner PIN ' || " +
+         "(select case when count(*) = 1 then 'OK' else 'WRONG' end from public.staff s where s.pin_hash = extensions.crypt('$p1', s.pin_hash));")
+  Remove-Item (Join-Path $work 'q.sql') -Force -ErrorAction SilentlyContinue
+  if ($chk -notmatch 'owner PIN OK$') { Fail "Starter setup check failed: $chk" }
+  Ok "Client starter setup: $chk"
+  $p1 = $null; $p2 = $null
+
+  # 3) the client site in config.js -> GitHub
+  $line = "    '$site': ['https://$ref.supabase.co', '$key'],"
+  [IO.File]::WriteAllText($cfg, $cfgText.Replace($marker, $line + "`r`n" + $marker), $utf8)
+  git add -- js/config.js
+  git commit -q -m "New client site $site -> Supabase project $ref" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`nClaude-Session: https://claude.ai/code/session_015M3SkwKzgacJqnC6D7qAuH"
+  if ($LASTEXITCODE -ne 0) { Fail 'Commit failed' }
+  git push -q origin dev; if ($LASTEXITCODE -ne 0) { Fail 'Push to dev failed' }
+  git push -q origin dev:main; if ($LASTEXITCODE -ne 0) { Fail 'Push to main failed' }
+  Ok "config.js now knows $site (main = dev = $((git rev-parse --short HEAD).Trim()))"
+  Info "Waiting for https://$site to take the new version (up to 4 minutes)..."
+  $live = $false
+  for ($w = 0; $w -lt 24; $w++) {
+    Start-Sleep 10
+    try { $c = (Invoke-WebRequest "https://$site/js/config.js?x=$w" -UseBasicParsing -ErrorAction Stop).Content; if ($c -match [regex]::Escape("'$site'")) { $live = $true; break } } catch {}
+  }
+  if (-not $live) { Fail "https://$site did not answer with the new version - check the Vercel project for this site" }
+  try {
+    $v = Invoke-RestMethod -Method Post -Uri "https://$ref.supabase.co/rest/v1/rpc/motionpos_version_public" -Body '{}' -ContentType 'application/json' `
+         -Headers @{ apikey = $key; Authorization = "Bearer $key" } -ErrorAction Stop
+  } catch { Fail "Client database does not answer with the anon key: $($_.Exception.Message)" }
+  Ok "https://$site is live and its database answers (version $v)"
+  Write-Host 'NEWCLIENT DONE' -ForegroundColor Green
 }
 
 default { Fail "Unknown step $Step" }

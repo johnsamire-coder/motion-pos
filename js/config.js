@@ -1,10 +1,17 @@
 // js/config.js - الإعدادات المركزية
 // المحل: الصفحة جاية من كمبيوتر المحل (http) فبتكلم قاعدة بيانات المحل. النت: الموقع (https) بيكلم قاعدة بيانات النت.
 const MOTION_LOCAL = location.protocol === 'http:';
-const CLOUD_URL = 'https://qyrezfpzcuioxasxjhiq.supabase.co';
-const CLOUD_SITE = 'https://motion-pos.vercel.app/';
+// كل موقع على النت ليه قاعدة بياناته. على كمبيوتر المحل، أداة المحل بتكتب اسم موقع العميل مكان location.hostname في السطر اللي جاي.
+const MOTION_SITE_HOST = location.hostname;
+const MOTION_SITES = {
+    'motion-pos.vercel.app': ['https://qyrezfpzcuioxasxjhiq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cmV6ZnB6Y3Vpb3hhc3hqaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNzY2ODAsImV4cCI6MjEwNjc1MjY4MH0._BrruPh4V6IUKa78u5CDJl-I4cRmU0RvZf5MsmAUXTQ'],
+    // clients (added by tools\motionlocal.ps1 -Step newclient)
+};
+const MOTION_SITE_KEY = MOTION_SITES[MOTION_SITE_HOST] ? MOTION_SITE_HOST : 'motion-pos.vercel.app';
+const CLOUD_URL = MOTION_SITES[MOTION_SITE_KEY][0];
+const CLOUD_SITE = 'https://' + MOTION_SITE_KEY + '/';
 const SUPABASE_URL = MOTION_LOCAL ? location.origin : CLOUD_URL;
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cmV6ZnB6Y3Vpb3hhc3hqaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNzY2ODAsImV4cCI6MjEwNjc1MjY4MH0._BrruPh4V6IUKa78u5CDJl-I4cRmU0RvZf5MsmAUXTQ';
+const SUPABASE_KEY = MOTION_SITES[MOTION_SITE_KEY][1];
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
