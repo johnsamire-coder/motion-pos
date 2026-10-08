@@ -253,6 +253,35 @@ function round2(value) {
 // -----------------------------------------
 // أدوات الشاشات (جداول، تواريخ، نداء السيرفر مع رسالة واضحة)
 // -----------------------------------------
+// ---------------------------------------------------------------- واتساب
+// رقم مصري 01xxxxxxxxx -> 201xxxxxxxxx
+function waPhone(phone) {
+    let p = String(phone || '').replace(/[^0-9]/g, '');
+    if (p.startsWith('00')) p = p.slice(2);
+    if (p.startsWith('0')) p = '20' + p.slice(1);
+    return p;
+}
+// {الاسم} = اسم العميل، {المحل} = اسم الشركة من الإعدادات
+function waFill(template, name) {
+    const company = (typeof appSettings !== 'undefined' && appSettings && appSettings.general && appSettings.general.company_name) || '';
+    return String(template || '').split('{الاسم}').join(name || '').split('{المحل}').join(company).trim();
+}
+function waLink(phone, text) {
+    const p = waPhone(phone);
+    if (!p) return '';
+    return 'https://wa.me/' + p + (text ? '?text=' + encodeURIComponent(text) : '');
+}
+function waOpen(phone, text) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        showToast('مفيش نت دلوقتي، الرسالة مش هتتبعت. ابعتها لما النت يرجع.', 'error');
+        return false;
+    }
+    const url = waLink(phone, text);
+    if (!url) { showToast('رقم الموبايل مش صحيح', 'error'); return false; }
+    window.open(url, '_blank', 'noopener');
+    return true;
+}
+
 function uiEsc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }

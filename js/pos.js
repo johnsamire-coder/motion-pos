@@ -443,6 +443,14 @@ function addItemToCart(product, selectedModifiers = [], notes = '') {
     renderOrderCartTicket();
 }
 
+// ---------------------------------------------------------------- رسالة شكر على الواتساب بعد الدفع (ضغطة واحدة)
+async function posAskThanks(c) {
+    const msg = waFill(appSet('whatsapp', 'thanks_message', ''), c.name);
+    if (!msg) return;
+    if (!(await uiConfirm(`تبعت رسالة شكر على الواتساب لـ ${c.name}؟\n\n${msg}`, 'ابعت 💬'))) return;
+    waOpen(c.phone, msg);
+}
+
 // ---------------------------------------------------------------- العميل بالموبايل
 function posSetCustomer(c) {
     if (!c) return;
@@ -877,6 +885,8 @@ async function confirmMultiplePaymentsAndClose() {
         }
 
         const closedOrderId = posState.cart.id;
+        const paidCustomerId = document.getElementById('select-customer')?.value || null;
+        const paidCustomer = paidCustomerId ? (posState.customers.find(x => x.id === paidCustomerId) || null) : null;
         closeMultiplePaymentsModal();
         resetActiveCart();
         posState.selectedTable = null;
@@ -885,6 +895,7 @@ async function confirmMultiplePaymentsAndClose() {
         renderAreaAndTables();
         renderOrderCartTicket();
         showToast(`💳 تم الدفع وإغلاق الطلب ${res.order_number || ''} بنجاح!`);
+        if (paidCustomer && paidCustomer.phone && appSet('whatsapp', 'thanks_enabled', true)) posAskThanks(paidCustomer);
     } catch (err) {
         console.error('Payment completion error:', err);
         showToast('لم تكتمل عملية الدفع، ومفيش أي حاجة اتسجلت: ' + (err.message || 'خطأ غير معروف'), 'error');

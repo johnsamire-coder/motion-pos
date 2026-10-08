@@ -32,15 +32,16 @@ async function custLoadDue() {
     box.innerHTML = uiCard(`📞 متابعات (لحد ٧ أيام قدام): ${custState.due.length}`, uiTable(custState.due, [
         { label: 'الميعاد', render: f => `<span class="${f.next_date <= res.today ? 'text-red-600 font-black' : ''}">${uiEsc(f.next_date)}${f.next_date < res.today ? ' (فات)' : (f.next_date === res.today ? ' (النهارده)' : '')}</span>` },
         { label: 'العميل', render: f => `<button class="text-blue-700 underline" onclick="custOpen('${f.customer_id}')">${uiEsc(f.name)}</button>` },
-        { label: 'الموبايل', render: f => custPhoneLinks(f.phone) },
+        { label: 'الموبايل', render: f => custPhoneLinks(f.phone, f.name) },
         { label: 'آخر ملاحظة', key: 'note' }, { label: 'بواسطة', key: 'by' },
         { label: '', render: f => uiBtn('سجّل مكالمة', `custOpen('${f.customer_id}')`, 'blue') + ' ' + uiBtn('خلصت', `custFollowDone('${f.id}')`, 'gray') }]));
 }
 
-function custPhoneLinks(phone) {
+function custPhoneLinks(phone, name) {
     if (!phone) return '-';
-    const wa = String(phone).replace(/^0/, '20');
-    return `<span class="whitespace-nowrap"><a class="text-blue-600" href="tel:${uiEsc(phone)}">${uiEsc(phone)}</a> <a class="text-emerald-600" target="_blank" rel="noopener" href="https://wa.me/${uiEsc(wa)}" title="واتساب">💬</a></span>`;
+    const s = (typeof appSettings !== 'undefined' && appSettings && appSettings.whatsapp) || {};
+    const wa = waLink(phone, waFill(s.customer_message || '', name));
+    return `<span class="whitespace-nowrap"><a class="text-blue-600" href="tel:${uiEsc(phone)}">${uiEsc(phone)}</a> <a class="text-emerald-600" target="_blank" rel="noopener" href="${uiEsc(wa)}" title="ابعت رسالة واتساب (النص من الإعدادات)">💬</a></span>`;
 }
 
 async function custLoadList() {
@@ -54,7 +55,7 @@ async function custLoadList() {
     custState.canCredit = !!res.can_credit;
     box.innerHTML = `<p class="text-[11px] text-slate-500 font-bold mb-2">${custState.list.length} عميل${custState.list.length >= 1000 ? ' (أول ١٠٠٠، دوّر بالاسم أو الرقم)' : ''}</p>` + uiTable(custState.list, [
         { label: 'الاسم', render: c => `<button class="text-blue-700 font-black underline" onclick="custOpen('${c.id}')">${uiEsc(c.name)}</button>${c.customer_type === 'on_account' ? ' <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded">آجل</span>' : ''}` },
-        { label: 'الموبايل', render: c => custPhoneLinks(c.phone) },
+        { label: 'الموبايل', render: c => custPhoneLinks(c.phone, c.name) },
         { label: 'الطلبات', key: 'orders_count' },
         { label: 'صرف', render: c => formatCurrency(c.total_spent) },
         { label: 'آخر زيارة', render: c => c.last_visit ? uiEsc(uiDate(c.last_visit)) : '-' },
@@ -95,7 +96,7 @@ async function custOpen(id) {
     custModal(`
         <div class="flex flex-wrap justify-between items-start gap-2 border-b pb-3 mb-3">
             <div><h3 class="font-black text-lg">${uiEsc(c.name)} <span class="text-[11px] bg-slate-100 px-2 py-0.5 rounded-lg">${uiEsc(CUST_TYPE_NAMES[c.customer_type] || c.customer_type)}</span></h3>
-                <div class="text-xs font-bold mt-1">${custPhoneLinks(c.phone)}${c.address ? ' | ' + uiEsc(c.address) : ''}${c.birthday ? ' | 🎂 ' + uiEsc(c.birthday) : ''}</div>
+                <div class="text-xs font-bold mt-1">${custPhoneLinks(c.phone, c.name)}${c.address ? ' | ' + uiEsc(c.address) : ''}${c.birthday ? ' | 🎂 ' + uiEsc(c.birthday) : ''}</div>
                 ${c.notes ? `<div class="text-[11px] text-amber-700 font-bold mt-1">📝 ${uiEsc(c.notes)}</div>` : ''}
                 <div class="text-[10px] text-slate-400 font-bold mt-1">اتسجّل ${uiEsc(uiDate(c.created_at))}${c.created_by ? ' بواسطة ' + uiEsc(c.created_by) : ''}</div></div>
             <div class="flex gap-2">${uiBtn('تعديل ✏️', `custEdit('${c.id}')`, 'gray')}${uiBtn('قفل ✖', 'custCloseModal()', 'gray')}</div>
