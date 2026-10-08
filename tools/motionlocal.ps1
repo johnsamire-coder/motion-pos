@@ -174,6 +174,30 @@ function Invoke-Backup([switch]$Force) {
   Get-ChildItem $bd -Filter 'motionpos_*.dump' | Sort-Object Name -Descending | Select-Object -Skip 14 | Remove-Item -Force
   return "backup saved: $(Split-Path $f -Leaf) ($([math]::Round((Get-Item $f).Length/1KB)) KB)"
 }
+# keep database, API and screens alive (programs started from a PowerShell window die when that window closes)
+function Ensure-Services($log) {
+  $notes = @()
+  if (-not (Test-DbUp)) {
+    Invoke-PgCtl "-D `"$Data`" -l `"$(Join-Path $Logs 'db.log')`" -w -t 60 start" | Out-Null
+    $notes += $(if (Test-DbUp) { 'database was stopped - started again' } else { 'database is stopped and did not start (see logs\db.log)' })
+  }
+  if (-not (Test-ApiUp)) {
+    Get-Process postgrest -ErrorAction SilentlyContinue | Stop-Process -Force
+    $exe = Get-ApiExe
+    Start-Process -FilePath $exe.FullName -ArgumentList "`"$(Join-Path $Root 'api\postgrest.conf')`"" -WindowStyle Hidden `
+      -RedirectStandardOutput (Join-Path $Logs 'api.log') -RedirectStandardError (Join-Path $Logs 'api_err.log') | Out-Null
+    for ($i = 0; $i -lt 20 -and -not (Test-ApiUp); $i++) { Start-Sleep 1 }
+    $notes += $(if (Test-ApiUp) { 'API was stopped - started again' } else { 'API is stopped and did not start (see logs\api_err.log)' })
+  }
+  if ((Get-Code "http://127.0.0.1:$WebPort/") -ne 200) {
+    Get-Process caddy -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Process -FilePath (Join-Path $CadDir 'caddy.exe') -ArgumentList "run --config `"$(Join-Path $CadDir 'Caddyfile')`" --adapter caddyfile" `
+      -WorkingDirectory $CadDir -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Logs 'web.log') -RedirectStandardError (Join-Path $Logs 'web_err.log') | Out-Null
+    for ($i = 0; $i -lt 15 -and (Get-Code "http://127.0.0.1:$WebPort/") -ne 200; $i++) { Start-Sleep 1 }
+    $notes += $(if ((Get-Code "http://127.0.0.1:$WebPort/") -eq 200) { 'screens were stopped - started again' } else { 'screens are stopped and did not start (see logs\web_err.log)' })
+  }
+  foreach ($n in $notes) { $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') FIX  $n"; Add-Content $log $line; Write-Host $line -ForegroundColor Yellow }
+}
 function Invoke-SyncLoop {
   $mutex = New-Object Threading.Mutex($false, 'Local\MotionPOSSyncLoop')
   if (-not $mutex.WaitOne(0)) { Fail 'Another sync loop is already running on this PC (window or automatic start). Close it first.' }
@@ -181,6 +205,8 @@ function Invoke-SyncLoop {
   $log = Join-Path $Logs 'sync.log'
   Write-Host 'Sync every 30 seconds. Leave this window open (minimize it). Ctrl+C or close to stop.' -ForegroundColor Yellow
   while ($true) {
+    Ensure-Services $log
+    if (Test-Path (Join-Path $Root 'sync.pause')) { Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') paused" -ForegroundColor DarkYellow; Start-Sleep 30; continue }
     $b = Invoke-Backup
     if ($b) { Add-Content $log "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $b"; Write-Host $b -ForegroundColor Cyan }
     $i = 0
@@ -338,6 +364,10 @@ server-port = $ApiPort
   if (Test-DbUp) { Ok "Database running (port $DbPort)" } else { Info 'Database stopped' }
   if (Test-ApiUp) { Ok "API running (port $ApiPort)" } else { Info 'API stopped' }
   if ((Get-Code "http://127.0.0.1:$WebPort/") -eq 200) { Ok "Screens running (port $WebPort)" } else { Info 'Screens stopped' }
+  if (Test-Path (Join-Path $Root 'sync.pause')) { Info 'Sync PAUSED - run -Step resume' }
+  $ts = (Get-ScheduledTask -TaskName 'MotionPOS Shop Server' -ErrorAction SilentlyContinue).State
+  if ($ts) { Info "Automatic start: $ts" } else { Info 'Automatic start: not set' }
+  if (Test-DbUp) { Info "Last good sync (UTC): $(Get-Val "select coalesce((select s.value from public.sync_state s where s.key = 'last_ok'), 'never');")" }
 }
 
 'cloud' {
@@ -419,6 +449,8 @@ server-port = $ApiPort
   Write-Host 'COMPARE DONE' -ForegroundColor Green
 }
 
+'pause'  { Set-Content (Join-Path $Root 'sync.pause') (Get-Date -Format s) -Encoding ASCII; Ok 'Sync paused (like the shop internet is down). Screens keep working. Run -Step resume to continue.' }
+'resume' { Remove-Item (Join-Path $Root 'sync.pause') -Force -ErrorAction SilentlyContinue; Ok 'Sync resumed (next round within 30 seconds)' }
 'autostart' {
   # start everything automatically when this Windows user logs in (no admin needed)
   $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
