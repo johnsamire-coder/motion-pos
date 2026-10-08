@@ -98,6 +98,15 @@ async function printOrderReceipt(orderId) {
     printHtml(Array.from({ length: copies }, () => one).join('<div style="page-break-after:always"></div>'), receiptPageCss());
 }
 
+// ورقة مكان واحد (المطبخ أو البار) من شاشة التحضير
+async function printStationTicket(orderId, station) {
+    const res = await loadPrintData(orderId);
+    if (!res) return;
+    const html = buildKitchenTicketHtml(res.order, station);
+    if (!html) return showToast('مفيش أصناف للمكان ده في الطلب', 'error');
+    printHtml(html, receiptPageCss());
+}
+
 async function printKitchenTickets(orderId) {
     const res = await loadPrintData(orderId);
     if (!res) return;

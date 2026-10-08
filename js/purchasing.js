@@ -124,10 +124,30 @@ function purAddLine() {
     if (!ing || !(qty > 0) || !(price >= 0) || document.getElementById('pur-new-price').value === '') return showToast('اختار الخامة واكتب الكمية والسعر', 'error');
     if (purState.lines.some(l => l.ingredient_id === ing)) return showToast('الخامة موجودة بالفعل', 'error');
     purState.lines.push({ ingredient_id: ing, qty, unit_price: price });
+    // نفضّي الخانات عشان الخامة الجاية متاخدش كمية وسعر اللي قبلها
+    document.getElementById('pur-new-ing').value = '';
+    document.getElementById('pur-new-qty').value = '';
+    document.getElementById('pur-new-price').value = '';
+    document.getElementById('pur-new-ing').focus();
     purRenderLines();
 }
 
-function purRemoveLine(idx) { purState.lines.splice(idx, 1); purRenderLines(); }
+async function purRemoveLine(idx) {
+    if (!(await uiConfirm('تحذف السطر ده من أمر الشراء؟', 'حذف', true))) return;
+    purState.lines.splice(idx, 1); purRenderLines();
+}
+
+async function purEditLine(idx) {
+    const l = purState.lines[idx];
+    if (!l) return;
+    const v = await uiForm('تعديل السطر', [
+        { key: 'qty', label: 'الكمية', type: 'number', value: l.qty, required: true },
+        { key: 'price', label: 'سعر الوحدة', type: 'number', value: l.unit_price, required: true }]);
+    if (!v) return;
+    const qty = Number(v.qty), price = Number(v.price);
+    if (!(qty > 0) || !(price >= 0)) return showToast('الكمية لازم أكبر من صفر والسعر صفر أو أكتر', 'error');
+    l.qty = qty; l.unit_price = price; purRenderLines();
+}
 
 function purRenderLines() {
     const box = document.getElementById('pur-new-lines');
@@ -137,7 +157,7 @@ function purRenderLines() {
     box.innerHTML = purState.lines.length ? uiTable(purState.lines.map((l, idx) => ({ ...l, idx })), [
         { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', key: 'qty' },
         { label: 'السعر', render: l => formatCurrency(l.unit_price) }, { label: 'الإجمالي', render: l => formatCurrency(l.qty * l.unit_price) },
-        { label: '', render: l => uiBtn('شيل', `purRemoveLine(${l.idx})`, 'gray') }]) + `<p class="text-xs font-black mt-2">الإجمالي: ${formatCurrency(total)}</p>` : '';
+        { label: '', render: l => '<div class="flex gap-1">' + uiBtn('تعديل', `purEditLine(${l.idx})`, 'gray') + uiBtn('حذف', `purRemoveLine(${l.idx})`, 'red') + '</div>' }]) + `<p class="text-xs font-black mt-2">الإجمالي: ${formatCurrency(total)}</p>` : '';
 }
 
 async function purSubmitNew() {

@@ -268,8 +268,10 @@ function waPhone(phone) {
     if (p.startsWith('0')) p = '20' + p.slice(1);
     return p;
 }
-// {الاسم} = اسم العميل، {المحل} = اسم الشركة من الإعدادات
+// {الاسم} = "أ/" + الاسم الأول للعميل، {المحل} = اسم الشركة من الإعدادات
 function waFill(template, name) {
+    const first = String(name || '').trim().split(/\s+/)[0] || '';
+    name = first ? 'أ/ ' + first : '';
     const company = (typeof appSettings !== 'undefined' && appSettings && appSettings.general && appSettings.general.company_name) || '';
     return String(template || '').split('{الاسم}').join(name || '').split('{المحل}').join(company).trim();
 }

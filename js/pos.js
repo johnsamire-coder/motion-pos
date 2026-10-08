@@ -175,8 +175,8 @@ function renderAreaAndTables() {
         else if (t.status === 'cleaning') { statusColor = "bg-sky-50 border-sky-300 text-sky-800"; statusName = "قيد التنظيف"; }
         
         const isSelected = posState.selectedTable && posState.selectedTable.id === t.id ? "ring-4 ring-blue-600" : "";
-        return `<div onclick="selectPosTable('${t.id}')" class="p-3 rounded-2xl border-2 ${statusColor} ${isSelected} cursor-pointer transition flex flex-col justify-between h-24">
-            <div class="flex justify-between items-center"><span class="font-extrabold text-sm">${t.table_number}</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/60">${statusName}</span></div>
+        return `<div onclick="selectPosTable('${t.id}')" class="p-3 rounded-2xl border-2 ${statusColor} ${isSelected} cursor-pointer transition flex flex-col justify-between gap-1 min-h-[6rem]">
+            <div class="flex flex-wrap justify-between items-center gap-1"><span class="font-extrabold text-sm">${uiEsc(t.table_number)}</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/60 whitespace-nowrap">${statusName}</span></div>
             <div class="text-[10px] font-bold text-slate-500">سعة: ${t.capacity} ضيوف</div>
         </div>`;
     }).join('');
@@ -290,8 +290,8 @@ async function selectPosTable(tableId) {
 function renderCategoriesPills() {
     const container = document.getElementById('category-pills');
     if (!container) return;
-    container.innerHTML = `<button onclick="filterPosProducts(null)" class="px-3 py-1 bg-blue-600 text-white rounded-xl text-xs font-bold shadow">الكل</button>` +
-        posState.categories.map(c => `<button onclick="filterPosProducts('${c.id}')" class="px-3 py-1 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200">${c.name}</button>`).join('');
+    container.innerHTML = `<button onclick="filterPosProducts(null)" class="shrink-0 whitespace-nowrap px-3 py-1 bg-blue-600 text-white rounded-xl text-xs font-bold shadow">الكل</button>` +
+        posState.categories.map(c => `<button onclick="filterPosProducts('${c.id}')" class="shrink-0 whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200">${uiEsc(c.name)}</button>`).join('');
 }
 
 function filterPosProducts(catId) { posState.activeCategory = catId; renderProductsGrid(); }
@@ -678,7 +678,7 @@ function setOrderType(type) {
     posState.selectedOrderType = type;
     refreshTypeButtons();
     const typeInfo = document.getElementById('ticket-type-info');
-    if (typeInfo) typeInfo.innerText = `النوع: ${type}`;
+    if (typeInfo) typeInfo.innerText = `النوع: ${(typeof PRINT_TYPE_NAMES !== 'undefined' && PRINT_TYPE_NAMES[type]) || type}`;
     renderAreaAndTables();
     renderOrderCartTicket();
 }
@@ -694,6 +694,11 @@ async function sendOrderToKitchen() {
     }
     if (typeof appSet === 'function' && appSet('pos', 'require_waiter', false) && !(document.getElementById('select-waiter')?.value)) {
         showToast('لازم تختار الويتر الأول (من الإعدادات)', 'error');
+        return false;
+    }
+    // طلب الصالة لازم يكون على طاولة (لو الفرع فيه طاولات)، وإلا الكاشير مش هيلاقيه على الطاولة
+    if (!posState.cart.id && posState.selectedOrderType === 'dine_in' && currentBranch && currentBranch.has_tables && !posState.selectedTable) {
+        showToast('اختار الطاولة الأول من خريطة الصالة، وبعدها ابعت الطلب', 'error');
         return false;
     }
     orderSubmissionInProgress = true;
@@ -742,9 +747,6 @@ async function sendOrderToKitchen() {
             renderAreaAndTables();
         }
         showToast(unsent.length ? '🚀 تم الإرسال للمطبخ!' : 'تم حفظ بيانات الطلب');
-        if (unsent.length && posState.cart.id && typeof printKitchenTickets === 'function' && appSet('receipt', 'auto_kitchen_ticket', false)) {
-            printKitchenTickets(posState.cart.id);
-        }
         renderOrderCartTicket();
         return true;
     } catch (err) {

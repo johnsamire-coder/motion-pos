@@ -1,6 +1,6 @@
 // js/auth.js - نظام تسجيل الدخول بالـ PIN المرن والمحصن
 // الدخول بيتم على السيرفر (staff_login): المتصفح بيبعت الرقم بس، والسيرفر بيرد ببيانات الموظف وتذكرة وردية.
-// التذكرة بتتحفظ في ذاكرة الصفحة بس، وبتتبعت مع أي عملية حساسة على السيرفر.
+// التذكرة بتتحفظ في التاب ده بس (sessionStorage)، وبتتبعت مع أي عملية حساسة على السيرفر.
 
 let staffSessionToken = null;
 
@@ -49,48 +49,75 @@ async function loginWithPin() {
             return;
         }
 
-        // 2. بيانات الموظف والدور والفرع جاية جاهزة من السيرفر
-        const roleName = (loginRes.role && loginRes.role.name) || 'كاشير';
-        const branchData = loginRes.branch || { name: 'الفرع الرئيسي', has_tables: true };
-        staffSessionToken = loginRes.session_token || null;
-
-        currentUser = {
-            ...loginRes.staff,
-            roles: { name: roleName },
-            branches: branchData
-        };
-        if (typeof isManagerUnlocked !== 'undefined') isManagerUnlocked = false;
-        if (typeof pendingTabTarget !== 'undefined') pendingTabTarget = null;
-        currentBranch = branchData;
-
-        // 3. إعدادات الضرائب والخدمة للفرع (جاية مع رد الدخول)
-        const taxData = loginRes.tax;
-        if (taxData) {
-            taxSettings.vat_percentage = parseFloat(taxData.vat_percentage) || 0;
-            taxSettings.service_charge_percentage = parseFloat(taxData.service_charge_percentage) || 0;
-            taxSettings.enable_vat = taxSettings.vat_percentage > 0;
-            taxSettings.enable_service = taxSettings.service_charge_percentage > 0;
-        }
-
-        // 5. فتح الواجهة الرئيسية
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-
-        document.getElementById('staff-name-display').innerText = `الموظف: ${currentUser.name}`;
-        document.getElementById('staff-role-display').innerText = `الدور: ${roleName}`;
-        document.getElementById('branch-badge').innerText = branchData.name;
-
-        showToast(`أهلا بك ${currentUser.name}`);
-        clearPin();
-
-        if (typeof applyTabPermissions === 'function') await applyTabPermissions();
-        if (typeof initPOSModule === 'function') initPOSModule();
-
+        await motionApplyLogin(loginRes);
     } catch (err) {
         console.error('Login error:', err);
         showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error');
     }
 }
+
+// بيانات الدخول بتتحفظ في التاب ده بس (sessionStorage)، عشان تحديث الصفحة (F5) ميخرّجش الموظف.
+// التذكرة نفسها بتتراجع على السيرفر عند كل فتح، ولو انتهت بيرجع لشاشة الرقم.
+async function motionApplyLogin(loginRes, quiet = false) {
+    try {
+            // 2. بيانات الموظف والدور والفرع جاية جاهزة من السيرفر
+            const roleName = (loginRes.role && loginRes.role.name) || 'كاشير';
+            const branchData = loginRes.branch || { name: 'الفرع الرئيسي', has_tables: true };
+            staffSessionToken = loginRes.session_token || null;
+            try { sessionStorage.setItem('motionpos_login', JSON.stringify(loginRes)); } catch (e) { /* private mode */ }
+
+            currentUser = {
+                ...loginRes.staff,
+                roles: { name: roleName },
+                branches: branchData
+            };
+            if (typeof isManagerUnlocked !== 'undefined') isManagerUnlocked = false;
+            if (typeof pendingTabTarget !== 'undefined') pendingTabTarget = null;
+            currentBranch = branchData;
+
+            // 3. إعدادات الضرائب والخدمة للفرع (جاية مع رد الدخول)
+            const taxData = loginRes.tax;
+            if (taxData) {
+                taxSettings.vat_percentage = parseFloat(taxData.vat_percentage) || 0;
+                taxSettings.service_charge_percentage = parseFloat(taxData.service_charge_percentage) || 0;
+                taxSettings.enable_vat = taxSettings.vat_percentage > 0;
+                taxSettings.enable_service = taxSettings.service_charge_percentage > 0;
+            }
+
+            // 5. فتح الواجهة الرئيسية
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+
+            document.getElementById('staff-name-display').innerText = `الموظف: ${currentUser.name}`;
+            document.getElementById('staff-role-display').innerText = `الدور: ${roleName}`;
+            document.getElementById('branch-badge').innerText = branchData.name;
+
+            if (!quiet) showToast(`أهلا بك ${currentUser.name}`);
+            clearPin();
+
+            if (typeof applyTabPermissions === 'function') await applyTabPermissions();
+            if (typeof initPOSModule === 'function' && (typeof canOpenTab !== 'function' || canOpenTab('pos'))) initPOSModule();
+    } catch (err) {
+        console.error('Login apply error:', err);
+    }
+}
+
+async function motionResumeLogin() {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem('motionpos_login') || 'null'); } catch (e) { saved = null; }
+    if (!saved || !saved.session_token) return;
+    staffSessionToken = saved.session_token;
+    try {
+        const chk = await serverRpc('pos_settings_list_secure');
+        if (!chk || !chk.ok) throw new Error('expired');
+    } catch (e) {
+        staffSessionToken = null;
+        try { sessionStorage.removeItem('motionpos_login'); } catch (x) { /* ignore */ }
+        return;
+    }
+    await motionApplyLogin(saved, true);
+}
+window.addEventListener('DOMContentLoaded', motionResumeLogin);
 
 function logout() {
     if (typeof paymentSubmissionInProgress !== 'undefined' && paymentSubmissionInProgress) {
@@ -101,6 +128,7 @@ function logout() {
         showToast('جارٍ حفظ الطلب، انتظر حتى تظهر نتيجة العملية قبل تسجيل الخروج.', 'error');
         return;
     }
+    try { sessionStorage.removeItem('motionpos_login'); } catch (e) { /* ignore */ }
     if (staffSessionToken) {
         _supabase.rpc('staff_logout', { p_token: staffSessionToken }).then(() => {}, () => {});
     }

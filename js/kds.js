@@ -88,9 +88,12 @@ function renderKDSCards() {
                     </div>
                     <div class="space-y-1 mb-3">${itemsHtml}</div>
                 </div>
+                <div class="flex gap-2">
                 ${!isPreparing
-                    ? `<button onclick="updateKDSStatus('${ord.id}', 'preparing')" class="w-full bg-amber-500 text-white py-2.5 rounded-xl font-extrabold text-xs">بدء التحضير</button>`
-                    : `<button onclick="updateKDSStatus('${ord.id}', 'ready')" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-extrabold text-xs">جاهز ✅</button>`}
+                    ? `<button onclick="updateKDSStatus('${ord.id}', 'preparing')" class="flex-1 bg-amber-500 text-white py-2.5 rounded-xl font-extrabold text-xs">بدء التحضير</button>`
+                    : `<button onclick="updateKDSStatus('${ord.id}', 'ready')" class="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-extrabold text-xs">جاهز ✅</button>`}
+                    <button onclick="printStationTicket('${ord.id}', '${kdsStation}')" title="طباعة ورقة المكان ده" class="px-4 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-extrabold text-xs">🖨️ طباعة</button>
+                </div>
             </div>`;
     }).join('');
 }

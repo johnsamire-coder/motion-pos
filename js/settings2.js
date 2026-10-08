@@ -54,7 +54,8 @@ function set2RenderAll() {
     set2Form('receipt', 'الطباعة والفاتورة', [['header', 'سطر فوق الفاتورة', 'text'], ['footer', 'سطر تحت الفاتورة (رسالة شكر)', 'text'],
         ['show_logo', 'اللوجو يظهر في الفاتورة', 'bool'], ['show_tax_number', 'الرقم الضريبي يظهر في الفاتورة', 'bool'],
         ['paper_mm', 'مقاس الورق', 'select', [[58, '58 مم'], [80, '80 مم']]], ['copies', 'عدد النسخ', 'number'],
-        ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool'], ['auto_kitchen_ticket', 'طباعة ورقة المطبخ أوتوماتيك بعد الإرسال', 'bool']]);
+        ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">ورقة المطبخ والبار بتتطبع من شاشة التحضير نفسها بزرار 🖨️ على كل طلب.</p>');
     set2Form('whatsapp', 'رسايل الواتساب', [['customer_message', 'الرسالة اللي بتتبعت من شاشة العملاء (زرار 💬)', 'text'],
         ['thanks_enabled', 'بعد الدفع: الكاشير يشوف زرار "ابعت رسالة شكر" لو الطلب عليه عميل بموبايل', 'bool'],
         ['thanks_message', 'رسالة الشكر بعد الدفع', 'text']],
@@ -69,7 +70,7 @@ function set2RenderAll() {
         ['warn_shisha_minutes', 'الشيشة: متأخر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number']],
         `<div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
          ${uiTable(set2.data.categories, [{ label: 'القسم', key: 'name' }, { label: 'المكان', render: c => `<select onchange="set2Station('${c.id}', this.value)" class="${uiInputClass()}">
-            ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
+            ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].filter(([v]) => (set2.settings.kds.stations || []).includes(v) || c.station === v).map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}${(set2.settings.kds.stations || []).includes(v) ? '' : ' (مقفول! الأصناف مش هتظهر)'}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
     set2Form('waiter_qr', 'الويتر والـ QR', [['qr_enabled', 'منيو الـ QR شغال', 'bool'], ['qr_call_waiter', 'زرار نداء الويتر', 'bool'],
         ['qr_request_bill', 'زرار طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في المنيو', 'bool']],
         `<div class="mt-4 border-t pt-3">${uiBtn('طباعة أكواد الطاولات (QR)', 'set2PrintQr()', 'blue')}
@@ -197,6 +198,13 @@ async function set2SaveForm(section) {
         else if (el.dataset.t === 'multi') { data[k] = data[k] || []; if (el.checked) data[k].push(el.value); }
         else data[k] = el.value;
     });
+    // لو مكان اتقفل، الأقسام اللي رايحة عليه بتتحوّل للبار (أو لأول مكان مفتوح)، عشان أصنافها متختفيش
+    if (section === 'kds' && Array.isArray(data.stations) && data.stations.length) {
+        const target = data.stations.includes('bar') ? 'bar' : data.stations[0];
+        for (const c of (set2.data.categories || [])) {
+            if (!data.stations.includes(c.station || 'kitchen')) { await set2Station(c.id, target); c.station = target; }
+        }
+    }
     await set2Save(section, data);
 }
 

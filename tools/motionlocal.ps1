@@ -525,9 +525,9 @@ server-port = $ApiPort
   $branch  = (Read-Host 'First branch name').Trim()
   $owner   = (Read-Host 'Owner name').Trim()
   if (-not $company -or -not $branch -or -not $owner) { Fail 'Names cannot be empty' }
-  $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN, 4 to 6 digits (hidden)' -AsSecureString)))
+  $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN, 4 digits (hidden)' -AsSecureString)))
   $p2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN again (hidden)' -AsSecureString)))
-  if ($p1 -notmatch '^\d{4,6}$') { Fail 'PIN must be 4 to 6 digits' }
+  if ($p1 -notmatch '^\d{4}$') { Fail 'PIN must be exactly 4 digits (the login keypad takes 4)' }
   if ($p1 -ne $p2) { Fail 'The two PINs are different' }
   $site = (Read-Host 'Client site address on Vercel (example: cafe-nour.vercel.app)').Trim().ToLower() -replace '^https?://', '' -replace '/.*$', ''
   if ($site -notmatch '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$') { Fail "Site address looks wrong: $site" }

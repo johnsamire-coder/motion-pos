@@ -3,7 +3,7 @@
 let stfState = { tab: 'list', staff: [], roles: [], branches: [], period: null, run: null };
 function setStaffTab(tab) { stfState.tab = tab; renderStaffBody(); }
 
-const STAFF_ROLE_NAMES = { owner: 'المالك', branch_manager: 'مدير فرع', cashier: 'كاشير', waiter: 'ويتر', storekeeper: 'أمين مخزن' };
+const STAFF_ROLE_NAMES = { owner: 'المالك', branch_manager: 'مدير فرع', cashier: 'كاشير', waiter: 'ويتر', storekeeper: 'أمين مخزن', kitchen: 'المطبخ' };
 const PERM_NAMES = { pos: 'البيع', kds: 'المطبخ', shift: 'الوردية', inventory: 'المخازن', inventory_approve: 'موافقات المخازن',
     purchasing: 'المشتريات', treasury: 'الخزينة', expenses: 'المصروفات', staff: 'الموظفين', payroll: 'المرتبات',
     reports: 'التقارير', settings: 'الإعدادات', accounting: 'الحسابات', sales: 'المبيعات', customers: 'العملاء' };
