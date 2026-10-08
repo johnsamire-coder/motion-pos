@@ -43,6 +43,7 @@ async function initPOSModule() {
     resetActiveCart();
     await loadPOSMasterData();
     renderPOSTerminal();
+    posStartAutoRefresh();
 }
 
 // إعدادات الضريبة والخدمة للفرع (للعرض بس، والحساب الحقيقي على السيرفر)
@@ -121,7 +122,28 @@ async function fetchBranchTables() {
         posState.tables = [];
         return;
     }
-    posState.tables = data || [];
+    posState.tables = (data || []).slice().sort((a, b) => String(a.table_number).localeCompare(String(b.table_number), 'ar', { numeric: true }));
+}
+
+// الكاشير بيتحدّث لوحده: الطاولات كل ٢٠ ثانية (عشان اللي بيحصل على الأجهزة التانية)، والمنيو والأسعار كل ٣ دقايق
+let posAutoTimer = null, posAutoTick = 0;
+function posStartAutoRefresh() {
+    if (posAutoTimer) return;
+    posAutoTimer = setInterval(async () => {
+        const view = document.getElementById('view-pos-workspace');
+        if (!currentUser || !staffSessionToken || !view || view.classList.contains('hidden') || document.hidden) return;
+        posAutoTick++;
+        try {
+            if (posAutoTick % 9 === 0) { await posRefreshData(); return; }
+            if (currentBranch && currentBranch.has_tables && posState.selectedAreaId) { await fetchBranchTables(); renderAreaAndTables(); }
+        } catch (e) { /* next time */ }
+    }, 20000);
+}
+
+async function posRefreshData() {
+    if (!currentUser || !currentUser.branch_id) return;
+    await loadPOSMasterData();
+    renderAreaAndTables(); renderCategoriesPills(); renderProductsGrid(); renderWaitersAndCustomersDropdowns(); renderOrderCartTicket();
 }
 
 async function renderTablesForArea() {
@@ -175,10 +197,10 @@ function renderAreaAndTables() {
         else if (t.status === 'cleaning') { statusColor = "bg-sky-50 border-sky-300 text-sky-800"; statusName = "قيد التنظيف"; }
         
         const isSelected = posState.selectedTable && posState.selectedTable.id === t.id ? "ring-4 ring-blue-600" : "";
-        return `<div onclick="selectPosTable('${t.id}')" class="p-3 rounded-2xl border-2 ${statusColor} ${isSelected} cursor-pointer transition flex flex-col justify-between gap-1 min-h-[6rem]">
-            <div class="flex flex-wrap justify-between items-center gap-1"><span class="font-extrabold text-sm">${uiEsc(t.table_number)}</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/60 whitespace-nowrap">${statusName}</span></div>
-            <div class="text-[10px] font-bold text-slate-500">سعة: ${t.capacity} ضيوف</div>
-        </div>`;
+        return `<button onclick="selectPosTable('${t.id}')" class="text-right px-2 py-1.5 rounded-xl border-2 ${statusColor} ${isSelected} transition flex flex-col justify-between gap-0.5 min-h-[3.4rem] min-w-0">
+            <span class="font-black text-sm leading-tight truncate w-full">${uiEsc(t.table_number)}</span>
+            <span class="flex justify-between items-center w-full gap-1"><span class="text-[10px] font-bold">${statusName}</span><span class="text-[10px] font-bold text-slate-500">👥${uiEsc(t.capacity)}</span></span>
+        </button>`;
     }).join('');
 }
 

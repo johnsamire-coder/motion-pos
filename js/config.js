@@ -98,6 +98,9 @@ async function serverRpc(name, params = {}) {
         if (String(error.message || '').includes('not_allowed')) {
             throw new Error('العملية دي مش مسموحة لدورك.');
         }
+        if (String(error.message || '').includes('table_number_taken')) {
+            throw new Error('فيه طاولة بنفس الرقم في المنطقة دي');
+        }
         if (String(error.message || '').includes('store_server_only')) {
             throw new Error('الفرع ده شغال من كمبيوتر المحل. فتح الوردية والطلبات وقفل اليوم بيتعملوا من المحل بس.');
         }
@@ -237,7 +240,11 @@ const SERVER_REASON_MESSAGES = {
     category_not_empty: 'القسم فيه أصناف. انقلها أو امسحها الأول',
     invalid_image: 'الصورة لازم تكون PNG أو JPG أو WEBP ومش كبيرة',
     qr_handled: 'الطلب ده اتأكد أو اترفض قبل كده',
-    invalid_url: 'اللينك لازم يبدأ بـ https://'
+    invalid_url: 'اللينك لازم يبدأ بـ https://',
+    last_branch: 'ده آخر فرع، مينفعش يتمسح',
+    branch_in_use: 'الفرع ده عليه شغل ومينفعش يتمسح. تقدر تغيّر اسمه بس',
+    warehouse_in_use: 'المخزن ده اتحرّك فيه بضاعة قبل كده، فمينفعش يتمسح. تقدر تغيّر اسمه',
+    table_number_taken: 'فيه طاولة بنفس الرقم في المنطقة دي'
 };
 
 // إعدادات الشركة والشاشات (بتتحمّل بعد الدخول)
@@ -416,12 +423,31 @@ async function uiCall(name, params, okMessage, ownerPinParam) {
             return null;
         }
         if (okMessage) showToast(okMessage);
+        if (MOTION_REFRESH_AFTER.has(name) && !['get', 'get_image', 'list', 'status'].includes(params && params.p_action)) motionDataChanged();
         return res;
     } catch (err) {
         console.error(name, err);
         showToast((err && err.message) || 'حدث خطأ أثناء الاتصال بالسيرفر', 'error');
         return null;
     }
+}
+
+// بعد أي تعديل في الإعدادات أو المنيو: الكاشير والإعدادات بيتحدّثوا لوحدهم من غير ريفرش
+const MOTION_REFRESH_AFTER = new Set(['settings_action_secure', 'settings2_secure', 'app_settings_save_secure', 'menu_admin_secure',
+    'modifiers_admin_secure', 'setup_admin_secure', 'staff_save_secure']);
+let _motionRefreshTimer = null;
+function motionDataChanged() {
+    clearTimeout(_motionRefreshTimer);
+    _motionRefreshTimer = setTimeout(async () => {
+        try {
+            if (typeof loadAppSettings === 'function') await loadAppSettings();
+            if (typeof loadPOSMasterData === 'function' && currentUser && currentUser.branch_id && (typeof canOpenTab !== 'function' || canOpenTab('pos'))) {
+                if (typeof loadBranchTaxSettings === 'function') await loadBranchTaxSettings();
+                await loadPOSMasterData();
+                if (typeof renderPOSTerminal === 'function') renderPOSTerminal();
+            }
+        } catch (err) { console.warn('refresh', err); }
+    }, 400);
 }
 
 const UI_BOX_NAMES = { main_cash: 'الخزينة الرئيسية', bank: 'البنك', owner: 'صاحب المحل', drawer: 'درج الكاشير' };

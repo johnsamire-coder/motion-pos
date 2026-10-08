@@ -17,6 +17,7 @@ async function settingsAction(action, data) {
             showToast(serverReasonMessage(res, 'تعذر الحفظ'), 'error');
             return false;
         }
+        if (typeof motionDataChanged === 'function') motionDataChanged();
         return true;
     } catch (err) {
         console.error('Settings action error:', err);
@@ -187,28 +188,55 @@ async function toggleProductAvailability(productId, currentStatus) {
 function renderBranchesSettings() {
     const container = document.getElementById('settings-branches-container');
     if (!container) return;
-
+    const isOwner = String(currentUser?.roles?.name || '') === 'owner';
     container.innerHTML = `
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4">
             <div class="flex justify-between items-center mb-4 border-b pb-3">
                 <h4 class="font-black text-sm text-slate-800">🏢 الفروع الحالية (${settingsState.branches.length})</h4>
                 <button onclick="addNewBranchPrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة فرع جديد ➕</button>
             </div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 ${settingsState.branches.map(b => `
-                    <div class="bg-slate-50 border p-3 rounded-2xl flex justify-between items-center text-xs font-bold">
-                        <div>
-                            <p class="text-slate-800 font-black">${b.name}</p>
-                            <p class="text-[10px] text-slate-400">${b.address || 'بدون عنوان'}</p>
+                    <div class="bg-slate-50 border p-3 rounded-2xl text-xs font-bold space-y-2">
+                        <div class="flex justify-between items-start gap-2">
+                            <div><p class="text-slate-800 font-black">${uiEsc(b.name)}</p><p class="text-[10px] text-slate-400">${uiEsc(b.address || 'بدون عنوان')}</p></div>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap ${b.has_tables ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">${b.has_tables ? 'يدعم طاولات' : 'تيك أواي بس'}</span>
                         </div>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] ${b.has_tables ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">
-                            ${b.has_tables ? 'يدعم طاولات' : 'تيك أواي بس'}
-                        </span>
-                    </div>
-                `).join('')}
+                        ${isOwner ? `<div class="flex gap-2"><button onclick="editBranchPrompt('${b.id}')" class="text-blue-700 bg-white border rounded-lg px-2 py-1">✏️ تعديل</button>
+                            <button onclick="deleteBranchPrompt('${b.id}')" class="text-red-600 bg-white border border-red-100 rounded-lg px-2 py-1">🗑️ مسح</button></div>` : ''}
+                    </div>`).join('')}
             </div>
-        </div>
-    `;
+        </div>`;
+}
+
+async function setupAction(action, data, okMsg) {
+    const res = await uiCall('setup_admin_secure', { p_action: action, p_data: data }, okMsg);
+    if (!res) return false;
+    await loadSettingsData();
+    renderBranchesSettings(); renderWarehousesSettings(); renderTablesSettings(); renderTaxSettings();
+    return true;
+}
+
+async function editBranchPrompt(id) {
+    const b = settingsState.branches.find(x => x.id === id) || {};
+    const v = await uiForm('تعديل الفرع', [
+        { key: 'name', label: 'اسم الفرع', value: b.name || '', required: true },
+        { key: 'address', label: 'العنوان', value: b.address || '' },
+        { key: 'tables', label: 'الفرع فيه طاولات وصالة (لو لأ: تيك أواي بس)', type: 'check', value: b.has_tables !== false, full: true }]);
+    if (!v) return;
+    if (await setupAction('edit_branch', { id, name: v.name, address: v.address || '', has_tables: v.tables }, 'تم تعديل الفرع') && currentBranch && currentUser?.branch_id === id) {
+        currentBranch.name = v.name; currentBranch.has_tables = v.tables;
+        const badge = document.getElementById('branch-badge'); if (badge) badge.textContent = v.name;
+    }
+}
+
+async function deleteBranchPrompt(id) {
+    const b = settingsState.branches.find(x => x.id === id) || {};
+    if (!(await uiConfirm(`تمسح فرع "${b.name}"؟\nمناطقه وطاولاته ومخازنه الفاضية هتتمسح معاه.\nالفرع اللي عليه أي شغل (طلبات، موظفين، مشتريات...) مش هيتمسح.`, 'مسح', true))) return;
+    const res = await uiCall('setup_admin_secure', { p_action: 'delete_branch', p_data: { id } });
+    if (res === null) return;
+    showToast('اتمسح الفرع');
+    await loadSettingsData(); renderBranchesSettings(); renderWarehousesSettings(); renderTablesSettings(); renderTaxSettings();
 }
 
 async function addNewBranchPrompt() {
@@ -227,26 +255,36 @@ async function addNewBranchPrompt() {
 function renderWarehousesSettings() {
     const container = document.getElementById('settings-warehouses-container');
     if (!container) return;
-
     container.innerHTML = `
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4">
             <div class="flex justify-between items-center mb-4 border-b pb-3">
                 <h4 class="font-black text-sm text-slate-800">📦 المخازن الحالية (${settingsState.warehouses.length})</h4>
                 <button onclick="addNewWarehousePrompt()" class="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة مخزن جديد ➕</button>
             </div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 ${settingsState.warehouses.map(w => `
-                    <div class="bg-slate-50 border p-3 rounded-2xl flex justify-between items-center text-xs font-bold">
-                        <div>
-                            <p class="text-slate-800 font-black">${w.name}</p>
-                            <p class="text-[10px] text-blue-600">${w.branches ? 'تابعة لـ: ' + w.branches.name : 'مخزن رئيسي مشترك'}</p>
+                    <div class="bg-slate-50 border p-3 rounded-2xl text-xs font-bold space-y-2">
+                        <div class="flex justify-between items-start gap-2">
+                            <div><p class="text-slate-800 font-black">${uiEsc(w.name)}</p><p class="text-[10px] text-blue-600">${w.branches ? 'تابع لـ: ' + uiEsc(w.branches.name) : 'مخزن رئيسي مشترك'}</p></div>
+                            ${w.is_main ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">رئيسي</span>' : ''}
                         </div>
-                        ${w.is_main ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">رئيسي</span>' : ''}
-                    </div>
-                `).join('')}
+                        <div class="flex gap-2"><button onclick="editWarehousePrompt('${w.id}')" class="text-blue-700 bg-white border rounded-lg px-2 py-1">✏️ تعديل الاسم</button>
+                            <button onclick="deleteWarehousePrompt('${w.id}')" class="text-red-600 bg-white border border-red-100 rounded-lg px-2 py-1">🗑️ مسح</button></div>
+                    </div>`).join('')}
             </div>
-        </div>
-    `;
+        </div>`;
+}
+
+async function editWarehousePrompt(id) {
+    const w = settingsState.warehouses.find(x => x.id === id) || {};
+    const v = await uiForm('تعديل المخزن', [{ key: 'name', label: 'اسم المخزن', value: w.name || '', required: true }]);
+    if (v) await setupAction('edit_warehouse', { id, name: v.name }, 'تم التعديل');
+}
+
+async function deleteWarehousePrompt(id) {
+    const w = settingsState.warehouses.find(x => x.id === id) || {};
+    if (!(await uiConfirm(`تمسح مخزن "${w.name}"؟ (المخزن اللي اتحرّك فيه أي بضاعة مش هيتمسح)`, 'مسح', true))) return;
+    await setupAction('delete_warehouse', { id }, 'اتمسح المخزن');
 }
 
 async function addNewWarehousePrompt() {
@@ -294,29 +332,52 @@ async function saveTaxSettings(branchId) {
     }
 }
 
+function motionTableSort(a, b) { return String(a.table_number).localeCompare(String(b.table_number), 'ar', { numeric: true }); }
+
 function renderTablesSettings() {
     const container = document.getElementById('settings-tables-container');
     if (!container) return;
-    container.innerHTML = settingsState.areas.map(area => `
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 mb-4 shadow-sm">
-            <div class="flex justify-between items-center mb-4 border-b pb-3">
-                <h4 class="font-black text-sm text-slate-800">منطقة: ${area.name}</h4>
-                <button onclick="addNewTable('${area.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة طاولة ➕</button>
+    const areas = settingsState.areas.filter(a => !currentUser?.branch_id || a.branch_id === currentUser.branch_id || String(currentUser?.roles?.name) === 'owner');
+    container.innerHTML = areas.map(area => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-3 border-b pb-3">
+                <h4 class="font-black text-sm text-slate-800">منطقة: ${uiEsc(area.name)} <span class="text-[11px] text-slate-400">(${(area.tables || []).length} طاولة)</span></h4>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="renameAreaPrompt('${area.id}')" class="text-blue-700 bg-slate-50 border rounded-xl px-3 py-1.5 text-xs font-bold">✏️ اسم المنطقة</button>
+                    <button onclick="deleteAreaPrompt('${area.id}')" class="text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5 text-xs font-bold">🗑️ مسح المنطقة</button>
+                    <button onclick="addNewTable('${area.id}')" class="bg-blue-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow hover:bg-blue-700">إضافة طاولة ➕</button>
+                </div>
             </div>
-            <div class="grid grid-cols-4 gap-3">
-                ${(area.tables || []).map(t => `
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col justify-between text-center">
-                        <span class="font-black text-sm text-slate-800">${t.table_number}</span>
-                        <div class="my-2 bg-white border rounded-xl p-1 flex justify-between items-center">
-                            <span class="text-[10px] font-bold text-slate-500">سعة: ${t.capacity} ضيوف</span>
-                            <button onclick="editTableCapacity('${t.id}', ${t.capacity})" class="text-[10px] text-blue-600 font-bold px-1 rounded hover:bg-blue-50">تعديل ✏️</button>
-                        </div>
-                        <button onclick="deleteTable('${t.id}')" class="bg-red-50 text-red-600 text-[10px] font-bold py-1 rounded-lg hover:bg-red-100 border border-red-100">حذف 🗑️</button>
-                    </div>
-                `).join('')}
+            <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-2">
+                ${(area.tables || []).slice().sort(motionTableSort).map(t => `
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 text-center text-[11px] font-bold space-y-1">
+                        <p class="font-black text-sm text-slate-800">${uiEsc(t.table_number)}</p>
+                        <p class="text-slate-500">${uiEsc(t.capacity)} كراسي</p>
+                        <div class="flex gap-1 justify-center"><button onclick="editTablePrompt('${t.id}')" class="text-blue-700 bg-white border rounded px-1.5" title="تعديل">✏️</button>
+                            <button onclick="deleteTable('${t.id}')" class="text-red-600 bg-white border border-red-100 rounded px-1.5" title="حذف">🗑️</button></div>
+                    </div>`).join('') || '<p class="col-span-full text-center text-slate-400 text-xs py-3">مفيش طاولات</p>'}
             </div>
-        </div>
-    `).join('');
+        </div>`).join('') || '<p class="text-xs text-slate-400 font-bold">مفيش مناطق. اعمل منطقة من: الخصومات والأسباب والمناطق.</p>';
+}
+
+async function editTablePrompt(tableId) {
+    const t = settingsState.areas.flatMap(a => a.tables || []).find(x => x.id === tableId) || {};
+    const v = await uiForm('تعديل الطاولة', [
+        { key: 'num', label: 'اسم أو رقم الطاولة (مثلاً 5 أو VIP 1)', value: t.table_number || '', required: true },
+        { key: 'cap', label: 'عدد الكراسي', type: 'number', min: 1, max: 50, value: t.capacity || 4, required: true }]);
+    if (v) await setupAction('edit_table', { id: tableId, table_number: v.num, capacity: String(parseInt(v.cap, 10) || 4) }, 'تم التعديل');
+}
+
+async function renameAreaPrompt(id) {
+    const a = settingsState.areas.find(x => x.id === id) || {};
+    const v = await uiForm('اسم المنطقة', [{ key: 'name', label: 'الاسم (مثلاً: الدور الأول، التراس)', value: a.name || '', required: true }]);
+    if (v) await setupAction('rename_area', { id, name: v.name }, 'تم التعديل');
+}
+
+async function deleteAreaPrompt(id) {
+    const a = settingsState.areas.find(x => x.id === id) || {};
+    if (!(await uiConfirm(`تمسح منطقة "${a.name}" وطاولاتها؟ (لو أي طاولة عليها طلبات قديمة مش هتتمسح)`, 'مسح', true))) return;
+    await setupAction('delete_area', { id }, 'اتمسحت المنطقة');
 }
 
 async function editTableCapacity(tableId, currentCapacity) {

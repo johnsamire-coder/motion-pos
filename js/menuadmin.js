@@ -186,9 +186,9 @@ function maRenderEditor() {
         const small = MA_SMALL_UNITS[ing.unit];
         return `<tr class="border-b text-xs font-bold">
             <td class="p-1.5"><select onchange="maRowIng(${i}, this.value)" class="${uiInputClass()} w-full max-w-[170px]">${(d.ingredients || []).map(x => `<option value="${uiEsc(x.id)}" ${x.id === r.ingredient_id ? 'selected' : ''}>${uiEsc(x.name)}</option>`).join('')}</select></td>
-            <td class="p-1.5 whitespace-nowrap"><input type="number" min="0" step="any" value="${uiEsc(r.qty)}" onchange="maRowQty(${i}, this.value)" class="${uiInputClass()} w-20"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
-                ${small ? `<br><span class="text-[10px] text-slate-400">= ${Math.round((Number(r.qty) || 0) * small[1] * 100) / 100} ${small[0]}</span>` : ''}</td>
-            <td class="p-1.5 whitespace-nowrap">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة لسه من غير سعر</span>'}</td>
+            <td class="p-1.5 whitespace-nowrap"><input type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="maRowQty(${i}, this.value)" class="${uiInputClass()} w-20"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
+                ${small ? `<br><span id="ma-rh-${i}" class="text-[10px] text-slate-400">= ${Math.round((Number(r.qty) || 0) * small[1] * 100) / 100} ${small[0]}</span>` : ''}</td>
+            <td class="p-1.5 whitespace-nowrap"><span id="ma-rc-${i}">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}</span>${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة لسه من غير سعر</span>'}</td>
             <td class="p-1.5"><button onclick="maRowDel(${i})" class="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1">🗑️ حذف</button></td></tr>`;
     }).join('');
     ov.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl my-4 p-5 text-right" dir="rtl">
@@ -196,9 +196,9 @@ function maRenderEditor() {
             <button onclick="maClose()" class="text-slate-400 hover:text-slate-700 font-black text-lg">✕</button></div>
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
             <div class="lg:col-span-2 space-y-3 text-xs font-black">
-                <label class="block">اسم الصنف *<input id="ma-name" value="${uiEsc(e.name)}" oninput="ma.ed.name=this.value" onchange="maReadFields(); maRenderEditor()" class="${uiInputClass()} w-full mt-1 text-sm"></label>
+                <label class="block">اسم الصنف *<input id="ma-name" value="${uiEsc(e.name)}" oninput="ma.ed.name=this.value" class="${uiInputClass()} w-full mt-1 text-sm"></label>
                 <div class="grid grid-cols-2 gap-2">
-                    <label class="block">سعر البيع *<input id="ma-price" type="number" min="0" step="any" value="${uiEsc(e.price)}" onchange="maReadFields(); maRenderEditor()" class="${uiInputClass()} w-full mt-1 text-sm"></label>
+                    <label class="block">سعر البيع *<input id="ma-price" type="number" min="0" step="any" value="${uiEsc(e.price)}" oninput="ma.ed.price=this.value; maUpdateSummary()" class="${uiInputClass()} w-full mt-1 text-sm"></label>
                     <label class="block">القسم *<select id="ma-cat" onchange="if(this.value==='__new__'){maReadFields(); maNewCatInline();}" class="${uiInputClass()} w-full mt-1 text-sm">
                         ${(d.categories || []).map(c => `<option value="${uiEsc(c.id)}" ${c.id === e.category_id ? 'selected' : ''}>${uiEsc(c.name)}</option>`).join('')}<option value="__new__">➕ قسم جديد</option></select></label>
                 </div>
@@ -238,9 +238,9 @@ function maRenderEditor() {
                     </div>
                 </div>
                 <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">تكلفة الصنف</p><p class="font-black">${formatCurrency(cost)}</p></div>
-                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">نسبة التكلفة</p><p class="font-black ${pct <= 35 ? 'text-emerald-700' : pct <= 50 ? 'text-amber-700' : 'text-red-600'}">${pct}%</p></div>
-                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">مكسب الصنف</p><p class="font-black">${formatCurrency(profit)}</p></div>
+                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">تكلفة الصنف</p><p id="ma-sum-cost" class="font-black">${formatCurrency(cost)}</p></div>
+                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">نسبة التكلفة</p><p id="ma-sum-pct" class="font-black ${pct <= 35 ? 'text-emerald-700' : pct <= 50 ? 'text-amber-700' : 'text-red-600'}">${pct}%</p></div>
+                    <div class="bg-slate-50 rounded-xl p-2"><p class="text-[11px] font-bold text-slate-500">مكسب الصنف</p><p id="ma-sum-profit" class="font-black">${formatCurrency(profit)}</p></div>
                 </div>
                 <p class="text-[10px] font-bold text-slate-400 mt-2">نسبة التكلفة الكويسة في الكافيهات غالباً من 25% لـ 35%.</p>
             </div>
@@ -251,6 +251,16 @@ function maRenderEditor() {
             <button onclick="maClose()" class="bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-black text-xs">إلغاء</button>
         </div></div>`;
     maAddHint();
+}
+
+// السعر بيتغيّر: الأرقام اللي تحت بس بتتحدّث (من غير ما الشاشة تترسم تاني وزرار الحفظ يفلت)
+function maUpdateSummary() {
+    const cost = maRecipeCost(), price = Number(ma.ed.price) || 0;
+    const pct = price ? Math.round(1000 * cost / price) / 10 : 0;
+    const c = document.getElementById('ma-sum-cost'), p = document.getElementById('ma-sum-pct'), f = document.getElementById('ma-sum-profit');
+    if (c) c.textContent = formatCurrency(cost);
+    if (p) { p.textContent = pct + '%'; p.className = 'font-black ' + (pct <= 35 ? 'text-emerald-700' : pct <= 50 ? 'text-amber-700' : 'text-red-600'); }
+    if (f) f.textContent = formatCurrency(price - cost);
 }
 
 // اسم الخامة: لو موجودة الوحدة بتتظبط، ولو جديدة بيظهر سطر الخامة الجديدة
@@ -290,7 +300,15 @@ async function maAddLine() {
     setTimeout(() => document.getElementById('ma-add-ing')?.focus(), 30);
 }
 
-function maRowQty(i, v) { maReadFields(); ma.ed.recipe[i].qty = Number(v) || 0; maRenderEditor(); }
+function maRowQty(i, v) {
+    const r = ma.ed.recipe[i];
+    r.qty = Number(v) || 0;
+    const ing = maIngs()[r.ingredient_id] || {}, small = MA_SMALL_UNITS[ing.unit];
+    const c = document.getElementById('ma-rc-' + i), h = document.getElementById('ma-rh-' + i);
+    if (c) c.textContent = formatCurrency(r.qty * (Number(ing.cost_per_unit) || 0));
+    if (h && small) h.textContent = `= ${Math.round(r.qty * small[1] * 100) / 100} ${small[0]}`;
+    maUpdateSummary();
+}
 function maRowIng(i, v) { maReadFields(); ma.ed.recipe[i].ingredient_id = v; maRenderEditor(); }
 async function maRowDel(i) {
     maReadFields();
