@@ -60,9 +60,11 @@ async function renderMenuAdmin() {
     const cats = d.categories || [];
     const catName = Object.fromEntries(cats.map(c => [c.id, c.name]));
     const q = ma.search.trim();
-    const prods = (d.products || []).filter(p => (ma.cat === 'all' || p.category_id === ma.cat || (ma.cat === 'norecipe' && !p.recipe.length && p.is_available))
-        && (!q || String(p.name).includes(q)));
+    const zeroN = p => p.recipe.filter(r => !(Number(r.qty) > 0)).length;
+    const prods = (d.products || []).filter(p => (ma.cat === 'all' || p.category_id === ma.cat || (ma.cat === 'norecipe' && !p.recipe.length && p.is_available)
+        || (ma.cat === 'noqty' && zeroN(p) > 0)) && (!q || String(p.name).includes(q)));
     const noRecipe = (d.products || []).filter(p => !p.recipe.length && p.is_available).length;
+    const noQty = (d.products || []).filter(p => zeroN(p) > 0).length;
     const pill = (key, label, n, active) => `<button onclick="ma.cat='${key}'; renderMenuAdmin()" class="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-black ${active ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">${uiEsc(label)} <span class="opacity-70">${n}</span></button>`;
     const cards = prods.map(p => {
         const pct = Number(p.price) ? Math.round(1000 * p.cost / p.price) / 10 : 0;
@@ -72,7 +74,7 @@ async function renderMenuAdmin() {
                 <span class="font-black text-sm text-blue-700 whitespace-nowrap">${formatCurrency(p.price)}</span></div>
             <span class="text-[11px] font-bold text-slate-500 truncate">${uiEsc(catName[p.category_id] || '')}${p.description ? ' | ' + uiEsc(p.description) : ''}</span>
             <div class="flex flex-wrap gap-1 mt-1">
-                <span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 ${p.recipe.length && !Number(p.cost) ? 'bg-amber-100 text-amber-800' : pctCls}">${!p.recipe.length ? '⚠️ ناقص وصفة' : (Number(p.cost) ? `التكلفة ${formatCurrency(p.cost)} (${pct}%)` : '⚠️ الوصفة موجودة بس الخامات لسه من غير سعر')}</span>
+                <span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 ${p.recipe.length && (!Number(p.cost) || zeroN(p)) ? 'bg-amber-100 text-amber-800' : pctCls}">${!p.recipe.length ? '⚠️ ناقص وصفة' : zeroN(p) ? `⚠️ ناقص كميات (${zeroN(p)} خامة)` : (Number(p.cost) ? `التكلفة ${formatCurrency(p.cost)} (${pct}%)` : '⚠️ الوصفة موجودة بس الخامات لسه من غير سعر')}</span>
                 ${p.is_available ? '' : '<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-red-100 text-red-700">موقوف</span>'}
                 ${p.show_in_menu ? '' : '<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-slate-200 text-slate-600">مش ظاهر في منيو الـ QR</span>'}
                 ${p.group_ids.length ? `<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-violet-100 text-violet-700">إضافات ${p.group_ids.length}</span>` : ''}
@@ -81,14 +83,15 @@ async function renderMenuAdmin() {
     root.innerHTML = uiCard('🍽️ المنيو والوصفات', `
         <div class="flex flex-wrap gap-2 items-center mb-3">
             <input value="${uiEsc(ma.search)}" oninput="ma.search=this.value; clearTimeout(window._maT); window._maT=setTimeout(renderMenuAdmin, 250)" placeholder="🔍 دوّر على صنف" class="${uiInputClass()} flex-1 min-w-[160px]">
-            <span class="text-[11px] font-bold text-slate-500">${(d.products || []).length} صنف | ${cats.length} قسم${noRecipe ? ` | <button onclick="ma.cat='norecipe'; renderMenuAdmin()" class="text-amber-700 underline">${noRecipe} ناقص وصفة</button>` : ''}</span>
+            <span class="text-[11px] font-bold text-slate-500">${(d.products || []).length} صنف | ${cats.length} قسم${noRecipe ? ` | <button onclick="ma.cat='norecipe'; renderMenuAdmin()" class="text-amber-700 underline">${noRecipe} ناقص وصفة</button>` : ''}${noQty ? ` | <button onclick="ma.cat='noqty'; renderMenuAdmin()" class="text-amber-700 underline">${noQty} ناقص كميات</button>` : ''}</span>
         </div>
         <div class="flex gap-2 overflow-x-auto pb-2 mb-3">
             ${pill('all', 'الكل', (d.products || []).length, ma.cat === 'all')}
             ${cats.map(c => pill(c.id, c.name, c.products, ma.cat === c.id)).join('')}
             ${noRecipe ? pill('norecipe', '⚠️ ناقص وصفة', noRecipe, ma.cat === 'norecipe') : ''}
+            ${noQty ? pill('noqty', '⚠️ ناقص كميات', noQty, ma.cat === 'noqty') : ''}
         </div>
-        ${ma.cat !== 'all' && ma.cat !== 'norecipe' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم ده', `maEditCategory('${ma.cat}')`, 'gray')}
+        ${ma.cat !== 'all' && ma.cat !== 'norecipe' && ma.cat !== 'noqty' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم ده', `maEditCategory('${ma.cat}')`, 'gray')}
             ${(cats.find(c => c.id === ma.cat) || {}).products ? '' : uiBtn('🗑️ مسح القسم', `maDeleteCategory('${ma.cat}')`, 'red')}</div>` : ''}
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards || '<p class="text-center text-slate-400 font-bold text-xs py-8 sm:col-span-2 xl:col-span-3">مفيش أصناف هنا. دوس "➕ صنف جديد".</p>'}</div>`,
         `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')}`);
@@ -120,7 +123,7 @@ function maOpen(id) {
     const d = ma.data;
     const p = id ? (d.products || []).find(x => x.id === id) : null;
     ma.ed = p ? { ...p, recipe: p.recipe.map(r => ({ ...r })), group_ids: [...p.group_ids], image: null, imageChanged: false }
-        : { id: null, name: '', price: '', category_id: (ma.cat !== 'all' && ma.cat !== 'norecipe') ? ma.cat : ((d.categories || [])[0] || {}).id || '',
+        : { id: null, name: '', price: '', category_id: (ma.cat !== 'all' && ma.cat !== 'norecipe' && ma.cat !== 'noqty') ? ma.cat : ((d.categories || [])[0] || {}).id || '',
             description: '', is_available: true, show_in_menu: true, sort_order: 0, recipe: [], group_ids: [], has_image: false, image: null, imageChanged: false };
     let ov = document.getElementById('ma-editor');
     if (!ov) {
@@ -186,7 +189,7 @@ function maRenderEditor() {
         const small = MA_SMALL_UNITS[ing.unit];
         return `<tr class="border-b text-xs font-bold">
             <td class="p-1.5"><select onchange="maRowIng(${i}, this.value)" class="${uiInputClass()} w-full max-w-[170px]">${(d.ingredients || []).map(x => `<option value="${uiEsc(x.id)}" ${x.id === r.ingredient_id ? 'selected' : ''}>${uiEsc(x.name)}</option>`).join('')}</select></td>
-            <td class="p-1.5 whitespace-nowrap"><input type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="maRowQty(${i}, this.value)" class="${uiInputClass()} w-20"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
+            <td class="p-1.5 whitespace-nowrap"><input type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="maRowQty(${i}, this.value, this)" class="${uiInputClass()} w-20 ${Number(r.qty) > 0 ? '' : 'ring-2 ring-amber-400'}" title="${Number(r.qty) > 0 ? '' : 'لسه من غير كمية'}"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
                 ${small ? `<br><span id="ma-rh-${i}" class="text-[10px] text-slate-400">= ${Math.round((Number(r.qty) || 0) * small[1] * 100) / 100} ${small[0]}</span>` : ''}</td>
             <td class="p-1.5 whitespace-nowrap"><span id="ma-rc-${i}">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}</span>${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة لسه من غير سعر</span>'}</td>
             <td class="p-1.5"><button onclick="maRowDel(${i})" class="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1">🗑️ حذف</button></td></tr>`;
@@ -300,9 +303,10 @@ async function maAddLine() {
     setTimeout(() => document.getElementById('ma-add-ing')?.focus(), 30);
 }
 
-function maRowQty(i, v) {
+function maRowQty(i, v, el) {
     const r = ma.ed.recipe[i];
     r.qty = Number(v) || 0;
+    if (el) el.classList.toggle('ring-2', !(r.qty > 0)), el.classList.toggle('ring-amber-400', !(r.qty > 0));
     const ing = maIngs()[r.ingredient_id] || {}, small = MA_SMALL_UNITS[ing.unit];
     const c = document.getElementById('ma-rc-' + i), h = document.getElementById('ma-rh-' + i);
     if (c) c.textContent = formatCurrency(r.qty * (Number(ing.cost_per_unit) || 0));
@@ -384,7 +388,8 @@ async function maSave() {
     const res = await maCall('save_product', {
         id: e.id, name: e.name.trim(), price: String(Number(e.price)), category_id: e.category_id, description: e.description || '',
         is_available: e.is_available, show_in_menu: e.show_in_menu, sort_order: String(Number(e.sort_order) || 0),
-        recipe: e.recipe.filter(r => Number(r.qty) > 0).map(r => ({ ingredient_id: r.ingredient_id, qty: String(r.qty) })),
+        // خامة كميتها صفر = معروفة بس الكمية لسه، بتتحفظ ومش بتخصم حاجة من المخزن
+        recipe: e.recipe.filter(r => r.ingredient_id && Number(r.qty) >= 0).map(r => ({ ingredient_id: r.ingredient_id, qty: String(Math.round((Number(r.qty) || 0) * 10000) / 10000) })),
         group_ids: e.group_ids }, 'اتحفظ الصنف ✅');
     if (!res) return;
     if (e.imageChanged) {
@@ -431,7 +436,7 @@ async function maImportRecipes() {
     try { const r = await fetch('recipes_suggested.txt', { cache: 'no-store' }); if (r.ok) suggested = await r.text(); } catch (e) { /* empty box */ }
     const v = await uiForm('🧪 إدخال الوصفات مرة واحدة', [
         { type: 'note', html: `<p class="text-sm">كل سطر خامة واحدة في صنف: <b>الصنف - الخامة - الكمية - الوحدة</b> (الكمية للكوباية أو الطبق الواحد)<br>مثال:<br>كابتشينو - بن اسبريسو - 0.018 - كيلو<br>كابتشينو - لبن - 0.15 - لتر<br>
-            ${suggested ? '<b class="text-emerald-700">الصندوق فيه وصفات مقترحة لأصناف المنيو، راجعها وعدّل اللي محتاجه.</b><br>' : ''}الخامة اللي مش موجودة بتتعمل لوحدها بتكلفة صفر (التكلفة بتتحدّث من المشتريات). والسطور اللي بتبدأ بـ # مش بتتحسب.</p>` },
+            ${suggested ? '<b class="text-emerald-700">الصندوق فيه وصفات مقترحة لأصناف المنيو، راجعها وعدّل اللي محتاجه.</b><br>' : ''}الكمية 0 يعني الخامة معروفة والكمية لسه (مش بتخصم من المخزن). الخامة اللي مش موجودة بتتعمل لوحدها بتكلفة صفر (التكلفة بتتحدّث من المشتريات). والسطور اللي بتبدأ بـ # مش بتتحسب.</p>` },
         { key: 'text', label: 'الوصفات', type: 'textarea', rows: 14, full: true, required: true, value: suggested },
         { key: 'overwrite', label: 'الأصناف اللي ليها وصفة قبل كده', type: 'select', options: [['keep', 'سيبها زي ما هي'], ['replace', 'استبدلها بالجديدة']], value: 'keep' }], { ok: 'معاينة' });
     if (!v) return;
@@ -442,7 +447,7 @@ async function maImportRecipes() {
         if (parts.length < 4) { bad.push(line); return; }
         const unit = parts[parts.length - 1], qty = toNum(parts[parts.length - 2]), ingredient = parts[parts.length - 3];
         const product = parts.slice(0, parts.length - 3).join(' - ');
-        if (!(qty > 0) || !/[0-9٠-٩]/.test(parts[parts.length - 2])) { bad.push(line); return; }
+        if (!(qty >= 0) || !/[0-9٠-٩]/.test(parts[parts.length - 2])) { bad.push(line); return; }
         rows.push({ product, ingredient, qty: String(qty), unit });
     });
     if (!rows.length) return showToast('مفيش ولا سطر مظبوط', 'error');

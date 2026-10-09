@@ -30,10 +30,10 @@ function renderInventoryBody() {
     const whSelect = `<select onchange="setInventoryWarehouse(this.value)" class="${uiInputClass()}">`
         + mine.map(w => `<option value="${uiEsc(w.id)}" ${w.id === invState.warehouseId ? 'selected' : ''}>${uiEsc(w.name)}${w.branch_name ? ' - ' + uiEsc(w.branch_name) : ''}</option>`).join('')
         + '</select>';
-    const tabs = uiTabs('inv', [['stock', 'الأرصدة'], ['ledger', 'دفتر الحركات'], ['waste', 'تسجيل هالك'], ['count', 'جرد (أعمى)'],
+    const tabs = uiTabs('inv', [['stock', 'الأرصدة'], ['buy', '🛒 محتاج شراء'], ['ledger', 'دفتر الحركات'], ['waste', 'تسجيل هالك'], ['count', 'جرد (أعمى)'],
         ['variance', 'المفروض والفعلي'], ['transfers', 'التحويلات']], invState.tab, 'setInventoryTab');
     root.innerHTML = `<div class="flex flex-wrap items-center gap-3 mb-2"><span class="text-xs font-black">المخزن:</span>${whSelect}</div>${tabs}<div id="inv-body"></div>`;
-    const loaders = { stock: invRenderStock, ledger: invRenderLedger, waste: invRenderWaste, count: invRenderCount,
+    const loaders = { stock: invRenderStock, buy: invRenderBuy, ledger: invRenderLedger, waste: invRenderWaste, count: invRenderCount,
         variance: invRenderVariance, transfers: invRenderTransfers };
     (loaders[invState.tab] || invRenderStock)();
 }
@@ -239,4 +239,72 @@ async function invTransferAction(id, action) {
         if (Number(res.missing_value) > 0) showToast(`العجز في الاستلام اتسجل بقيمة ${formatCurrency(res.missing_value)}`, 'error');
         invRenderTransfers();
     }
+}
+
+// -----------------------------------------
+// محتاج شراء: الخامات اللي داخلة في المنيو ومالهاش رصيد في المخزن (أو وصلت للحد الأدنى)
+// -----------------------------------------
+let invBuyItems = [];
+
+async function invRenderBuy() {
+    const body = document.getElementById('inv-body');
+    if (!invState.warehouseId) { body.innerHTML = '<p class="text-xs font-bold text-slate-400">مفيش مخزن متاح</p>'; return; }
+    const res = await uiCall('inv_shopping_secure', { p_warehouse_id: invState.warehouseId });
+    if (!res) return;
+    invBuyItems = res.items || [];
+    const none = invBuyItems.filter(i => i.reason === 'none').length, low = invBuyItems.length - none;
+    const noPrice = invBuyItems.filter(i => !Number(i.cost_per_unit)).length;
+    const rows = invBuyItems.map((i, idx) => `<tr class="border-b border-slate-100 text-xs font-bold hover:bg-slate-50">
+        <td class="p-2"><input type="checkbox" class="inv-buy-chk w-4 h-4" data-i="${idx}" checked></td>
+        <td class="p-2"><b>${uiEsc(i.name)}</b>${Number(i.no_amounts) ? `<br><span class="text-[10px] text-amber-700">في ${uiEsc(i.no_amounts)} صنف لسه من غير كمية</span>` : ''}</td>
+        <td class="p-2">${uiEsc(i.unit)}</td>
+        <td class="p-2">${i.reason === 'none' ? '<span class="text-red-600">مش موجودة</span>' : `<span class="text-amber-700">${uiEsc(Number(i.quantity))} (الحد ${uiEsc(Number(i.min_stock_alert))})</span>`}</td>
+        <td class="p-2">${Number(i.cost_per_unit) ? formatCurrency(i.cost_per_unit) : '<span class="text-slate-400">من غير سعر</span>'}</td>
+        <td class="p-2 text-[11px] text-slate-600">${uiEsc(i.used_in)} صنف${i.products ? ': ' + uiEsc(i.products) + (Number(i.used_in) > 6 ? '...' : '') : ''}</td>
+        <td class="p-2"><input type="number" min="0" step="any" id="inv-buy-q-${idx}" placeholder="الكمية" class="${uiInputClass()} w-24"></td></tr>`).join('');
+    body.innerHTML = uiCard(`🛒 محتاج شراء (${invBuyItems.length} خامة)`, invBuyItems.length ? `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold mb-3">
+            <div class="bg-red-50 text-red-700 p-3 rounded-xl border">مش موجودة خالص: <b>${none}</b></div>
+            <div class="bg-amber-50 text-amber-800 p-3 rounded-xl border">قربت تخلص (وصلت للحد الأدنى): <b>${low}</b></div>
+            <div class="bg-slate-50 p-3 rounded-xl border">من غير سعر لسه: <b>${noPrice}</b> (السعر بيتسجل لوحده أول ما تتشتري)</div>
+        </div>
+        <p class="text-[11px] font-bold text-slate-500 mb-2">دي الخامات اللي داخلة في وصفات المنيو ومالهاش رصيد في المخزن ده. علّم على اللي هتشتريه واكتب الكمية، وحوّلهم لأمر شراء مرة واحدة.</p>
+        <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>
+            <th class="p-2"><input type="checkbox" checked onchange="document.querySelectorAll('.inv-buy-chk').forEach(x => x.checked = this.checked)" class="w-4 h-4"></th>
+            ${['الخامة', 'الوحدة', 'الرصيد', 'آخر سعر', 'داخلة في', 'هتشتري كام'].map(h => `<th class="p-2 text-[11px] text-slate-500 font-black border-b">${h}</th>`).join('')}</tr></thead>
+            <tbody>${rows}</tbody></table></div>` : '<p class="text-center text-emerald-700 font-black text-sm py-6">كل الخامات اللي في المنيو موجودة ✅</p>',
+        invBuyItems.length ? (canDo('po_create') ? uiBtn('🛒 حوّل المختار لأمر شراء', 'invBuyToPo()', 'green') : '') + uiBtn('🖨️ طباعة القايمة', 'invBuyPrint()', 'gray') : '');
+}
+
+function invBuyChosen() {
+    return [...document.querySelectorAll('.inv-buy-chk:checked')].map(x => {
+        const idx = Number(x.dataset.i);
+        return { ...invBuyItems[idx], want: Number(document.getElementById('inv-buy-q-' + idx)?.value) || 0 };
+    });
+}
+
+async function invBuyToPo() {
+    const chosen = invBuyChosen();
+    if (!chosen.length) return showToast('علّم على خامة واحدة على الأقل', 'error');
+    const withQty = chosen.filter(x => x.want > 0);
+    if (!withQty.length) return showToast('اكتب الكمية اللي هتشتريها قدام كل خامة', 'error');
+    if (withQty.length < chosen.length && !(await uiConfirm(`${chosen.length - withQty.length} خامة من غير كمية مش هتدخل في أمر الشراء. نكمّل؟`, 'كمّل'))) return;
+    if (typeof purState === 'undefined') return showToast('شاشة المشتريات مش متاحة', 'error');
+    purState.lines = withQty.map(x => ({ ingredient_id: x.ingredient_id, qty: x.want, unit_price: Number(x.cost_per_unit) || 0 }));
+    purState.tab = 'new';
+    switchMainTab('purchase');
+    showToast(`اتحطت ${withQty.length} خامة في أمر شراء جديد. اختار المورد واكتب الأسعار واحفظ.`);
+}
+
+function invBuyPrint() {
+    const chosen = invBuyChosen();
+    if (!chosen.length) return showToast('علّم على خامة واحدة على الأقل', 'error');
+    const g = (typeof appSettings !== 'undefined' && appSettings && appSettings.general) || {};
+    const wh = (invState.warehouses.find(w => w.id === invState.warehouseId) || {}).name || '';
+    printHtml(`${g.logo ? `<div style="text-align:center"><img src="${uiEsc(g.logo)}" style="max-height:60px"></div>` : ''}
+        <h2 style="text-align:center;margin:4px 0">${uiEsc(g.company_name || '')}</h2>
+        <h3 style="text-align:center;margin:4px 0">قايمة مشتريات - ${uiEsc(wh)} - ${uiEsc(uiDate(new Date().toISOString()))}</h3>
+        <table border="1" cellpadding="6" style="font-size:13px"><tr><th>#</th><th>الخامة</th><th>الوحدة</th><th>الرصيد</th><th>الكمية المطلوبة</th><th>السعر</th><th>ملاحظات</th></tr>
+        ${chosen.map((x, i) => `<tr><td>${i + 1}</td><td>${uiEsc(x.name)}</td><td>${uiEsc(x.unit)}</td><td>${x.reason === 'none' ? 'مش موجودة' : uiEsc(Number(x.quantity))}</td>
+            <td>${x.want ? uiEsc(x.want) : ''}</td><td></td><td></td></tr>`).join('')}</table>`, '@page { size: A4; margin: 12mm; } body { font-size: 13px; }');
 }
