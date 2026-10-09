@@ -52,12 +52,14 @@ install)
   # ---------------------------------------------------------------- 0) checks
   [ -r /etc/os-release ] && . /etc/os-release
   info "Server: ${PRETTY_NAME:-unknown}"
-  if [ -f "$SECRETS/env" ] && psqlm -d "$DB" -c 'select 1' >/dev/null 2>&1; then
-    fail "Motion POS is already installed here. Use: update"
+  # can be run again after a stop in the middle; once finished it refuses (the data would be lost)
+  [ -f "$SECRETS/installed" ] && fail "Motion POS is already installed here. Use: update"
+  if ! pg_lsclusters -h 2>/dev/null | awk '{print $1" "$2}' | grep -qx "$PGV $CLUSTER"; then
+    ss -ltn | grep -q ":$PGPORT " && fail "Port $PGPORT is already used by something else - stopped, nothing changed"
   fi
-  ss -ltn | grep -q ":$PGPORT " && fail "Port $PGPORT is already used by something else - stopped, nothing changed"
-  ss -ltn | grep -q "127.0.0.1:$API_PORT " && fail "Port $API_PORT is already used by something else - stopped, nothing changed"
-  [ -e /etc/nginx/sites-enabled/motionpos ] && fail "nginx site motionpos already exists - stopped, nothing changed"
+  if ! systemctl list-unit-files motionpos-api.service >/dev/null 2>&1 || ! systemctl cat motionpos-api >/dev/null 2>&1; then
+    ss -ltn | grep -q "127.0.0.1:$API_PORT " && fail "Port $API_PORT is already used by something else - stopped, nothing changed"
+  fi
   myip=$(hostname -I | tr ' ' '\n' | grep -v ':' | head -1)
   dnsip=$(getent hosts "$DOMAIN" | awk '{print $1}' | head -1)
   [ -n "$dnsip" ] || fail "$DOMAIN does not point anywhere yet (Namecheap A record pos -> server). Wait a few minutes and run again"
@@ -124,10 +126,16 @@ SQL
   mkdir -p "$BASE"
   if [ -d "$REPO/.git" ]; then git -C "$REPO" pull -q --ff-only || fail "git pull failed"; else git clone -q "$REPO_URL" "$REPO" || fail "git clone failed"; fi
   ok "Program files: $(git -C "$REPO" log -1 --format='%h')"
-  tables=$(val "select count(*) from information_schema.tables where table_schema='public'")
-  if [ "$tables" != "0" ] && [ -n "$(val "select public.motionpos_version_public()" | grep -E '^[0-9]{3}$')" ]; then
-    ok "Tables already built (version $(val "select public.motionpos_version_public()"))"
+  latest=$(ls "$REPO"/supabase/migrations/0*.sql | xargs -n1 basename | grep -oE '^[0-9]{3}' | sort | tail -1)
+  have=$(val "select public.motionpos_version_public()" | grep -E '^[0-9]{3}$' || true)
+  if [ "$have" = "$latest" ]; then
+    ok "Tables already built (version $have)"
   else
+    if [ -n "$(val "select count(*) from information_schema.tables where table_schema='public'" | grep -vx 0)" ]; then
+      info "Half-built tables from a stopped try (version ${have:-none}) - starting them again (no real data here yet)"
+      psqlm -d postgres -c "drop database $DB with (force)" >/dev/null || fail "Could not clear the half-built database"
+      psqlm -d postgres -c "create database $DB" >/dev/null || fail "Creating the database failed"
+    fi
     psqlm -d "$DB" >/dev/null <<'SQL' || fail "Preparing the database failed"
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
@@ -140,6 +148,10 @@ SQL
       n=$(basename "$f"); log="/var/log/motionpos/sql_${n%.sql}.log"
       info "Running $n"
       sudo -u postgres "/usr/lib/postgresql/$PGV/bin/psql" -X -q -v ON_ERROR_STOP=1 -p "$PGPORT" -d "$DB" -f "$f" > "$log" 2>&1 || { tail -20 "$log"; fail "SQL failed: $n"; }
+      if [ "$n" != "${n#schema_}" ]; then
+        # the roles every copy starts with (the self-tests use them); the real ones come with the data
+        psqlm -d "$DB" -c "insert into public.roles (name) select x from unnest(array['owner','branch_manager','cashier','waiter','storekeeper']) x where not exists (select 1 from public.roles r where r.name = x)" >/dev/null || fail "Adding the roles failed"
+      fi
       num=$(echo "$n" | grep -oE '^[0-9]{3}' || true)
       if [ -n "$num" ] && grep -q "MOTIONPOS-$num-SELFTEST-OK" "$f" && ! grep -q "MOTIONPOS-$num-SELFTEST-OK\|selftest skipped" "$log"; then
         fail "$num self-test message missing (see $log)"
@@ -237,6 +249,7 @@ CRON
   v=$(curl -s -m 15 -X POST "https://$DOMAIN/rest/v1/rpc/motionpos_version_public" -H 'Content-Type: application/json' -d '{}')
   [ "$code" = "200" ] || fail "https://$DOMAIN/ answers $code"
   ok "https://$DOMAIN/ -> 200, database version $v"
+  date -u +%FT%TZ > "$SECRETS/installed"
   echo "SERVER INSTALL DONE"
   ;;
 
