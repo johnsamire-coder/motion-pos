@@ -4,7 +4,7 @@
 
 const SET2_SECTIONS = [['general', 'الشركة واللوجو'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
     ['qr', 'الويتر ومنيو الـ QR'], ['loyalty', 'خصم الانتماء والسوشيال'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
-    ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب']];
+    ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب'], ['reset', '🧹 تصفير البرنامج']];
 
 let set2 = { settings: null, data: null, recipeProduct: '', recipeLines: [], products: [] };
 
@@ -19,6 +19,7 @@ function set2Inject() {
     const content = document.querySelector('#view-settings-workspace .lg\\:col-span-3');
     if (!aside || !content || document.getElementById('btn-set-general')) return;
     SET2_SECTIONS.forEach(([k, label]) => {
+        if (k === 'reset' && String(currentUser?.roles?.name || '') !== 'owner') return;
         const b = document.createElement('button');
         b.id = 'btn-set-' + k;
         b.className = 'set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2';
@@ -107,6 +108,40 @@ function set2RenderAll() {
     if (typeof set2RenderModifiers === 'function') set2RenderModifiers();
     set2RenderLists();
     set2RenderPayAcc();
+    set2RenderReset();
+}
+
+// ---------------------------------------------------------------- تصفير البرنامج (المالك بس)
+function set2RenderReset() {
+    const box = document.getElementById('set-section-reset');
+    if (!box) return;
+    box.innerHTML = uiCard('🧹 تصفير البرنامج (بداية جديدة)', `
+        <div class="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-bold leading-6 mb-3">
+            ⚠️ ده بيمسح نهائي ومفيش رجوع:<br>
+            كل الفواتير والطلبات والمدفوعات، والمشتريات والاستلامات وفواتير الموردين، والورديات وحركات الدرج والخزينة،
+            والقيود والمصروفات والمرتبات والسلف، وحركات المخزن وأرصدته (الرصيد بيبقى صفر)، والعملاء، والموردين، والشكاوي،
+            وكل اليوزرات ماعدا المالك.</div>
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs font-bold leading-6 mb-3">
+            ✅ بيفضل زي ما هو: الأصناف والأقسام، والخامات بأسعارها وعبواتها، والوصفات، والإضافات، وكل الإعدادات، والشركة واللوجو،
+            والفروع والمخازن والطاولات، وشجرة الحسابات، والصلاحيات.</div>
+        <p class="text-[11px] font-bold text-slate-500 mb-3">لو المحل عنده لابتوب شغال من غير نت، المسح بيوصله لوحده مع المزامنة. خد نسخة احتياطي الأول لو محتاج.</p>`,
+        uiBtn('🧹 امسح كل حاجة وابدأ من جديد', 'set2DoReset()', 'red'));
+}
+
+async function set2DoReset() {
+    const v = await uiForm('تأكيد تصفير البرنامج', [
+        { type: 'note', html: '<p class="text-sm font-bold text-red-700">المسح نهائي ومفيش رجوع. عشان تكمّل اكتب الجملة دي بالظبط: <b>امسح كل حاجة</b></p>' },
+        { key: 'confirm', label: 'اكتب: امسح كل حاجة', required: true },
+        { key: 'pin', label: 'رقمك السري (المالك)', type: 'pin', required: true }], { ok: 'امسح نهائي', danger: true,
+        validate: x => x.confirm !== 'امسح كل حاجة' ? { key: 'confirm', msg: 'اكتب الجملة زي ما هي بالظبط' } : null });
+    if (!v) return;
+    const res = await uiCall('system_reset_secure', { p_pin: v.pin, p_confirm: v.confirm });
+    if (!res) return;
+    const d = res.deleted || {};
+    const total = Object.values(d).reduce((s, n) => s + (Number(n) || 0), 0);
+    await uiForm('تم التصفير ✅', [{ type: 'note', html: `<p class="text-sm font-bold">اتمسح ${total} سطر، منهم ${Number(d.orders) || 0} طلب و${Number(d.staff) || 0} يوزر.<br>البرنامج بقى نضيف ومستني أول يوم شغل.</p>` }], { ok: 'تمام' });
+    if (typeof motionDataChanged === 'function') motionDataChanged();
+    location.reload();
 }
 
 // ---------------------------------------------------------------- الشغل من غير نت (المزامنة) - للمالك بس

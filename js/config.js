@@ -177,6 +177,7 @@ const SERVER_REASON_MESSAGES = {
     invalid_price: 'السعر غير صحيح',
     invalid_category: 'القسم غير صحيح',
     invalid_value: 'قيمة غير صحيحة',
+    confirm_text: 'الجملة اللي اتكتبت مش مظبوطة',
     invalid_branch: 'الفرع غير صحيح',
     invalid_percentage: 'النسبة لازم تكون من 0 لـ 100',
     invalid_capacity: 'السعة لازم تكون رقم من 1 لـ 999',

@@ -1,5 +1,5 @@
 # Motion POS - shop server on this PC (database + API + screens), works on any Windows PC
-# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off|pause|resume|newclient [-Rebuild] [-Site client.vercel.app] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
+# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off|pause|resume|wipe|newclient [-Rebuild] [-Site client.vercel.app] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
 param([string]$Step = 'status', [switch]$Rebuild, [string]$Site = '', [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -60,8 +60,9 @@ $Files = [ordered]@{
   'supabase\migrations\025_recipes_import_fix.sql'            = '8fdca1a2ba38d2b8'
   'supabase\migrations\026_recipe_ingredients_shopping.sql'    = '179b0e77eb0e3d73'
   'supabase\migrations\027_ingredient_packs.sql'               = '02ccf0a53676d6c1'
+  'supabase\migrations\028_system_reset.sql'                  = 'cf533e1ccb5d759e'
 }
-$LastVersion = '027'
+$LastVersion = '028'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }
@@ -482,6 +483,40 @@ server-port = $ApiPort
 
 'pause'  { Set-Content (Join-Path $Root 'sync.pause') (Get-Date -Format s) -Encoding ASCII; Ok 'Sync paused (like the shop internet is down). Screens keep working. Run -Step resume to continue.' }
 'resume' { Remove-Item (Join-Path $Root 'sync.pause') -Force -ErrorAction SilentlyContinue; Ok 'Sync resumed (next round within 30 seconds)' }
+
+'wipe' {
+  # start clean: delete every sale, purchase, shift, journal entry, stock movement, customer, supplier and every user except the owner
+  # on the cloud AND on this PC. Products, ingredients (with prices), recipes, add-ons, settings, branches and tables stay.
+  Use-Env; Start-Db
+  Write-Host ''
+  Write-Host 'THIS DELETES FOR GOOD: all sales, payments, purchases, receipts, supplier invoices, shifts, cash moves,' -ForegroundColor Red
+  Write-Host 'journal entries, expenses, payroll, stock movements and balances, customers, suppliers, feedback,' -ForegroundColor Red
+  Write-Host 'and every user except the owner. On the cloud and on this PC.' -ForegroundColor Red
+  Write-Host 'KEPT: products, categories, ingredients with prices, recipes, add-ons, settings, company, branches, tables.' -ForegroundColor Green
+  Write-Host ''
+  $a = Read-Host 'Type WIPE in capital letters to continue (anything else cancels)'
+  if ($a -cne 'WIPE') { Fail 'Cancelled - nothing was deleted' }
+  $b = Invoke-Backup -Force
+  if ($b -like '*FAILED*') { Fail "Backup before wipe failed - nothing was deleted. $b" } else { Ok "Safety copy of this PC first: $b" }
+  Set-Content (Join-Path $Root 'sync.pause') (Get-Date -Format s) -Encoding ASCII
+  Info 'Sync paused, waiting 35 seconds for a running round to finish...'
+  Start-Sleep 35
+  if (Test-Path (Join-Path $Secret 'cloud_conn.dat')) {
+    $conn = Get-CloudConn
+    $saved = $env:PGPASSWORD; Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    $out = 'select public.pos_system_reset()::text;' | & psql $conn -X -A -t -v ON_ERROR_STOP=1 -f - 2>&1
+    $code = $LASTEXITCODE; $env:PGPASSWORD = $saved
+    if ($code -ne 0) { Remove-Item (Join-Path $Root 'sync.pause') -Force -ErrorAction SilentlyContinue; Fail "Cloud wipe failed (this PC NOT touched): $(Hide $out $conn)" }
+    Ok "Cloud wiped: $(Hide $out $conn)"
+  } else {
+    Info 'No cloud connection saved on this PC - only this PC is wiped. For the cloud: Supabase SQL Editor, run: select public.pos_system_reset();'
+  }
+  $r = Get-Val 'select public.pos_system_reset()::text'
+  Ok "This PC wiped: $r"
+  Remove-Item (Join-Path $Root 'sync.pause') -Force -ErrorAction SilentlyContinue
+  Ok 'Sync resumed. Open the screens again and log in with the owner PIN.'
+  Write-Host 'WIPE DONE' -ForegroundColor Green
+}
 'autostart' {
   # start everything automatically when this Windows user logs in (no admin needed)
   $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
