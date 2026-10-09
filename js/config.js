@@ -5,6 +5,8 @@ const MOTION_LOCAL = location.protocol === 'http:';
 const MOTION_SITE_HOST = location.hostname;
 const MOTION_SITES = {
     'motion-pos.vercel.app': ['https://qyrezfpzcuioxasxjhiq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cmV6ZnB6Y3Vpb3hhc3hqaGlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNzY2ODAsImV4cCI6MjEwNjc1MjY4MH0._BrruPh4V6IUKa78u5CDJl-I4cRmU0RvZf5MsmAUXTQ'],
+    // سيرفر الشركة: الشاشات والـ API على نفس العنوان (nginx بيوصّل /rest/v1 للـ API)
+    'pos.jssolutions-eg.com': ['https://pos.jssolutions-eg.com', 'motionpos-server'],
     // clients (added by tools\motionlocal.ps1 -Step newclient)
 };
 const MOTION_SITE_KEY = MOTION_SITES[MOTION_SITE_HOST] ? MOTION_SITE_HOST : 'motion-pos.vercel.app';
