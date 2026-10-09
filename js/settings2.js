@@ -290,6 +290,7 @@ async function set2RenderRecipes() {
     const ings = set2.data.ingredients || [];
     box.innerHTML = uiCard('الوصفات (الريسبي)', `<p class="text-xs font-bold text-slate-600">الوصفات بقت جوه كل صنف في <button onclick="switchSettingsSection('menu')" class="text-blue-700 underline font-black">المنيو والوصفات 🍽️</button>: افتح الصنف، وضيف الخامات والكميات، وتقدر تعمل خامة جديدة من نفس المكان.</p>`)
         + uiCard('الخامات', uiTable(ings, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
+            { label: 'العبوة اللي بنشتري بيها', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
             { label: 'التكلفة (من المشتريات)', render: i => formatCurrency(i.cost_per_unit) }, { label: 'الحد الأدنى', key: 'min_stock_alert' },
             { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'مفيش خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
 }
@@ -324,6 +325,7 @@ const SET2_INGREDIENT_CATALOG = ['بن', 'بن اسبريسو', 'بن تركي',
     'عيش برجر', 'عيش فينو', 'عيش توست', 'لحمة برجر', 'فراخ', 'سجق', 'جبنة', 'جبنة شيدر', 'جبنة موتزاريلا', 'بيض', 'طماطم', 'خس', 'بصل', 'خيار', 'مخلل',
     'بطاطس', 'زيت', 'زبدة', 'كاتشب', 'مايونيز', 'مستردة', 'ملح', 'فلفل', 'دقيق', 'مكرونة', 'رز', 'معسل', 'فحم', 'ولاعة', 'خرطوم شيشة',
     'كوبايات ورق', 'غطيان كوبايات', 'شفاطات', 'مناديل', 'علب تيك أواي', 'أكياس'];
+const SET2_PACK_UNITS = ['جالون', 'كرتونة', 'شوال', 'علبة', 'كيس', 'باكيت', 'زجاجة', 'جركن', 'صندوق', 'شدّة'];
 const SET2_DEFAULT_UNITS = ['كيلو', 'جرام', 'لتر', 'مللي', 'قطعة', 'علبة', 'كرتونة', 'رغيف', 'كيس', 'زجاجة', 'باكيت'];
 
 async function set2EditIngredient(id) {
@@ -334,9 +336,15 @@ async function set2EditIngredient(id) {
     const fields = [
         { key: 'name', label: 'اسم الخامة', value: i.name || '', required: true, list: SET2_INGREDIENT_CATALOG, help: 'اكتب حرفين وهتظهرلك أسماء جاهزة، أو اكتب اسم جديد' },
         { key: 'unit', label: 'الوحدة', type: 'select', options: units.map(u => [u, u]), value: i.unit || '', placeholder: 'اختار الوحدة', addNew: 'وحدة جديدة', required: true },
-        { key: 'min', label: 'الحد الأدنى للتنبيه', type: 'number', min: 0, value: i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5), required: true }];
+        { key: 'min', label: 'الحد الأدنى للتنبيه', type: 'number', min: 0, value: i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5), required: true },
+        { type: 'note', html: '📦 <b>العبوة (اختياري):</b> لو بتشتري الخامة دي بعبوة (جالون، كرتونة، شوال...) اكتب اسمها وجواها كام وحدة. بعد كده في الشراء والاستلام والجرد تكتب بالعبوة والسيستم يحسب بالوحدة لوحده. مثال: الوحدة لتر، العبوة جالون، وجواها 3 (أو اللي مكتوب على الجالون).' },
+        { key: 'pack_unit', label: 'اسم العبوة', value: i.pack_unit || '', list: SET2_PACK_UNITS, placeholder: 'مثلاً جالون' },
+        { key: 'pack_size', label: 'العبوة فيها كام وحدة؟', type: 'number', min: 0, value: i.pack_size || '', placeholder: 'مثلاً 3' }];
     if (!id) fields.push({ key: 'cost', label: 'تكلفة الوحدة المبدئية', type: 'money', min: 0, value: 0, help: 'بعد كده بتتحسب لوحدها من المشتريات' });
     const v = await uiForm(id ? 'تعديل خامة' : 'خامة جديدة', fields, { validate: x => {
+        if (x.pack_unit && !(Number(x.pack_size) > 0)) return { key: 'pack_size', msg: 'اكتب العبوة فيها كام وحدة' };
+        if (!x.pack_unit && Number(x.pack_size) > 0) return { key: 'pack_unit', msg: 'اكتب اسم العبوة' };
+        if (x.pack_unit && x.pack_unit === x.unit) return { key: 'pack_unit', msg: 'العبوة لازم تبقى غير الوحدة' };
         const dup = (set2.data.ingredients || []).find(y => y.id !== id && String(y.name).trim() === x.name);
         return dup ? { key: 'name', msg: 'الخامة دي موجودة قبل كده' } : null;
     } });
@@ -345,7 +353,8 @@ async function set2EditIngredient(id) {
         try { await serverRpc('app_settings_save_secure', { p_section: 'inventory', p_data: { units: [...saved, v.unit].slice(-40) } }); } catch (err) { console.warn('unit not saved', err); }
         if (typeof loadAppSettings === 'function') loadAppSettings();
     }
-    if (await uiCall('settings2_secure', { p_action: 'save_ingredient', p_data: { id: id || null, name: v.name, unit: v.unit, min_stock_alert: String(v.min || 0), cost_per_unit: String(v.cost || 0) } }, 'تم الحفظ')) initSettings2();
+    if (await uiCall('settings2_secure', { p_action: 'save_ingredient', p_data: { id: id || null, name: v.name, unit: v.unit, min_stock_alert: String(v.min || 0), cost_per_unit: String(v.cost || 0),
+        pack_unit: v.pack_unit || '', pack_size: v.pack_unit ? String(v.pack_size) : '' } }, 'تم الحفظ')) initSettings2();
 }
 
 // ---------------------------------------------------------------- discounts, cancel reasons, areas

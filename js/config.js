@@ -397,6 +397,71 @@ function uiBtn(label, onclick, color = 'blue') {
 
 function uiInputClass() { return 'bg-slate-50 border p-2 rounded-xl text-xs font-bold'; }
 
+// -----------------------------------------
+// الوحدات: كل خامة ليها وحدة أساسية (كيلو / لتر / قطعة...) والمخزن والوصفات بيتحسبوا بيها.
+// وممكن يبقى ليها "عبوة" بنشتري بيها (جالون / كرتونة...) ومكتوب جواها كام وحدة.
+// خانتين مربوطين: تكتب في واحدة والتانية بتتحسب لوحدها.
+//   شراء وجرد واستلام: العبوة <-> الوحدة الأساسية (أو الجرام/المللي لو مفيش عبوة)
+//   وصفات وهالك: الجرام/المللي <-> الكيلو/اللتر (أو العبوة لو الوحدة مالهاش أصغر)
+// -----------------------------------------
+const UNIT_SMALL = { 'كيلو': ['جرام', 1000], 'كجم': ['جرام', 1000], 'لتر': ['مللي', 1000] };
+function unitPack(ing) {
+    const n = Number(ing && ing.pack_size);
+    return ing && ing.pack_unit && n > 0 ? { label: ing.pack_unit, mult: 1 / n, size: n } : null;
+}
+function unitAlt(ing, purpose) {
+    if (!ing) return null;
+    const pack = unitPack(ing), s = UNIT_SMALL[String(ing.unit || '').trim()];
+    const small = s ? { label: s[0], mult: s[1] } : null;
+    return purpose === 'buy' ? (pack || small) : (small || pack);
+}
+function unitNum(v) { const n = Math.round(Number(v) * 10000) / 10000; return Number.isFinite(n) ? n : 0; }
+// "7.57 لتر (2 جالون)"
+function uiQtyText(qty, ing) {
+    const q = Number(qty) || 0, pack = unitPack(ing);
+    return `${unitNum(q)} ${uiEsc((ing && ing.unit) || '')}${pack && q ? ` <span class="text-slate-400">(${unitNum(q * pack.mult)} ${uiEsc(pack.label)})</span>` : ''}`;
+}
+// خانة الوحدة الأساسية (id) + خانة تانية مربوطة بيها (id-alt). القيمة اللي بتتحفظ دايماً في الخانة الأساسية.
+function uiQtyPair(id, ing, purpose, value, attrs = '', onInput = '', kind = 'qty') {
+    const alt = kind === 'price' ? (unitPack(ing) ? { label: unitPack(ing).label, mult: unitPack(ing).size } : null) : unitAlt(ing, purpose);
+    const v = value === undefined || value === null || value === '' ? '' : unitNum(value);
+    const unit = (ing && ing.unit) || '';
+    const base = `<input id="${id}" type="number" min="0" step="any" value="${uiEsc(v)}" ${attrs} oninput="uiPairFrom(this);${onInput}" class="${uiInputClass()} w-24" placeholder="${kind === 'price' ? 'سعر ال' + uiEsc(unit) : uiEsc(unit || 'الكمية')}">`;
+    const baseLbl = `<span class="text-[11px] text-slate-500 font-bold">${kind === 'price' ? 'لل' : ''}${uiEsc(unit)}</span>`;
+    if (!alt) return `<span class="inline-flex items-center gap-1 flex-wrap">${base}${baseLbl}</span>`;
+    const av = v === '' ? '' : unitNum(Number(v) * alt.mult);
+    return `<span class="inline-flex items-center gap-1 flex-wrap">${base}${baseLbl}<span class="text-slate-300">⇄</span>
+        <input id="${id}-alt" data-mult="${alt.mult}" type="number" min="0" step="any" value="${uiEsc(av)}" oninput="uiPairFrom(this)" class="${uiInputClass()} w-24 bg-amber-50" placeholder="${kind === 'price' ? 'سعر ال' + uiEsc(alt.label) : uiEsc(alt.label)}">
+        <span class="text-[11px] text-amber-700 font-bold">${kind === 'price' ? 'لل' : ''}${uiEsc(alt.label)}</span></span>`;
+}
+function uiPairFrom(el) {
+    if (!el) return;
+    if (el.id.endsWith('-alt')) {
+        const base = document.getElementById(el.id.slice(0, -4));
+        if (!base) return;
+        const m = Number(el.dataset.mult) || 1;
+        base.value = el.value === '' ? '' : unitNum(Number(el.value) / m);
+        base.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+        const alt = document.getElementById(el.id + '-alt');
+        if (!alt || document.activeElement === alt) return;
+        alt.value = el.value === '' ? '' : unitNum(Number(el.value) * (Number(alt.dataset.mult) || 1));
+    }
+}
+// للشاشات اللي بتستخدم uiForm: { label, mult } للخانة المربوطة
+function unitPairOf(ing, purpose, kind = 'qty') {
+    if (kind === 'price') { const p = unitPack(ing); return p ? { label: 'سعر ال' + p.label, mult: p.size } : undefined; }
+    const a = unitAlt(ing, purpose);
+    return a ? { label: a.label, mult: a.mult } : undefined;
+}
+// يحط الخانتين جوه مكان (span) لما الخامة تتغير من القايمة
+function uiPairMount(boxId, id, ing, purpose, kind = 'qty') {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const old = document.getElementById(id);
+    box.innerHTML = uiQtyPair(id, ing, purpose, old ? old.value : '', '', '', kind);
+}
+
 function uiOptions(items, valueKey, labelFn, placeholder) {
     return (placeholder ? `<option value="">${uiEsc(placeholder)}</option>` : '')
         + (items || []).map(i => `<option value="${uiEsc(i[valueKey])}">${uiEsc(labelFn(i))}</option>`).join('');
@@ -474,6 +539,7 @@ function uiAskAmount(title, defaultValue = '') {
 //   type: text | number | money | select | date | textarea | check | pin | note
 //   addNew: (select) يضيف "➕ جديد" في آخر القايمة، والقيمة اللي بتتكتب بترجع في الخانة نفسها و key + '_new' = true
 //   list: (text) اقتراحات بتنزل وانت بتكتب، وتقدر تكتب غيرها
+//   pair: (number/money) { label, mult } خانة تانية مربوطة بوحدة تانية (مثلاً الجالون)، القيمة بترجع بالوحدة الأساسية
 // Returns a Promise with the values, or null if cancelled. opts: { ok, danger, validate(values) => message | { key, msg } | null }
 // -----------------------------------------
 let uiFormSeq = 0;
@@ -500,7 +566,9 @@ function uiForm(title, fields, opts = {}) {
             } else {
                 const t = { number: 'number', money: 'number', date: 'date', pin: 'password' }[f.type] || 'text';
                 const extra = f.type === 'pin' ? 'inputmode="numeric" maxlength="4" autocomplete="off"' : ((f.type === 'number' || f.type === 'money') ? `inputmode="decimal" step="${f.step || 'any'}" ${f.min !== undefined ? `min="${f.min}"` : ''}` : '');
-                input = `<input id="${fid}" type="${t}" ${extra} value="${uiEsc(v)}" placeholder="${uiEsc(f.placeholder || '')}" class="${cls} ${f.type === 'pin' ? 'text-center tracking-widest' : ''}" ${f.list ? `list="${fid}-list"` : ''}>
+                input = `<input id="${fid}" type="${t}" ${extra} value="${uiEsc(v)}" placeholder="${uiEsc(f.placeholder || '')}" class="${cls} ${f.type === 'pin' ? 'text-center tracking-widest' : ''}" ${f.list ? `list="${fid}-list"` : ''} ${f.pair ? 'oninput="uiPairFrom(this)"' : ''}>
+                    ${f.pair ? `<div class="flex items-center gap-1 mt-1"><span class="text-amber-700 text-xs">⇄</span><input id="${fid}-alt" data-mult="${f.pair.mult}" type="number" step="any" min="0" oninput="uiPairFrom(this)"
+                        value="${v === '' ? '' : unitNum(Number(v) * f.pair.mult)}" class="${cls} bg-amber-50"><span class="text-xs font-bold text-amber-700 whitespace-nowrap">${uiEsc(f.pair.label)}</span></div>` : ''}
                     ${f.list ? `<datalist id="${fid}-list">${f.list.map(x => `<option value="${uiEsc(x)}">`).join('')}</datalist>` : ''}`;
             }
             return `<div class="${f.full ? 'md:col-span-2' : ''}"><label for="${fid}" class="block text-xs font-black text-slate-600 mb-1">${uiEsc(f.label)}${f.required ? ' <span class="text-red-500">*</span>' : ''}</label>${input}

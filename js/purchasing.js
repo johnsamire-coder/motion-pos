@@ -9,13 +9,16 @@ async function loadPurchasingScreen() {
     const [sup, wh, ing] = await Promise.all([
         uiCall('suppliers_secure', { p_data: null }),
         uiCall('inv_warehouses_secure', {}),
-        _supabase.from('ingredients').select('id, name, unit').order('name')
+        _supabase.from('ingredients').select('id, name, unit, pack_unit, pack_size, cost_per_unit').order('name')
     ]);
     purState.suppliers = (sup && sup.suppliers) || [];
     purState.warehouses = ((wh && wh.warehouses) || []).filter(w => w.mine);
     purState.ingredients = ing.data || [];
     renderPurchasingBody();
 }
+
+function purIng(id) { return purState.ingredients.find(i => i.id === id) || null; }
+function purIngByName(name) { return purState.ingredients.find(i => String(i.name).trim() === String(name || '').trim()) || null; }
 
 function renderPurchasingBody() {
     const root = document.getElementById('purchase-root');
@@ -94,8 +97,10 @@ async function purReceive(id) {
     if (!open.length) return showToast('كل الكميات اتستلمت', 'error');
     const fields = [{ type: 'note', label: 'اكتب الكمية اللي وصلت فعلاً وسعرها (صفر = موصلش). الأرقام المكتوبة هي الباقي من الأمر.' }];
     open.forEach((x, i) => fields.push(
-        { key: 'q' + i, label: `${x.l.ingredient} (${x.l.unit}): وصل كام؟ (الباقي ${x.remaining})`, type: 'number', min: 0, max: x.remaining, value: x.remaining, required: true },
-        { key: 'c' + i, label: `${x.l.ingredient}: سعر الوحدة الفعلي`, type: 'money', min: 0, value: Number(x.l.unit_price), required: true }));
+        { key: 'q' + i, label: `${x.l.ingredient} (${x.l.unit}): وصل كام؟ (الباقي ${x.remaining})`, type: 'number', min: 0, max: x.remaining, value: x.remaining, required: true,
+          pair: unitPairOf(purIngByName(x.l.ingredient), 'buy') },
+        { key: 'c' + i, label: `${x.l.ingredient}: سعر ال${x.l.unit} الفعلي`, type: 'number', min: 0, value: Number(x.l.unit_price), required: true,
+          pair: unitPairOf(purIngByName(x.l.ingredient), 'buy', 'price') }));
     fields.push({ key: 'notes', label: 'ملاحظات الاستلام (اختياري)', type: 'textarea', full: true });
     const v = await uiForm('استلام بضاعة', fields, { ok: 'استلام', validate: x => open.some((_, i) => x['q' + i] > 0) ? null : 'مفيش كميات اتستلمت' });
     if (!v) return;
@@ -215,10 +220,10 @@ function purRenderNew() {
             <select id="pur-new-sup" class="${uiInputClass()}">${uiOptions(purState.suppliers.filter(s => s.is_active !== false), 'id', s => s.name, 'اختار المورد')}</select>
             <select id="pur-new-wh" class="${uiInputClass()}">${uiOptions(purState.warehouses, 'id', w => w.name, 'اختار المخزن')}</select>
         </div>
-        <div class="flex flex-wrap gap-2 mb-2">
-            <select id="pur-new-ing" onchange="purShowLastPrice()" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
-            <input id="pur-new-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()} w-28">
-            <input id="pur-new-price" type="number" min="0" step="0.0001" placeholder="سعر الوحدة" class="${uiInputClass()} w-28">
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+            <select id="pur-new-ing" onchange="purIngChanged()" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
+            <span class="text-[11px] font-black text-slate-500 self-center">الكمية:</span><span id="pur-new-qty-box">${uiQtyPair('pur-new-qty', null, 'buy', '')}</span>
+            <span class="text-[11px] font-black text-slate-500 self-center">السعر:</span><span id="pur-new-price-box">${uiQtyPair('pur-new-price', null, 'buy', '', '', '', 'price')}</span>
             ${uiBtn('إضافة', 'purAddLine()', 'gray')}
         </div>
         <div id="pur-last-price" class="text-[11px] font-bold text-slate-500 mb-2"></div>
@@ -237,11 +242,18 @@ function purAddLine() {
     purState.lines.push({ ingredient_id: ing, qty, unit_price: price });
     // نفضّي الخانات عشان الخامة الجاية متاخدش كمية وسعر اللي قبلها
     document.getElementById('pur-new-ing').value = '';
-    document.getElementById('pur-new-qty').value = '';
-    document.getElementById('pur-new-price').value = '';
+    ['pur-new-qty', 'pur-new-qty-alt', 'pur-new-price', 'pur-new-price-alt'].forEach(x => { const el = document.getElementById(x); if (el) el.value = ''; });
     document.getElementById('pur-new-ing').focus();
     const lp = document.getElementById('pur-last-price'); if (lp) lp.innerHTML = '';
     purRenderLines();
+}
+
+// الخامة اتغيرت: الخانات بتتعمل بوحدتها وعبوتها (مثلاً لتر ⇄ جالون)
+function purIngChanged() {
+    const ing = purIng(document.getElementById('pur-new-ing').value);
+    uiPairMount('pur-new-qty-box', 'pur-new-qty', ing, 'buy');
+    uiPairMount('pur-new-price-box', 'pur-new-price', ing, 'buy', 'price');
+    purShowLastPrice();
 }
 
 // آخر سعر شراء للخامة، وزرار لآخر ٥ استلامات
@@ -259,7 +271,7 @@ async function purShowLastPrice() {
     const h = hist[0];
     box.innerHTML = `آخر سعر شراء: <b class="text-slate-800">${formatCurrency(h.unit_cost)}</b> من ${uiEsc(h.supplier)} يوم ${uiEsc(uiDate(h.at))} ${uiBtn('آخر ٥ فواتير', 'purShowLast5()', 'gray')}`;
     const price = document.getElementById('pur-new-price');
-    if (price && price.value === '') price.value = Number(h.unit_cost);
+    if (price && price.value === '') { price.value = Number(h.unit_cost); uiPairFrom(price); }
 }
 
 async function purShowLast5() {
@@ -278,8 +290,8 @@ async function purEditLine(idx) {
     const l = purState.lines[idx];
     if (!l) return;
     const v = await uiForm('تعديل السطر', [
-        { key: 'qty', label: 'الكمية', type: 'number', value: l.qty, required: true },
-        { key: 'price', label: 'سعر الوحدة', type: 'number', value: l.unit_price, required: true }]);
+        { key: 'qty', label: `الكمية (${(purIng(l.ingredient_id) || {}).unit || ''})`, type: 'number', value: l.qty, required: true, pair: unitPairOf(purIng(l.ingredient_id), 'buy') },
+        { key: 'price', label: `سعر ال${(purIng(l.ingredient_id) || {}).unit || 'وحدة'}`, type: 'number', value: l.unit_price, required: true, pair: unitPairOf(purIng(l.ingredient_id), 'buy', 'price') }]);
     if (!v) return;
     const qty = Number(v.qty), price = Number(v.price);
     if (!(qty > 0) || !(price >= 0)) return showToast('الكمية لازم أكبر من صفر والسعر صفر أو أكتر', 'error');
@@ -292,8 +304,8 @@ function purRenderLines() {
     const names = Object.fromEntries(purState.ingredients.map(i => [i.id, `${i.name} (${i.unit})`]));
     const total = purState.lines.reduce((s, l) => s + l.qty * l.unit_price, 0);
     box.innerHTML = purState.lines.length ? uiTable(purState.lines.map((l, idx) => ({ ...l, idx })), [
-        { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', key: 'qty' },
-        { label: 'السعر', render: l => formatCurrency(l.unit_price) }, { label: 'الإجمالي', render: l => formatCurrency(l.qty * l.unit_price) },
+        { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', render: l => uiQtyText(l.qty, purIng(l.ingredient_id)) },
+        { label: 'السعر', render: l => formatCurrency(l.unit_price) + (unitPack(purIng(l.ingredient_id)) ? `<br><span class="text-[10px] text-amber-700">ال${uiEsc(purIng(l.ingredient_id).pack_unit)} ${formatCurrency(l.unit_price * unitPack(purIng(l.ingredient_id)).size)}</span>` : '') }, { label: 'الإجمالي', render: l => formatCurrency(l.qty * l.unit_price) },
         { label: '', render: l => '<div class="flex gap-1">' + uiBtn('تعديل', `purEditLine(${l.idx})`, 'gray') + uiBtn('حذف', `purRemoveLine(${l.idx})`, 'red') + '</div>' }]) + `<p class="text-xs font-black mt-2">الإجمالي: ${formatCurrency(total)}</p>` : '';
 }
 

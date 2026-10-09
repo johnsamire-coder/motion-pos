@@ -186,11 +186,11 @@ function maRenderEditor() {
     const sug = maSuggestFor(e.name);
     const rows = e.recipe.map((r, i) => {
         const ing = ings[r.ingredient_id] || {};
-        const small = MA_SMALL_UNITS[ing.unit];
+        const alt = unitAlt(ing, 'use');
         return `<tr class="border-b text-xs font-bold">
             <td class="p-1.5"><select onchange="maRowIng(${i}, this.value)" class="${uiInputClass()} w-full max-w-[170px]">${(d.ingredients || []).map(x => `<option value="${uiEsc(x.id)}" ${x.id === r.ingredient_id ? 'selected' : ''}>${uiEsc(x.name)}</option>`).join('')}</select></td>
-            <td class="p-1.5 whitespace-nowrap"><input type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="maRowQty(${i}, this.value, this)" class="${uiInputClass()} w-20 ${Number(r.qty) > 0 ? '' : 'ring-2 ring-amber-400'}" title="${Number(r.qty) > 0 ? '' : 'لسه من غير كمية'}"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
-                ${small ? `<br><span id="ma-rh-${i}" class="text-[10px] text-slate-400">= ${Math.round((Number(r.qty) || 0) * small[1] * 100) / 100} ${small[0]}</span>` : ''}</td>
+            <td class="p-1.5 whitespace-nowrap"><input id="ma-rq-${i}" type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="uiPairFrom(this); maRowQty(${i}, this.value, this)" class="${uiInputClass()} w-20 ${Number(r.qty) > 0 ? '' : 'ring-2 ring-amber-400'}" title="${Number(r.qty) > 0 ? '' : 'لسه من غير كمية'}"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
+                ${alt ? `<br><span class="text-amber-700">⇄</span> <input id="ma-rq-${i}-alt" data-mult="${alt.mult}" type="number" min="0" step="any" value="${Number(r.qty) ? unitNum(Number(r.qty) * alt.mult) : ''}" oninput="uiPairFrom(this)" class="${uiInputClass()} w-20 bg-amber-50 mt-1"> <span class="text-amber-700">${uiEsc(alt.label)}</span>` : ''}</td>
             <td class="p-1.5 whitespace-nowrap"><span id="ma-rc-${i}">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}</span>${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة لسه من غير سعر</span>'}</td>
             <td class="p-1.5"><button onclick="maRowDel(${i})" class="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1">🗑️ حذف</button></td></tr>`;
     }).join('');
@@ -277,7 +277,9 @@ function maAddHint() {
     if (sel) {
         const small = MA_SMALL_UNITS[unit];
         const prev = sel.value;
-        sel.innerHTML = `<option value="1">${uiEsc(unit || 'الوحدة')}</option>` + (small ? `<option value="${small[1]}">${small[0]}</option>` : '');
+        const pack = ing ? unitPack(ing) : null;
+        sel.innerHTML = `<option value="1">${uiEsc(unit || 'الوحدة')}</option>` + (small ? `<option value="${small[1]}">${small[0]}</option>` : '')
+            + (pack ? `<option value="${pack.mult}">${uiEsc(pack.label)}</option>` : '');
         if (small && prev === String(small[1])) sel.value = prev;
     }
 }
@@ -307,10 +309,9 @@ function maRowQty(i, v, el) {
     const r = ma.ed.recipe[i];
     r.qty = Number(v) || 0;
     if (el) el.classList.toggle('ring-2', !(r.qty > 0)), el.classList.toggle('ring-amber-400', !(r.qty > 0));
-    const ing = maIngs()[r.ingredient_id] || {}, small = MA_SMALL_UNITS[ing.unit];
-    const c = document.getElementById('ma-rc-' + i), h = document.getElementById('ma-rh-' + i);
+    const ing = maIngs()[r.ingredient_id] || {};
+    const c = document.getElementById('ma-rc-' + i);
     if (c) c.textContent = formatCurrency(r.qty * (Number(ing.cost_per_unit) || 0));
-    if (h && small) h.textContent = `= ${Math.round(r.qty * small[1] * 100) / 100} ${small[0]}`;
     maUpdateSummary();
 }
 function maRowIng(i, v) { maReadFields(); ma.ed.recipe[i].ingredient_id = v; maRenderEditor(); }

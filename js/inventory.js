@@ -11,7 +11,7 @@ async function loadInventoryScreen() {
     if (!root) return;
     const [wh, ing] = await Promise.all([
         uiCall('inv_warehouses_secure', {}),
-        _supabase.from('ingredients').select('id, name, unit').order('name')
+        _supabase.from('ingredients').select('id, name, unit, pack_unit, pack_size, cost_per_unit').order('name')
     ]);
     if (!wh) return;
     invState.warehouses = wh.warehouses || [];
@@ -38,6 +38,8 @@ function renderInventoryBody() {
     (loaders[invState.tab] || invRenderStock)();
 }
 
+function invIng(id) { return invState.ingredients.find(i => i.id === id) || null; }
+
 function invIngredientOptions(placeholder) {
     return uiOptions(invState.ingredients, 'id', i => `${i.name} (${i.unit})`, placeholder);
 }
@@ -53,7 +55,7 @@ async function invRenderStock() {
     body.innerHTML = (low.length ? `<div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-black mb-3">⚠️ ${low.length} خامة تحت الحد الأدنى: ${low.map(i => uiEsc(i.name)).join('، ')}</div>` : '')
         + uiCard(`الأرصدة (إجمالي القيمة ${formatCurrency(total)})`, uiTable(items, [
             { label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
-            { label: 'الرصيد', render: i => `<b class="${i.low ? 'text-red-600' : 'text-blue-700'}">${uiEsc(Number(i.quantity))}</b>` },
+            { label: 'الرصيد', render: i => `<b class="${i.low ? 'text-red-600' : 'text-blue-700'}">${uiQtyText(i.quantity, invIng(i.ingredient_id) || i)}</b>` },
             { label: 'الحد الأدنى', key: 'min_stock_alert' }, { label: 'تكلفة الوحدة', render: i => formatCurrency(i.cost_per_unit) },
             { label: 'القيمة', render: i => formatCurrency(i.value) }]));
 }
@@ -82,9 +84,9 @@ async function invRenderLedger() {
 
 function invRenderWaste() {
     document.getElementById('inv-body').innerHTML = uiCard('تسجيل هالك / تالف (بموافقة المدير)', `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 max-w-3xl">
-            <select id="inv-waste-ing" class="${uiInputClass()}">${invIngredientOptions('اختار الخامة')}</select>
-            <input id="inv-waste-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()}">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 max-w-4xl items-center">
+            <select id="inv-waste-ing" onchange="uiPairMount('inv-waste-box', 'inv-waste-qty', invIng(this.value), 'use')" class="${uiInputClass()}">${invIngredientOptions('اختار الخامة')}</select>
+            <span id="inv-waste-box">${uiQtyPair('inv-waste-qty', null, 'use', '')}</span>
             <input id="inv-waste-reason" type="text" placeholder="السبب (انتهاء صلاحية / وقع / ...)" class="${uiInputClass()}">
         </div>
         <div class="mt-3">${uiBtn('تسجيل الهالك', 'invSubmitWaste()', 'red')}</div>`);
@@ -105,7 +107,8 @@ function invRenderCount() {
     document.getElementById('inv-body').innerHTML = uiCard('جرد أعمى: اكتب اللي عدّيته بس (الرصيد مش ظاهر قصداً)', `
         <p class="text-xs font-bold text-slate-500 mb-3">سيب الخانة فاضية للخامة اللي مش هتجردها. بعد الحفظ هيظهر الفرق لكل خامة، ويتعمل بيه قيد.</p>
         ${uiTable(invState.ingredients, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
-            { label: 'الكمية المعدودة', render: i => `<input type="number" min="0" step="any" data-count-ing="${uiEsc(i.id)}" class="${uiInputClass()} w-32">` }])}
+            { label: 'الكمية المعدودة', render: i => uiQtyPair('inv-cnt-' + i.id, i, 'buy', '', `data-count-ing="${uiEsc(i.id)}"`) }])}
+        <p class="text-[11px] font-bold text-amber-700 mt-2">تقدر تكتب بالعبوة (الخانة الصفرا، مثلاً 2 جالون) أو بالوحدة، والتانية بتتحسب لوحدها.</p>
         <input id="inv-count-notes" type="text" placeholder="ملاحظات" class="${uiInputClass()} w-full mt-3">
         <div class="mt-3">${uiBtn('حفظ الجرد', 'invSubmitCount()', 'blue')}</div>
         <div id="inv-count-result" class="mt-4"></div>`);
@@ -160,8 +163,8 @@ async function invRenderTransfers() {
             <div class="flex flex-wrap gap-2 mb-2">
                 <span class="text-xs font-black self-center">إلى:</span>
                 <select id="inv-tr-to" class="${uiInputClass()}">${uiOptions(others, 'id', w => w.name + (w.branch_name ? ' - ' + w.branch_name : ''), 'اختار المخزن')}</select>
-                <select id="inv-tr-ing" class="${uiInputClass()}">${invIngredientOptions('اختار الخامة')}</select>
-                <input id="inv-tr-qty" type="number" min="0" step="any" placeholder="الكمية" class="${uiInputClass()} w-28">
+                <select id="inv-tr-ing" onchange="uiPairMount('inv-tr-box', 'inv-tr-qty', invIng(this.value), 'buy')" class="${uiInputClass()}">${invIngredientOptions('اختار الخامة')}</select>
+                <span id="inv-tr-box">${uiQtyPair('inv-tr-qty', null, 'buy', '')}</span>
                 ${uiBtn('إضافة للطلب', 'invTransferAddLine()', 'gray')}
             </div>
             <div id="inv-tr-lines"></div>
@@ -192,6 +195,7 @@ function invTransferAddLine() {
     if (invState.transferLines.some(l => l.ingredient_id === ing)) return showToast('الخامة موجودة في الطلب', 'error');
     invState.transferLines.push({ ingredient_id: ing, qty });
     document.getElementById('inv-tr-qty').value = '';
+    const alt = document.getElementById('inv-tr-qty-alt'); if (alt) alt.value = '';
     invTransferRenderLines();
 }
 
@@ -205,7 +209,7 @@ function invTransferRenderLines() {
     if (!box) return;
     const names = Object.fromEntries(invState.ingredients.map(i => [i.id, `${i.name} (${i.unit})`]));
     box.innerHTML = invState.transferLines.length ? uiTable(invState.transferLines.map((l, idx) => ({ ...l, idx })), [
-        { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', key: 'qty' },
+        { label: 'الخامة', render: l => uiEsc(names[l.ingredient_id]) }, { label: 'الكمية', render: l => uiQtyText(l.qty, invIng(l.ingredient_id)) },
         { label: '', render: l => uiBtn('شيل', `invTransferRemoveLine(${l.idx})`, 'gray') }]) : '';
 }
 
@@ -229,7 +233,8 @@ async function invTransferAction(id, action) {
         const t = res && (res.transfers || []).find(x => x.id === id);
         if (!t) return;
         const v = await uiForm('استلام التحويل: اكتب اللي وصل فعلاً', (t.lines || []).map((l, i) => ({ key: 'q' + i,
-            label: `${l.ingredient} (اتشحن ${Number(l.qty_shipped)})`, type: 'number', min: 0, value: Number(l.qty_shipped), required: true })), { ok: 'استلام' });
+            label: `${l.ingredient} (اتشحن ${Number(l.qty_shipped)} ${l.unit || ''})`, type: 'number', min: 0, value: Number(l.qty_shipped), required: true,
+            pair: unitPairOf(invIng(l.ingredient_id), 'buy') })), { ok: 'استلام' });
         if (!v) return;
         lines = (t.lines || []).map((l, i) => ({ ingredient_id: l.ingredient_id, qty: Number(v['q' + i]) }));
     }
@@ -257,11 +262,11 @@ async function invRenderBuy() {
     const rows = invBuyItems.map((i, idx) => `<tr class="border-b border-slate-100 text-xs font-bold hover:bg-slate-50">
         <td class="p-2"><input type="checkbox" class="inv-buy-chk w-4 h-4" data-i="${idx}" checked></td>
         <td class="p-2"><b>${uiEsc(i.name)}</b>${Number(i.no_amounts) ? `<br><span class="text-[10px] text-amber-700">في ${uiEsc(i.no_amounts)} صنف لسه من غير كمية</span>` : ''}</td>
-        <td class="p-2">${uiEsc(i.unit)}</td>
-        <td class="p-2">${i.reason === 'none' ? '<span class="text-red-600">مش موجودة</span>' : `<span class="text-amber-700">${uiEsc(Number(i.quantity))} (الحد ${uiEsc(Number(i.min_stock_alert))})</span>`}</td>
+        <td class="p-2">${uiEsc(i.unit)}${unitPack(invIng(i.ingredient_id)) ? `<br><span class="text-[10px] text-amber-700">${uiEsc(invIng(i.ingredient_id).pack_unit)} = ${unitNum(invIng(i.ingredient_id).pack_size)} ${uiEsc(i.unit)}</span>` : ''}</td>
+        <td class="p-2">${i.reason === 'none' ? '<span class="text-red-600">مش موجودة</span>' : `<span class="text-amber-700">${uiQtyText(i.quantity, invIng(i.ingredient_id))} (الحد ${uiEsc(Number(i.min_stock_alert))})</span>`}</td>
         <td class="p-2">${Number(i.cost_per_unit) ? formatCurrency(i.cost_per_unit) : '<span class="text-slate-400">من غير سعر</span>'}</td>
         <td class="p-2 text-[11px] text-slate-600">${uiEsc(i.used_in)} صنف${i.products ? ': ' + uiEsc(i.products) + (Number(i.used_in) > 6 ? '...' : '') : ''}</td>
-        <td class="p-2"><input type="number" min="0" step="any" id="inv-buy-q-${idx}" placeholder="الكمية" class="${uiInputClass()} w-24"></td></tr>`).join('');
+        <td class="p-2">${uiQtyPair('inv-buy-q-' + idx, invIng(i.ingredient_id) || i, 'buy', '')}</td></tr>`).join('');
     body.innerHTML = uiCard(`🛒 محتاج شراء (${invBuyItems.length} خامة)`, invBuyItems.length ? `
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold mb-3">
             <div class="bg-red-50 text-red-700 p-3 rounded-xl border">مش موجودة خالص: <b>${none}</b></div>
@@ -306,5 +311,5 @@ function invBuyPrint() {
         <h3 style="text-align:center;margin:4px 0">قايمة مشتريات - ${uiEsc(wh)} - ${uiEsc(uiDate(new Date().toISOString()))}</h3>
         <table border="1" cellpadding="6" style="font-size:13px"><tr><th>#</th><th>الخامة</th><th>الوحدة</th><th>الرصيد</th><th>الكمية المطلوبة</th><th>السعر</th><th>ملاحظات</th></tr>
         ${chosen.map((x, i) => `<tr><td>${i + 1}</td><td>${uiEsc(x.name)}</td><td>${uiEsc(x.unit)}</td><td>${x.reason === 'none' ? 'مش موجودة' : uiEsc(Number(x.quantity))}</td>
-            <td>${x.want ? uiEsc(x.want) : ''}</td><td></td><td></td></tr>`).join('')}</table>`, '@page { size: A4; margin: 12mm; } body { font-size: 13px; }');
+            <td>${x.want ? uiQtyText(x.want, invIng(x.ingredient_id)).replace(/<[^>]+>/g, '') : ''}</td><td></td><td></td></tr>`).join('')}</table>`, '@page { size: A4; margin: 12mm; } body { font-size: 13px; }');
 }
