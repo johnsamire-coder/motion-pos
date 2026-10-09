@@ -1,6 +1,9 @@
 // js/config.js - الإعدادات المركزية
 // المحل: الصفحة جاية من كمبيوتر المحل (http) فبتكلم قاعدة بيانات المحل. النت: الموقع (https) بيكلم قاعدة بيانات النت.
 const MOTION_LOCAL = location.protocol === 'http:';
+// الموقع القديم بيحوّل لوحده على سيرفر الشركة (نفس الصفحة ونفس كود الطاولة)
+const MOTION_MOVED_TO = 'pos.jssolutions-eg.com';
+if (location.hostname === 'motion-pos.vercel.app') location.replace('https://' + MOTION_MOVED_TO + location.pathname + location.search + location.hash);
 // كل موقع على النت ليه قاعدة بياناته. على كمبيوتر المحل، أداة المحل بتكتب اسم موقع العميل مكان location.hostname في السطر اللي جاي.
 const MOTION_SITE_HOST = location.hostname;
 const MOTION_SITES = {
