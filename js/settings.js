@@ -36,6 +36,7 @@ async function initSettingsModule() {
 }
 
 function switchSettingsSection(section) {
+    try { sessionStorage.setItem('motionpos_settab', section); } catch (e) { /* private mode */ }
     document.querySelectorAll('.set-section').forEach(el => el.classList.add('hidden'));
     const targetEl = document.getElementById('set-section-' + section);
     if (targetEl) targetEl.classList.remove('hidden');

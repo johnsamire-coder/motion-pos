@@ -97,8 +97,25 @@ async function motionApplyLogin(loginRes, quiet = false) {
 
             if (typeof applyTabPermissions === 'function') await applyTabPermissions();
             if (typeof initPOSModule === 'function' && (typeof canOpenTab !== 'function' || canOpenTab('pos'))) initPOSModule();
+            if (quiet) motionRestoreTab(motionSavedTab);
     } catch (err) {
         console.error('Login apply error:', err);
+    }
+}
+
+// بعد التحديث (F5): يرجع لنفس الشاشة (ونفس قسم الإعدادات) اللي كان واقف فيها، لو لسه مسموحله
+// اتقري أول ما الصفحة تفتح، قبل ما الدخول يفتح الشاشة الأولى ويكتب فوقها
+let motionSavedTab = null, motionSavedSec = null;
+try { motionSavedTab = sessionStorage.getItem('motionpos_tab'); motionSavedSec = sessionStorage.getItem('motionpos_settab'); } catch (e) { /* private mode */ }
+function motionRestoreTab(tab) {
+    const sec = motionSavedSec;
+    if (!tab || typeof switchMainTab !== 'function' || (typeof canOpenTab === 'function' && !canOpenTab(tab))) return;
+    switchMainTab(tab);
+    if (tab === 'settings' && sec && typeof switchSettingsSection === 'function') {
+        let n = 0;
+        const t = setInterval(() => {
+            if (document.getElementById('btn-set-' + sec) || ++n > 40) { clearInterval(t); if (document.getElementById('btn-set-' + sec)) switchSettingsSection(sec); }
+        }, 150);
     }
 }
 
@@ -113,11 +130,21 @@ async function motionResumeLogin() {
     } catch (e) {
         staffSessionToken = null;
         try { sessionStorage.removeItem('motionpos_login'); } catch (x) { /* ignore */ }
+        document.getElementById('motion-resume-style')?.remove();
         return;
     }
     await motionApplyLogin(saved, true);
+    document.getElementById('motion-resume-style')?.remove();
 }
 window.addEventListener('DOMContentLoaded', motionResumeLogin);
+// شاشة الرقم السري متظهرش لحظة وهو بيرجع لوحده بعد التحديث
+try {
+    if (sessionStorage.getItem('motionpos_login')) {
+        const st = document.createElement('style'); st.id = 'motion-resume-style'; st.textContent = '#login-screen{visibility:hidden}';
+        document.head.appendChild(st);
+        setTimeout(() => { const x = document.getElementById('motion-resume-style'); if (x) x.remove(); }, 8000);
+    }
+} catch (e) { /* ignore */ }
 
 function logout() {
     if (typeof paymentSubmissionInProgress !== 'undefined' && paymentSubmissionInProgress) {
@@ -128,7 +155,7 @@ function logout() {
         showToast('جارٍ حفظ الطلب، انتظر حتى تظهر نتيجة العملية قبل تسجيل الخروج.', 'error');
         return;
     }
-    try { sessionStorage.removeItem('motionpos_login'); } catch (e) { /* ignore */ }
+    try { sessionStorage.removeItem('motionpos_login'); sessionStorage.removeItem('motionpos_tab'); sessionStorage.removeItem('motionpos_settab'); } catch (e) { /* ignore */ }
     if (staffSessionToken) {
         _supabase.rpc('staff_logout', { p_token: staffSessionToken }).then(() => {}, () => {});
     }

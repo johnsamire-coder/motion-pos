@@ -420,6 +420,7 @@
             });
             const activeEl = document.getElementById('view-' + targetTab + '-workspace');
             if (activeEl) activeEl.classList.remove('hidden');
+            try { sessionStorage.setItem('motionpos_tab', targetTab); } catch (e) { /* private mode */ }
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
                 const hidden = btn.classList.contains('hidden');
                 btn.className = "main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200" + (hidden ? ' hidden' : '');
