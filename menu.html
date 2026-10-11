@@ -190,7 +190,8 @@
             .footer { padding-bottom:24px; }
         }
         @media (min-width: 1300px) { .product-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-        @media (min-width: 900px) and (max-width: 1120px) { .menu-layout.with-cart { grid-template-columns:150px minmax(0,1fr) 240px; gap:12px; padding:16px; } .menu-layout.browse-only { grid-template-columns:150px minmax(0,1fr); gap:12px; padding:16px; } .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .item .ph { height:125px; } }
+        @media (min-width: 900px) and (max-width: 1120px) { .menu-layout.with-cart { grid-template-columns:140px minmax(0,1fr) 205px; gap:10px; padding:12px; } .menu-layout.browse-only { grid-template-columns:140px minmax(0,1fr); gap:10px; padding:12px; } .product-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; } .item .ph { height:112px; } .item { padding:7px; } }
+        @media (min-width: 900px) and (max-width: 980px) { .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     </style>
 </head>
 <body>
@@ -368,7 +369,7 @@
             imgs.forEach(i => { if (imgCache[i.dataset.img]) i.src = imgCache[i.dataset.img]; else io.observe(i); });
         }
 
-        function goCat(id) { const s = document.getElementById('sec-' + id); if (s) window.scrollTo({ top: s.getBoundingClientRect().top + window.scrollY - 118, behavior: 'smooth' }); }
+        function goCat(id) { const s = document.getElementById('sec-' + id); const offset = window.matchMedia('(min-width: 900px)').matches ? 170 : 118; if (s) window.scrollTo({ top: s.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' }); }
         function spyCats() {
             const secs = [...document.querySelectorAll('[data-sec]')];
             const onScroll = () => {
