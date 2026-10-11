@@ -99,6 +99,98 @@
         .center-msg { text-align: center; padding: 90px 20px; font-weight: 800; color: var(--ink2); }
         .err { color: var(--bad); font-size: 13px; font-weight: 800; margin-top: 6px; display: none; }
         .tag-off { background: #fdecec; color: var(--bad); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 800; margin: 10px 14px 0; text-align: center; }
+
+        :root { --bg:#fff9f5; --card:#fff; --ink:#35241f; --ink2:#806d66; --muted:#aa9890; --line:#f0e1db; --brand:#be705c; --brand2:#d58973; --gold:#d58973; --gold-soft:#f8e7df; --shadow:0 7px 22px rgba(80,45,33,.07); }
+        .side-nav, .cart-panel { display:none; }
+        .cat-icon { display:none; }
+        .item .ph { background:linear-gradient(135deg,#f8e9e1,#f2ddd4); color:var(--brand); }
+        .photo-fallback { font-size:40px; filter:drop-shadow(0 2px 4px rgba(90,55,40,.12)); }
+        .tax-note { text-align:center; padding:4px 14px; }
+        @media (min-width: 900px) {
+            body { padding-bottom:24px; background:#fffaf7; }
+            .hero { position:sticky; top:0; z-index:25; padding:10px 22px; color:var(--ink); background:rgba(255,255,255,.96); border-bottom:1px solid var(--line); box-shadow:0 3px 15px rgba(60,35,25,.04); backdrop-filter:blur(14px); }
+            .hero::after { display:none; }
+            .hero .wrap { max-width:1500px; display:flex; align-items:center; gap:14px; }
+            .hero .logo { width:48px; height:48px; border-radius:15px; padding:3px; box-shadow:none; border:1px solid var(--line); }
+            .hero-brand { min-width:0; }
+            .hero h1 { margin:0; font-size:20px; color:var(--ink); }
+            .hero .sub { color:var(--ink2); }
+            .hero .chip { color:var(--brand); background:#fff4ef; border-color:#f2d9cf; }
+            .hero .welcome { display:none; }
+            .modebar { margin:0 0 0 auto; max-width:320px; }
+            .modebtn { color:var(--ink2); border-color:var(--line); background:#fff; padding:8px 10px; font-size:12px; }
+            .modebtn.on { color:#fff; background:var(--brand); border-color:var(--brand); }
+            .cats { position:sticky; top:68px; z-index:20; margin:0; border-radius:0; background:rgba(255,250,247,.96); border-bottom:1px solid var(--line); }
+            .cats .wrap { max-width:1500px; display:flex; align-items:center; gap:18px; padding:0 22px; }
+            .cats .row { flex:1; gap:10px; padding:12px 0; overflow-x:auto; }
+            .cat { min-width:112px; height:78px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; white-space:normal; border-radius:15px; padding:8px 12px; background:#fff; border-color:var(--line); color:var(--ink2); box-shadow:0 2px 9px rgba(70,45,34,.04); }
+            .cat-icon { display:block; font-size:24px; line-height:1; }
+            .cat.on { color:#fff; background:var(--brand); border-color:var(--brand); }
+            .search { width:min(340px,32%); flex:none; margin:0; border-radius:999px; padding:9px 14px; }
+            .menu-layout { max-width:1500px; margin:0 auto; padding:22px; display:grid; gap:20px; align-items:start; }
+            .menu-layout.with-cart { grid-template-columns:minmax(155px,190px) minmax(0,1fr) minmax(245px,300px); }
+            .menu-layout.browse-only { grid-template-columns:minmax(155px,190px) minmax(0,1fr); }
+            .side-nav { display:block; position:sticky; top:158px; align-self:start; background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px 12px; box-shadow:var(--shadow); }
+            .side-title { display:flex; align-items:center; gap:10px; padding:4px 8px 12px; border-bottom:1px solid #f5eae5; margin-bottom:6px; }
+            .side-title>span { width:38px; height:38px; display:grid; place-items:center; color:var(--brand); background:#fff1eb; border-radius:13px; font-size:21px; }
+            .side-title strong,.side-title small { display:block; }
+            .side-title strong { font-size:14px; }
+            .side-title small { color:var(--muted); font-size:11px; font-weight:700; }
+            .side-link { width:100%; display:flex; align-items:center; gap:9px; padding:10px 8px; background:transparent; border-bottom:1px solid #f7efeb; text-align:right; color:var(--ink); font-weight:800; font-size:13px; border-radius:11px; }
+            .side-link:hover,.side-link:focus-visible { background:#fff1eb; color:var(--brand); }
+            .side-icon { width:28px; text-align:center; font-size:19px; }
+            .side-name { flex:1; }
+            .side-link b { color:var(--brand); font-size:19px; }
+            .side-promo { display:flex; flex-direction:column; align-items:flex-start; gap:4px; margin:14px 2px 0; padding:14px; border-radius:16px; color:#694437; background:linear-gradient(145deg,#f7e6de,#fff6f0); }
+            .side-promo span { font-size:23px; }
+            .side-promo strong { font-size:13px; }
+            .side-promo small { color:var(--ink2); font-size:11px; }
+            .menu-main { min-width:0; }
+            section.menu-sec { padding:0 0 8px; scroll-margin-top:175px; }
+            section.menu-sec h2 { margin:4px 2px 13px; font-size:19px; gap:8px; }
+            section.menu-sec h2::before { display:none; }
+            .section-icon { display:inline-grid; place-items:center; width:32px; height:32px; border-radius:11px; color:var(--brand); background:#fff0e9; font-size:19px; }
+            .product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); gap:12px; }
+            .item { min-width:0; display:flex; flex-direction:column; gap:0; margin:0; padding:9px; border-radius:18px; transition:transform .18s ease,box-shadow .18s ease; }
+            .item:hover { transform:translateY(-2px); box-shadow:0 11px 24px rgba(80,45,33,.12); }
+            .item .ph { width:100%; height:150px; border-radius:13px; }
+            .item .ph img { width:100%; height:100%; object-fit:cover; }
+            .item .info { padding:8px 2px 1px; min-height:100px; }
+            .item .name { font-size:14px; line-height:1.45; }
+            .item .desc { font-size:11px; -webkit-line-clamp:2; }
+            .item .foot { padding-top:8px; }
+            .price { color:#a95443; font-size:15px; }
+            .add { background:var(--brand); border-radius:999px; height:34px; min-width:42px; }
+            .cart-panel { display:block; position:sticky; top:158px; max-height:calc(100vh - 176px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:20px; padding:15px; box-shadow:var(--shadow); }
+            .cart-heading { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:1px solid #f3e9e4; }
+            .cart-heading>div { display:flex; align-items:center; gap:8px; font-size:17px; }
+            .cart-heading>div span { font-size:21px; color:var(--brand); }
+            .cart-count { min-width:26px; padding:2px 8px; border-radius:999px; text-align:center; font-weight:900; color:#fff; background:var(--brand); }
+            .cart-items { padding-top:4px; }
+            .cart-item { display:flex; align-items:center; gap:9px; padding:11px 0; border-bottom:1px solid #f3e9e4; }
+            .cart-thumb { width:54px; height:54px; flex:none; display:grid; place-items:center; overflow:hidden; border-radius:12px; color:var(--brand); background:#f8e8e0; font-size:23px; }
+            .cart-thumb img { width:100%; height:100%; object-fit:cover; }
+            .cart-item-info { flex:1; min-width:0; }
+            .cart-item-info>strong { display:block; font-size:12px; line-height:1.4; }
+            .cart-item-info>small { display:block; color:var(--ink2); font-size:10px; }
+            .cart-item-foot { display:flex; justify-content:space-between; align-items:center; gap:4px; margin-top:6px; }
+            .cart-price { color:#9f4c3d; font-size:11px; font-weight:900; }
+            .mini-qty { gap:2px; padding:2px; border-radius:10px; }
+            .mini-qty button { width:25px; height:25px; border-radius:7px; font-size:15px; }
+            .mini-qty b { min-width:20px; font-size:12px; }
+            .cart-total { display:flex; justify-content:space-between; align-items:center; padding:15px 0 4px; font-size:14px; font-weight:800; }
+            .cart-total strong { color:#9f4c3d; font-size:16px; }
+            .cart-checkout { margin-top:12px; border-radius:999px; background:var(--brand); }
+            .cart-checkout span { float:left; font-size:20px; line-height:1; }
+            .cart-empty { min-height:140px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; color:var(--ink2); text-align:center; }
+            .cart-empty span { font-size:34px; }
+            .cart-empty strong { color:var(--ink); font-size:13px; }
+            .cart-empty small { font-size:11px; }
+            .bottom { display:none !important; }
+            .footer { padding-bottom:24px; }
+        }
+        @media (min-width: 1300px) { .product-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+        @media (min-width: 900px) and (max-width: 1120px) { .menu-layout.with-cart { grid-template-columns:150px minmax(0,1fr) 240px; gap:12px; padding:16px; } .menu-layout.browse-only { grid-template-columns:150px minmax(0,1fr); gap:12px; padding:16px; } .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .item .ph { height:125px; } }
     </style>
 </head>
 <body>
@@ -181,28 +273,37 @@
             app.innerHTML = `
                 <header class="hero"><div class="wrap" style="position:relative;z-index:1">
                     ${M.logo ? `<img class="logo" src="${esc(M.logo)}" alt="">` : ''}
-                    <h1>${esc(M.company_name || '')}</h1>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub">${esc(M.branch)}</span>` : ''}</div>
+                    <div class="hero-brand"><h1>${esc(M.company_name || '')}</h1>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub">${esc(M.branch)}</span>` : ''}</div></div>
                     ${M.welcome ? `<p class="welcome">${esc(M.welcome)}</p>` : ''}
                     ${M.ordering ? `<div class="modebar"><button class="modebtn ${mode === 'order' ? 'on' : ''}" onclick="setMode('order')">🛒 هطلب بنفسي</button>
                         <button class="modebtn ${mode !== 'order' ? 'on' : ''}" onclick="setMode('browse')">👀 بتفرّج بس</button></div>` : ''}
                 </div></header>
                 <div class="cats"><div class="wrap">
-                    <div class="row" id="cat-row">${cats.map((c, i) => `<button class="cat ${i === 0 ? 'on' : ''}" data-cat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')">${esc(c.name)}</button>`).join('')}</div>
+                    <div class="row" id="cat-row">${cats.map((c, i) => `<button class="cat ${i === 0 ? 'on' : ''}" data-cat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')"><span class="cat-icon">${categoryEmoji(c.name)}</span><span>${esc(c.name)}</span></button>`).join('')}</div>
                     <div class="search"><span>🔍</span><input id="q" placeholder="دوّر على اللي نفسك فيه" oninput="filter(this.value)"></div>
                 </div></div>
-                <div class="wrap">
-                    ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الموبايل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.</div>' : ''}
-                    ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2>${esc(c.name)}</h2>
-                        ${(c.products || []).map(itemHtml).join('')}</section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
-                    ${M.show_prices && taxNote ? `<p class="muted" style="text-align:center;padding:4px 14px">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
-                    ${payInfoHtml()}
-                    <div class="footer">
-                        ${M.facebook_url ? `<a href="${esc(M.facebook_url)}" target="_blank" rel="noopener">📘 فيسبوك</a>` : ''}
-                        ${M.instagram_url ? `<a href="${esc(M.instagram_url)}" target="_blank" rel="noopener">📸 إنستجرام</a>` : ''}
-                        ${M.feedback_token ? `<a href="feedback.html?b=${esc(M.feedback_token)}">💬 رأيك يهمنا</a>` : ''}
-                        ${M.phone ? `<div style="margin-top:8px">☎️ ${esc(M.phone)}</div>` : ''}
-                    </div>
+                <div class="menu-layout wrap ${canOrder() ? 'with-cart' : 'browse-only'}">
+                    <aside class="side-nav" aria-label="أقسام المنيو">
+                        <div class="side-title"><span>☕</span><div><strong>الأقسام</strong><small>اختار اللي نفسك فيه</small></div></div>
+                        <nav>${cats.map(c => `<button class="side-link" data-cat="${esc(c.id)}" onclick="goCat(' ${esc(c.id)} '.trim())"><span class="side-icon">${categoryEmoji(c.name)}</span><span class="side-name">${esc(c.name)}</span><b>‹</b></button>`).join('')}</nav>
+                        <div class="side-promo"><span>☕</span><strong>استمتع بكل رشفة</strong><small>نحضّرها لك بحب</small></div>
+                    </aside>
+                    <main class="menu-main">
+                        ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الموبايل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.</div>' : ''}
+                        ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2><span class="section-icon">${categoryEmoji(c.name)}</span>${esc(c.name)}</h2>
+                            <div class="product-grid">${(c.products || []).map(itemHtml).join('')}</div></section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
+                        ${M.show_prices && taxNote ? `<p class="muted tax-note">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
+                        ${payInfoHtml()}
+                        <div class="footer">
+                            ${M.facebook_url ? `<a href="${esc(M.facebook_url)}" target="_blank" rel="noopener">📘 فيسبوك</a>` : ''}
+                            ${M.instagram_url ? `<a href="${esc(M.instagram_url)}" target="_blank" rel="noopener">📸 إنستجرام</a>` : ''}
+                            ${M.feedback_token ? `<a href="feedback.html?b=${esc(M.feedback_token)}">💬 رأيك يهمنا</a>` : ''}
+                            ${M.phone ? `<div style="margin-top:8px">☎️ ${esc(M.phone)}</div>` : ''}
+                        </div>
+                    </main>
+                    ${canOrder() ? `<aside class="cart-panel" id="cart-panel"><div class="cart-heading"><div><span>🛒</span><strong>سلة الطلبات</strong></div><span class="cart-count">${cartCount()}</span></div>
+                        <div class="cart-items">${cartPanelHtml()}</div></aside>` : ''}
                 </div>`;
             renderBottom();
             observeImages();
@@ -231,12 +332,25 @@
 
         function itemHtml(p) {
             const inCart = cart.filter(l => l.product_id === p.id).reduce((s, l) => s + l.qty, 0);
-            return `<div class="item" data-name="${esc(p.name)}" onclick="openItem('${esc(p.id)}')">
-                <div class="ph">${p.has_image ? `<img data-img="${esc(p.id)}" alt="">` : esc(String(p.name).trim().charAt(0))}</div>
+            return `<article class="item" data-name="${esc(p.name)}" onclick="openItem('${esc(p.id)}')">
+                <div class="ph">${p.has_image ? `<img data-img="${esc(p.id)}" alt="">` : `<span class="photo-fallback">${categoryEmoji(p.name)}</span>`}</div>
                 <div class="info"><div class="name">${esc(p.name)}</div>
                     ${p.description ? `<div class="desc">${esc(p.description)}</div>` : ''}
                     <div class="foot">${M.show_prices ? `<span class="price">${money(p.price)} <small>${esc(cur())}</small></span>` : '<span></span>'}
-                        ${canOrder() ? `<button class="add ${inCart ? 'incart' : ''}" onclick="event.stopPropagation(); openItem('${esc(p.id)}')">${inCart ? '✓ ' + inCart : '+'}</button>` : ''}</div></div></div>`;
+                        ${canOrder() ? `<button class="add ${inCart ? 'incart' : ''}" onclick="event.stopPropagation(); openItem('${esc(p.id)}')">${inCart ? '✓ ' + inCart : '+'}</button>` : ''}</div></div></article>`;
+        }
+        function categoryEmoji(name) {
+            const s = String(name || '').toLowerCase();
+            if (/قهوة|اسبريسو|اسبرسو|كابتشينو|لاتيه|موكا|coffee/.test(s)) return '☕';
+            if (/شاي|أعشاب|اعشاب|سحلب/.test(s)) return '🍵';
+            if (/شيشة|معسل/.test(s)) return '💨';
+            if (/حلويات|كيك|وافل|حلو|تشيز|مولتن|أم علي/.test(s)) return '🍰';
+            if (/مخبوزات|كرواسون|معجنات/.test(s)) return '🥐';
+            if (/وجبات|ساندوتش|برجر|كفتة|ستريبس|بانيه|سوسيس/.test(s)) return '🥪';
+            if (/بطاطس|إضافات|اضافات|مخلل|سلطة/.test(s)) return '🍟';
+            if (/إفطار|افطار|بيض/.test(s)) return '🍳';
+            if (/مشروبات|عصير|سموذي|ميلك|فرابيه|فراولة|مانجو|برتقال|ليمون|مياه|بيبسي|سفن|ميرندا/.test(s)) return '🥤';
+            return '🍽️';
         }
 
         function observeImages() {
@@ -274,6 +388,25 @@
             document.querySelectorAll('[data-sec]').forEach(s => { s.style.display = [...s.querySelectorAll('.item')].some(i => i.style.display !== 'none') ? '' : 'none'; });
         }
 
+        function cartPanelHtml() {
+            if (!cart.length) return '<div class="cart-empty"><span>🛍️</span><strong>سلتك لسه فاضية</strong><small>اختار حاجة من المنيو وهتظهر هنا</small></div>';
+            return cart.map((l, i) => {
+                const p = products[l.product_id];
+                if (!p) return '';
+                const mods = l.mods.map(id => modById(p, id)?.name).filter(Boolean);
+                return `<div class="cart-item"><div class="cart-thumb">${p.has_image ? `<img data-img="${esc(p.id)}" alt="">` : categoryEmoji(p.name)}</div>
+                    <div class="cart-item-info"><strong>${esc(p.name)}</strong>${mods.length ? `<small>${esc(mods.join('، '))}</small>` : ''}${l.note ? `<small>📝 ${esc(l.note)}</small>` : ''}
+                        <div class="cart-item-foot"><span class="cart-price">${M.show_prices ? money(lineUnit(l) * l.qty) + ' ' + esc(cur()) : ''}</span>
+                            <div class="qty mini-qty"><button onclick="event.stopPropagation(); inlineCartQty(${i},-1)">−</button><b>${l.qty}</b><button onclick="event.stopPropagation(); inlineCartQty(${i},1)">+</button></div></div></div></div>`;
+            }).join('') + (M.show_prices ? `<div class="cart-total"><span>الإجمالي</span><strong>${money(cartTotal())} ${esc(cur())}</strong></div>` : '') + `<button class="primary cart-checkout" onclick="openCart()">إتمام الطلب <span>›</span></button>`;
+        }
+        function inlineCartQty(i, d) {
+            if (!cart[i]) return;
+            cart[i].qty += d;
+            if (cart[i].qty <= 0) cart.splice(i, 1);
+            saveCart();
+            render();
+        }
         function cartCount() { return cart.reduce((s, l) => s + l.qty, 0); }
         function lineUnit(l) { const p = products[l.product_id]; return (Number(p.price) || 0) + l.mods.reduce((s, id) => s + (Number(modById(p, id)?.price) || 0), 0); }
         function cartTotal() { return cart.reduce((s, l) => s + lineUnit(l) * l.qty, 0); }
