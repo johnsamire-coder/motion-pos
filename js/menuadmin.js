@@ -94,7 +94,33 @@ async function renderMenuAdmin() {
         ${ma.cat !== 'all' && ma.cat !== 'norecipe' && ma.cat !== 'noqty' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم ده', `maEditCategory('${ma.cat}')`, 'gray')}
             ${(cats.find(c => c.id === ma.cat) || {}).products ? '' : uiBtn('🗑️ مسح القسم', `maDeleteCategory('${ma.cat}')`, 'red')}</div>` : ''}
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards || '<p class="text-center text-slate-400 font-bold text-xs py-8 sm:col-span-2 xl:col-span-3">مفيش أصناف هنا. دوس "➕ صنف جديد".</p>'}</div>`,
-        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')}`);
+        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')} ${uiBtn('📤 تصدير أسماء الأصناف', 'maExportProducts()', 'gray')}`);
+}
+
+function maExportProducts() {
+    const products = ma.data?.products || [];
+    if (!products.length) { showToast('مفيش أصناف للتصدير'); return; }
+    const categories = Object.fromEntries((ma.data.categories || []).map(c => [c.id, c.name]));
+    const csvCell = value => {
+        let text = String(value ?? '');
+        if (/^[\t\r\n ]*[=+\-@]/.test(text)) text = "'" + text;
+        return '"' + text.replace(/"/g, '""') + '"';
+    };
+    const rows = [
+        ['معرّف الصنف', 'القسم', 'اسم الصنف', 'الحالة', 'ظاهر في منيو QR'],
+        ...products.map(p => [p.id, categories[p.category_id] || '', p.name, p.is_available ? 'متاح' : 'موقوف', p.show_in_menu ? 'نعم' : 'لا'])
+    ];
+    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'motion-pos-products.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('تم تصدير ' + products.length + ' صنف');
 }
 
 async function maEditCategory(id) {
