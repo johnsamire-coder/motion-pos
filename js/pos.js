@@ -681,10 +681,18 @@ async function pickCancelReason(title, type, pinLabel) {
     }
     let list = posState.cancelReasons.filter(r => !type || !r.reason_type || r.reason_type === type);
     if (!list.length) list = posState.cancelReasons;
-    const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true }];
+    const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' }];
     if (pinLabel) fields.push({ key: 'pin', label: pinLabel, type: 'pin', required: true });
     const v = await uiForm(title, fields, { ok: 'تأكيد', danger: true });
     if (!v) return null;
+    // سبب مكتوب بإيد المدير: يتسجل في جدول الأسباب الأول (بنفس رقم المدير من الشاشة) وبعدين يتستخدم في الإلغاء
+    if (v.reason_new) {
+        const created = await serverRpc('create_cancel_reason_secure', {
+            p_reason: v.reason, p_reason_type: type || 'void_item', p_manager_pin: String(v.pin || '').trim()
+        });
+        if (!created || !created.ok) { showToast(serverReasonMessage(created, 'تعذر تسجيل السبب الجديد'), 'error'); return null; }
+        return { id: created.id, reason: v.reason, reason_type: type || 'void_item', pin: v.pin };
+    }
     const reason = list.find(r => String(r.id) === String(v.reason));
     return reason ? { ...reason, pin: v.pin } : null;
 }
@@ -1322,11 +1330,18 @@ async function refundOrderPrompt() {
     const v = await uiForm('مرتجع كامل لطلب مدفوع', [
         { type: 'note', label: 'الفلوس هترجع للزبون، والقيد هيتعكس.' },
         { key: 'num', label: 'رقم الطلب (زي 1005)', required: true },
-        { key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true },
+        { key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' },
         { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'مرتجع', danger: true });
     if (!v) return;
     const normalized = v.num.startsWith('#') ? v.num : '#' + v.num;
-    const reason = { id: v.reason };
+    let reason = { id: v.reason };
+    if (v.reason_new) {
+        const created = await serverRpc('create_cancel_reason_secure', {
+            p_reason: v.reason, p_reason_type: 'return', p_manager_pin: String(v.pin || '').trim()
+        });
+        if (!created || !created.ok) { showToast(serverReasonMessage(created, 'تعذر تسجيل السبب الجديد'), 'error'); return; }
+        reason = { id: created.id, reason: v.reason };
+    }
     const managerPin = v.pin;
     try {
         const res = await serverRpc('refund_order_secure', {
