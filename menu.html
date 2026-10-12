@@ -42,19 +42,47 @@
         .search { margin: 0 14px 10px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
         .search input { border: 0; outline: 0; flex: 1; font-size: 15px; background: transparent; }
         section.menu-sec { padding: 6px 14px 4px; scroll-margin-top: 120px; }
-        section.menu-sec h2 { font-size: 19px; font-weight: 900; margin: 16px 2px 10px; display: flex; align-items: center; gap: 8px; }
-        section.menu-sec h2::before { content: ''; width: 6px; height: 20px; border-radius: 4px; background: var(--gold); }
-        .item { display: flex; gap: 12px; background: var(--card); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow); border: 1px solid #f1ebe2; align-items: stretch; }
-        .item .ph { width: 92px; height: 92px; border-radius: 14px; flex: none; background: linear-gradient(135deg, var(--gold-soft), #efe2cc); display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 900; color: var(--gold); overflow: hidden; }
+        section.menu-sec h2 { font-size: 19px; font-weight: 900; margin: 20px 2px 4px; text-align: center; }
+        section.menu-sec h2 small { display: block; font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: 1px; margin-top: 2px; }
+        section.menu-sec h2::after { content: ''; display: block; width: 44px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, transparent, var(--gold), transparent); margin: 6px auto 10px; }
+        .items { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        @media (min-width: 560px) { .items { grid-template-columns: repeat(3, 1fr); } }
+        .shell { max-width: 1400px; margin: 0 auto; }
+        .side-cats, .side-cart { display: none; }
+        .scat { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 12px; background: transparent; color: var(--ink2); font-weight: 800; font-size: 14px; text-align: right; }
+        .scat .ic { font-size: 20px; flex: none; }
+        .scat.on { background: var(--brand); color: #fff; }
+        .scat-title { font-weight: 900; font-size: 15px; color: var(--brand); margin: 2px 2px 10px; }
+        .scline { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+        .scline .ph { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, var(--gold-soft), #efe2cc); color: var(--gold); font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 19px; overflow: hidden; flex: none; }
+        .scline .ph img { width: 100%; height: 100%; object-fit: cover; }
+        .scline .n { flex: 1; min-width: 0; font-weight: 800; font-size: 13px; }
+        .scline .n small { display: block; color: var(--ink2); font-weight: 700; }
+        .scline .rm { background: none; color: var(--bad); font-size: 14px; padding: 2px 4px; flex: none; }
+        .side-cart h3 { margin: 0 0 8px; font-size: 17px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+        .side-cart .tot { display: flex; justify-content: space-between; font-weight: 900; font-size: 16px; padding: 12px 0 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+        .side-empty { text-align: center; color: var(--ink2); font-weight: 700; font-size: 13px; padding: 16px 4px; line-height: 1.9; }
+        @media (min-width: 900px) {
+            body { padding-bottom: 24px; }
+            .shell { display: grid; grid-template-columns: 230px minmax(0, 1fr) 300px; gap: 16px; align-items: start; padding: 0 18px 20px; }
+            .shell .wrap { max-width: none; }
+            .side-cats, .side-cart { display: block; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
+            .bottom { display: none; }
+            .items { grid-template-columns: repeat(4, 1fr); }
+            .sheet { max-width: 540px; margin-inline: auto; }
+        }
+        @media (min-width: 1280px) { .items { grid-template-columns: repeat(5, 1fr); } }
+        .item { background: var(--card); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow); border: 1px solid #f1ebe2; display: flex; flex-direction: column; }
+        .item .ph { width: 100%; aspect-ratio: 1 / 1; border-radius: 14px; flex: none; background: linear-gradient(135deg, var(--gold-soft), #efe2cc); display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 900; color: var(--gold); overflow: hidden; }
         .item .ph img { width: 100%; height: 100%; object-fit: cover; }
-        .item .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-        .item .name { font-weight: 900; font-size: 16px; line-height: 1.4; }
-        .item .desc { color: var(--ink2); font-size: 13px; font-weight: 600; line-height: 1.6; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .item .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 6px; }
+        .item .info { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: center; }
+        .item .name { font-weight: 900; font-size: 15px; line-height: 1.5; margin-top: 8px; }
+        .item .desc { color: var(--ink2); font-size: 12px; font-weight: 600; line-height: 1.6; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .item .foot { margin-top: auto; padding-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .price { font-weight: 900; font-size: 16px; color: var(--brand); }
         .price small { font-size: 12px; color: var(--ink2); font-weight: 700; }
-        .add { background: var(--brand); color: #fff; border-radius: 12px; min-width: 40px; height: 36px; font-size: 20px; font-weight: 900; padding: 0 12px; }
-        .incart { background: var(--gold); color: #1c1410; font-size: 14px; }
+        .add { background: linear-gradient(135deg, var(--brand2), var(--brand)); color: #fff; border-radius: 999px; width: 100%; height: 38px; font-size: 14px; font-weight: 900; padding: 0 12px; box-shadow: 0 4px 12px rgba(28,20,16,.18); }
+        .incart { background: linear-gradient(135deg, var(--gold), #a9743a); color: #1c1410; font-size: 14px; }
         .bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(247,242,234,0), var(--bg) 30%); }
         .bottom .inner { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; }
         .cartbar { flex: 1; background: var(--brand); color: #fff; border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 15px; box-shadow: 0 10px 30px rgba(28,20,16,.35); }
@@ -191,10 +219,12 @@
                     <div class="row" id="cat-row">${cats.map((c, i) => `<button class="cat ${i === 0 ? 'on' : ''}" data-cat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')">${esc(c.name)}</button>`).join('')}</div>
                     <div class="search"><span>🔍</span><input id="q" placeholder="دوّر على اللي نفسك فيه" oninput="filter(this.value)"></div>
                 </div></div>
+                <div class="shell">
+                <aside class="side-cats"><div class="scat-title">🗂️ الأقسام</div>${cats.map((c, i) => `<button class="scat ${i === 0 ? 'on' : ''}" data-scat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')"><span class="ic">${iconFor(c.name)}</span><span>${esc(c.name)}</span></button>`).join('')}</aside>
                 <div class="wrap">
                     ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الموبايل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.</div>' : ''}
                     ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2>${esc(c.name)}</h2>
-                        ${(c.products || []).map(itemHtml).join('')}</section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
+                        <div class="items">${(c.products || []).map(itemHtml).join('')}</div></section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
                     ${M.show_prices && taxNote ? `<p class="muted" style="text-align:center;padding:4px 14px">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
                     ${payInfoHtml()}
                     <div class="footer">
@@ -203,7 +233,10 @@
                         ${M.feedback_token ? `<a href="feedback.html?b=${esc(M.feedback_token)}">💬 رأيك يهمنا</a>` : ''}
                         ${M.phone ? `<div style="margin-top:8px">☎️ ${esc(M.phone)}</div>` : ''}
                     </div>
+                </div>
+                <aside class="side-cart" id="side-cart"></aside>
                 </div>`;
+            renderCartSide();
             renderBottom();
             observeImages();
             spyCats();
@@ -236,7 +269,7 @@
                 <div class="info"><div class="name">${esc(p.name)}</div>
                     ${p.description ? `<div class="desc">${esc(p.description)}</div>` : ''}
                     <div class="foot">${M.show_prices ? `<span class="price">${money(p.price)} <small>${esc(cur())}</small></span>` : '<span></span>'}
-                        ${canOrder() ? `<button class="add ${inCart ? 'incart' : ''}" onclick="event.stopPropagation(); openItem('${esc(p.id)}')">${inCart ? '✓ ' + inCart : '+'}</button>` : ''}</div></div></div>`;
+                        ${canOrder() ? `<button class="add ${inCart ? 'incart' : ''}" onclick="event.stopPropagation(); openItem('${esc(p.id)}')">${inCart ? '✓ ' + inCart + ' في الطلب' : 'إضافة +'}</button>` : ''}</div></div></div>`;
         }
 
         function observeImages() {
@@ -265,6 +298,11 @@
                     if (on && !b.classList.contains('on')) b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
                     b.classList.toggle('on', on);
                 });
+                document.querySelectorAll('.scat').forEach(b => {
+                    const on = b.dataset.scat === curId;
+                    if (on && !b.classList.contains('on')) b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+                    b.classList.toggle('on', on);
+                });
             };
             window.onscroll = onScroll;
         }
@@ -273,6 +311,58 @@
             document.querySelectorAll('.item').forEach(el => { el.style.display = !q || el.dataset.name.includes(q) ? '' : 'none'; });
             document.querySelectorAll('[data-sec]').forEach(s => { s.style.display = [...s.querySelectorAll('.item')].some(i => i.style.display !== 'none') ? '' : 'none'; });
         }
+
+        // ---------------- شاشة كبيرة: قايمة الأقسام يمين + سلة الطلبات شمال
+        function isWide() { return window.matchMedia('(min-width: 900px)').matches; }
+        function iconFor(name) {
+            const s = String(name || '');
+            if (/شيشة|معسل/.test(s)) return '💨';
+            if (/أيس|ايس|آيس|مثلج|بارد/.test(s)) return '🧊';
+            if (/شاي|أعشاب|اعشاب|سحلب|كرك|ينسون|نعناع/.test(s)) return '🫖';
+            if (/قهوة|كوفي|إسبريسو|اسبريسو|أمريكانو|امريكانو|لاتيه|كابتشينو|موكا|فلات وايت/.test(s)) return '☕';
+            if (/فرابيه|فرابي/.test(s)) return '🧋';
+            if (/ميلك شيك|ميلكشيك/.test(s)) return '🥤';
+            if (/سموذي|سموزي/.test(s)) return '🍌';
+            if (/عصير|فريش/.test(s)) return '🍊';
+            if (/كوكتيل|موهيتو/.test(s)) return '🍸';
+            if (/سوفت|مياه|صودا|مشروبات غازية/.test(s)) return '🥤';
+            if (/سندوتش|ساندوتش|برجر|شاورما|بيتزا|فطير|وجبات|توست/.test(s)) return '🥪';
+            if (/ديزرت|حلويات|كيك|تشيز|براوني|وافل|آيس كريم|ايس كريم/.test(s)) return '🍰';
+            if (/كرواسون|مخبوزات/.test(s)) return '🥐';
+            if (/إضافات|اضافات|صوص/.test(s)) return '➕';
+            return '🍽️';
+        }
+        function renderCartSide() {
+            const box = document.getElementById('side-cart');
+            if (!box) return;
+            const n = cartCount();
+            const svc = [
+                M.call_waiter ? `<button class="svc" onclick="svc('waiter')">🙋 نادي الويتر</button>` : '',
+                M.request_bill ? `<button class="svc" onclick="svc('bill')">🧾 الحساب</button>` : '',
+            ].filter(Boolean).join('');
+            const last = store(KEY + '_last');
+            const myBtn = (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) ? `<button class="svc" onclick="pollStatus('${esc(last.ref)}', true)">📦 طلبي</button>` : '';
+            let body;
+            if (cart.length) {
+                const lines = cart.map((l, i) => { const p = products[l.product_id]; const mods = l.mods.map(id => (modById(p, id) || {}).name).filter(Boolean);
+                    return `<div class="scline"><div class="ph">${p.has_image ? `<img data-img="${esc(p.id)}" alt="">` : esc(String(p.name).trim().charAt(0))}</div>
+                        <div class="n">${esc(p.name)}${mods.length ? `<small>+ ${esc(mods.join('، '))}</small>` : ''}${l.note ? `<small>📝 ${esc(l.note)}</small>` : ''}
+                        ${M.show_prices ? `<small>${money(lineUnit(l) * l.qty)} ${esc(cur())}</small>` : ''}</div>
+                        <div class="qty"><button onclick="lineQty(${i},-1)">${l.qty === 1 ? '🗑' : '−'}</button><b>${l.qty}</b><button onclick="lineQty(${i},1)">+</button></div>
+                        <button class="rm" onclick="removeLine(${i})" title="شيل الصنف">✕</button></div>`; }).join('');
+                body = `${lines}
+                    ${M.show_prices && canOrder() ? `<div class="tot"><span>الإجمالي</span><span>${money(cartTotal())} ${esc(cur())}</span></div>` : ''}
+                    ${canOrder() ? `<button class="primary" onclick="askInfo()">إتمام الطلب ✈️</button>`
+                        : `<p class="side-empty">حوّل لوضع "هطلب بنفسي" من فوق عشان تكمّل الطلب</p>`}`;
+            } else {
+                body = `<div class="side-empty">${canOrder() ? 'السلة فاضية 🛒<br>دوس على أي صنف وضيفه هنا'
+                    : (M.ordering ? 'حوّل لوضع "هطلب بنفسي" من فوق عشان تطلب' : 'اطلب من الويتر على طول 🙋')}</div>`;
+            }
+            box.innerHTML = `<h3>🛒 سلة الطلبات ${n ? `<span class="count">${n}</span>` : ''}</h3>${body}
+                ${(svc || myBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${svc}${myBtn}</div>` : ''}`;
+            observeImages();
+        }
+        function removeLine(i) { cart.splice(i, 1); saveCart(); render(); }
 
         function cartCount() { return cart.reduce((s, l) => s + l.qty, 0); }
         function lineUnit(l) { const p = products[l.product_id]; return (Number(p.price) || 0) + l.mods.reduce((s, id) => s + (Number(modById(p, id)?.price) || 0), 0); }
@@ -377,6 +467,7 @@
             cart[i].qty += d;
             if (cart[i].qty <= 0) cart.splice(i, 1);
             saveCart(); render();
+            if (isWide()) return;
             if (cart.length) openCart(); else closeSheet();
         }
 
@@ -460,6 +551,8 @@
             } catch (err) { toast('في مشكلة في الاتصال. حاول تاني.'); }
         }
 
+        // لما حجم الشاشة يتغير بين الموبايل والشاشة الكبيرة، ارسم تاني بالشكل المناسب
+        try { window.matchMedia('(min-width: 900px)').addEventListener('change', () => { if (M) render(); }); } catch (e) { /* متصفح قديم */ }
         load();
     </script>
 </body>
