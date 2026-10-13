@@ -28,7 +28,7 @@
         .hero::after { content: ''; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%; background: rgba(192, 138, 62, .18); }
         .hero .logo { width: 74px; height: 74px; border-radius: 22px; background: #fff; object-fit: contain; padding: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
         .hero h1 { margin: 10px 0 2px; font-size: 26px; font-weight: 900; letter-spacing: -.3px; }
-        .hero .sub { color: #e8d9c4; font-size: 13px; font-weight: 700; }
+        .hero .sub { color: #e8d9c4; font-size: 13px; font-weight: 700; } .hero .sub .addr { font-size: 11px; font-weight: 500; opacity: .85; margin-top: 2px; }
         .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 800; }
         .welcome { margin-top: 12px; font-size: 15px; font-weight: 700; color: #f7ecdc; line-height: 1.7; }
         .modebar { display: flex; gap: 8px; margin-top: 14px; position: relative; z-index: 1; }
@@ -210,7 +210,7 @@
                 <header class="hero"><div class="wrap" style="position:relative;z-index:1">
                     ${M.logo ? `<img class="logo" src="${esc(M.logo)}" alt="">` : ''}
                     <h1>${esc(M.company_name || '')}</h1>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub">${esc(M.branch)}</span>` : ''}</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub" style="display:inline-flex;flex-direction:column;line-height:1.35">${esc(M.branch)}${M.branch_address ? `<small class="addr">${esc(M.branch_address)}</small>` : ''}</span>` : ''}</div>
                     ${M.welcome ? `<p class="welcome">${esc(M.welcome)}</p>` : ''}
                     ${M.ordering ? `<div class="modebar"><button class="modebtn ${mode === 'order' ? 'on' : ''}" onclick="setMode('order')">🛒 هطلب بنفسي</button>
                         <button class="modebtn ${mode !== 'order' ? 'on' : ''}" onclick="setMode('browse')">👀 بتفرّج بس</button></div>` : ''}
