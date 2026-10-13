@@ -107,6 +107,8 @@ async function loadPrintData(orderId) {
 async function printOrderReceipt(orderId) {
     const res = await loadPrintData(orderId);
     if (!res) return;
+    // طلب ضيافة: بتطلع ورقة الضيافة (من غير أسعار) مش فاتورة
+    if (res.order && res.order.hospitality) return printHtml(buildHospitalityHtml(res.order, res.settings), receiptPageCss());
     // كود QR لصفحة الشكاوي والاقتراحات في آخر الفاتورة
     const soc = (res.settings && res.settings.social) || {};
     if (res.order.feedback_token && appSet('receipt', 'show_feedback_qr', true) && soc.feedback_enabled !== false) {
@@ -268,4 +270,34 @@ async function exportReportExcel(rep) {
         console.error('Excel export error:', err);
         showToast('تعذر التصدير لإكسل: ' + (err.message || ''), 'error');
     }
+}
+// -----------------------------------------
+// ورقة الضيافة: الأصناف والكميات من غير أي أسعار
+// -----------------------------------------
+const HOSP_CAT_NAMES = { owner_guest: 'ضيف المالك', family: 'أهل', staff: 'موظفين', marketing: 'دعاية' };
+function buildHospitalityHtml(o, s) {
+    const g = (s && s.general) || {};
+    const h = o.hospitality || {};
+    const items = (o.items || []).map(i => `<tr><td class="b">${uiEsc(i.quantity)} ×</td><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}</td></tr>`).join('');
+    return `
+        <div class="c b big">${uiEsc(g.company_name || '')}</div>
+        ${o.branch ? `<div class="c">${uiEsc(o.branch)}</div>` : ''}
+        <div class="line"></div>
+        <div class="c b big">🎁 ضيافة</div>
+        <div class="c b">${uiEsc(o.order_number || '')}</div>
+        <div>${uiEsc(uiDate(o.created_at))}${o.table_number ? ' | طاولة ' + uiEsc(o.table_number) : ''}</div>
+        <div>النوع: ${uiEsc(HOSP_CAT_NAMES[h.category] || h.category || '')}</div>
+        ${h.guest_name ? `<div>الضيف: ${uiEsc(h.guest_name)}</div>` : ''}
+        ${h.approved_by ? `<div>وافق: ${uiEsc(h.approved_by)}</div>` : ''}
+        ${h.note ? `<div>ملاحظة: ${uiEsc(h.note)}</div>` : ''}
+        <div class="line"></div>
+        <table>${items}</table>
+        <div class="line"></div>
+        <div class="c">مع تحيات ${uiEsc(g.company_name || 'المحل')} ❤️</div>`;
+}
+
+async function printHospitalitySlip(orderId) {
+    const res = await loadPrintData(orderId);
+    if (!res || !res.order) return;
+    printHtml(buildHospitalityHtml(res.order, res.settings), receiptPageCss());
 }

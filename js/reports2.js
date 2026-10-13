@@ -6,7 +6,7 @@ const REPORT_CATALOG = [
         ['sales_category', 'بالقسم'], ['sales_item', 'بالصنف'], ['sales_modifiers', 'أكتر الإضافات'], ['sales_waiter', 'بالويتر'],
         ['sales_cashier', 'بالكاشير'], ['sales_compare', 'مقارنة بالفترة اللي قبلها']]],
     ['الربحية', [['item_profit', 'ربحية الأصناف وتصنيف المنيو'], ['category_profit', 'ربحية الأقسام'], ['daily_profit', 'الربح اليومي']]],
-    ['الخصومات والإلغاءات', [['discounts_detail', 'الخصومات بالتفصيل'], ['voids_detail', 'الإلغاءات بالتفصيل'], ['order_cancellations', 'الطلبات الملغية (تفاصيل كاملة)'], ['cancelled_order_items', 'أصناف الطلبات الملغية'], ['refunds_detail', 'المرتجعات والطلبات الملغية']]],
+    ['الخصومات والإلغاءات', [['discounts_detail', 'الخصومات بالتفصيل'], ['hospitality', 'الضيافة 🎁'], ['voids_detail', 'الإلغاءات بالتفصيل'], ['order_cancellations', 'الطلبات الملغية (تفاصيل كاملة)'], ['cancelled_order_items', 'أصناف الطلبات الملغية'], ['refunds_detail', 'المرتجعات والطلبات الملغية']]],
     ['مؤشرات السرقة', [['theft_indicators', 'مؤشرات السرقة لكل موظف'], ['long_open_orders', 'طلبات مفتوحة من وقت طويل'], ['manager_approvals', 'موافقات المديرين']]],
     ['المخازن', [['stock_valuation', 'تقييم المخزون'], ['waste_by_reason', 'الهالك بالسبب'], ['count_variances', 'فروقات الجرد'],
         ['low_stock', 'خامات تحت الحد'], ['stock_turnover', 'دوران المخزون'], ['transfers', 'التحويلات']]],

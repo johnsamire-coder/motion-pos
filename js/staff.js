@@ -14,10 +14,10 @@ const PERM_NAMES = { pos: 'البيع', kds: 'المطبخ', shift: 'الورد�
     treasury_transfer: 'تحويل بين الخزن', day_close: 'قفل اليوم', tips_distribute: 'توزيع الإكراميات',
     exp_record: 'تسجيل مصروف', exp_recurring: 'المصروفات المتكررة (المرتبات والإيجار...)', exp_categories: 'بنود المصروفات', exp_custody: 'العهد',
     staff_manage: 'إضافة وتعديل الموظفين وأرقامهم السرية', payroll_approve: 'اعتماد المرتبات', payroll_pay: 'صرف المرتبات والسلف',
-    acc_manual: 'قيود يدوية وعكس القيود', settings_menu: 'تعديل المنيو والوصفات والإضافات' };
+    acc_manual: 'قيود يدوية وعكس القيود', settings_menu: 'تعديل المنيو والوصفات والإضافات', hospitality: 'قفل الطلب ضيافة 🎁' };
 const PERM_SUBS = new Set(['po_create', 'po_approve', 'po_receive', 'po_post', 'po_invoice', 'supplier_pay', 'suppliers_manage', 'inv_waste', 'inv_transfer',
     'inv_stocktake', 'treasury_transfer', 'day_close', 'tips_distribute', 'exp_record', 'exp_recurring', 'exp_categories', 'exp_custody', 'staff_manage', 'payroll_approve',
-    'payroll_pay', 'acc_manual', 'settings_menu']);
+    'payroll_pay', 'acc_manual', 'settings_menu', 'hospitality']);
 
 async function loadStaffScreen() {
     renderStaffBody();

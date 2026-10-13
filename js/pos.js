@@ -865,6 +865,8 @@ async function openMultiplePaymentsModal() {
     if (tipInput) tipInput.value = '0';
 
     renderPaymentLines();
+    const hospBtn = document.getElementById('hospitality-button');
+    if (hospBtn) hospBtn.classList.toggle('hidden', !(canDo('hospitality') && appSet('hospitality', 'enabled', true)));
     document.getElementById('payments-modal').classList.remove('hidden');
 }
 
@@ -1350,4 +1352,59 @@ async function refundOrderPrompt() {
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر عمل المرتجع'), 'error');
         showToast(`تم مرتجع الطلب ${res.order_number} بمبلغ ${formatCurrency(res.total)}. رجّع الفلوس للزبون.`);
     } catch (err) { console.error(err); showToast('تعذر عمل المرتجع: ' + (err.message || ''), 'error'); }
+}
+// -----------------------------------------
+// الضيافة: الطلب بيتقفل من غير فلوس (الدرج والوردية مالهمش دعوة)، والخامات بتتخصم من المخزن، والقيد بالتكلفة.
+// الموافقة برقم المدير (لحد الحد اليومي من الإعدادات) أو المالك. السيرفر هو اللي بيتأكد من كل حاجة.
+// -----------------------------------------
+async function hospitalityClose() {
+    if (paymentSubmissionInProgress) return;
+    if (!posState.cart.id) return showToast('الطلب لسه ما اتحفظش', 'error');
+    if (typeof hasUnsentItems === 'function' && hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها الأول', 'error');
+    const limit = Number(appSet('hospitality', 'manager_daily_limit', 500)) || 0;
+    const v = await uiForm('🎁 ضيافة', [
+        { key: 'info', type: 'note', label: `الطلب هيتقفل من غير فلوس، والخامات هتتخصم من المخزن. قيمته بسعر المنيو ${formatCurrency(posState.cart.server_total)}. ` +
+            (limit > 0 ? `المدير يوافق لحد ${formatCurrency(limit)} في اليوم، والزيادة برقم المالك.` : 'الموافقة برقم المالك بس.') },
+        { key: 'category', label: 'الضيافة لمين', type: 'select', options: [['owner_guest', 'ضيف المالك'], ['family', 'أهل'], ['staff', 'موظفين'], ['marketing', 'دعاية']], placeholder: 'اختار', required: true },
+        { key: 'guest', label: 'اسم الضيف (اختياري)', type: 'text' },
+        { key: 'note', label: 'ملاحظة (اختياري)', type: 'text' },
+        { key: 'pin', label: 'رقم المدير أو المالك', type: 'pin', required: true }
+    ], { ok: 'تأكيد الضيافة 🎁' });
+    if (!v) return;
+    paymentSubmissionInProgress = true;
+    const hospBtn = document.getElementById('hospitality-button');
+    if (hospBtn) hospBtn.disabled = true;
+    try {
+        const info = await serverRpc('update_order_info_secure', {
+            p_order_id: posState.cart.id,
+            p_waiter_id: document.getElementById('select-waiter')?.value || null,
+            p_customer_id: document.getElementById('select-customer')?.value || null,
+            p_guest_count: parseInt(posState.cart.guest_count, 10) || 1
+        });
+        if (!info || !info.ok) return showToast(serverReasonMessage(info, 'تعذر حفظ بيانات الطلب'), 'error');
+        const res = await serverRpc('hospitality_close_secure', {
+            p_order_id: posState.cart.id, p_category: v.category, p_guest_name: v.guest || null,
+            p_note: v.note || null, p_pin: String(v.pin || '').trim()
+        });
+        if (!res || !res.ok) {
+            let message = serverReasonMessage(res, 'تعذر قفل الطلب ضيافة');
+            if (res && res.reason === 'hospitality_limit') message += ` (اتوافق النهارده على ${formatCurrency(res.used)} من ${formatCurrency(res.limit)}، والطلب ده ${formatCurrency(res.value)})`;
+            return showToast(message, 'error');
+        }
+        const closedOrderId = posState.cart.id;
+        closeMultiplePaymentsModal();
+        resetActiveCart();
+        posState.selectedTable = null;
+        if (appSet('hospitality', 'auto_print', true) && typeof printHospitalitySlip === 'function') printHospitalitySlip(closedOrderId);
+        if (currentBranch && currentBranch.has_tables) await fetchBranchTables();
+        renderAreaAndTables();
+        renderOrderCartTicket();
+        showToast(`🎁 الطلب ${res.order_number || ''} اتقفل ضيافة`);
+    } catch (err) {
+        console.error('Hospitality error:', err);
+        showToast('الضيافة ما اتسجلتش، ومفيش أي حاجة اتغيرت: ' + (err.message || 'خطأ غير معروف'), 'error');
+    } finally {
+        paymentSubmissionInProgress = false;
+        if (hospBtn) hospBtn.disabled = false;
+    }
 }
