@@ -61,8 +61,10 @@ $Files = [ordered]@{
   'supabase\migrations\026_recipe_ingredients_shopping.sql'    = '179b0e77eb0e3d73'
   'supabase\migrations\027_ingredient_packs.sql'               = '02ccf0a53676d6c1'
   'supabase\migrations\028_system_reset.sql'                  = 'cf533e1ccb5d759e'
+  'supabase\migrations\029_order_cancellations_report.sql'    = 'a7fc6498cf6fad5c'
+  'supabase\migrations\030_custom_cancel_reason.sql'          = '0329725d43424353'
 }
-$LastVersion = '028'
+$LastVersion = '030'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }
@@ -97,6 +99,7 @@ function Get-Download($urls, $name) {
 function Use-Env {
   if ($env:PATH -notlike "*$PgBin*") { $env:PATH = "$PgBin;$env:PATH" }
   $env:PGCLIENTENCODING = 'UTF8'
+  $env:LC_MESSAGES = 'C'   # Arabic Windows: libintl crashes PostgREST when translating libpq messages
   $pf = Join-Path $Secret 'db_superuser.txt'
   if (Test-Path $pf) { $env:PGPASSWORD = (Get-Content $pf -Raw).Trim() }
 }
