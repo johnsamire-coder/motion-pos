@@ -65,8 +65,9 @@ $Files = [ordered]@{
   'supabase\migrations\030_custom_cancel_reason.sql'          = '0329725d43424353'
   'supabase\migrations\031_hospitality.sql'                    = '09ee5d1b1180d9d7'
   'supabase\migrations\032_menu_branch_address.sql'           = '60fa8b054fc0ef6b'
+  'supabase\migrations\033_one_shift_per_branch_own_attendance.sql' = 'd2070cf7b5cbc16e'
 }
-$LastVersion = '032'
+$LastVersion = '033'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }

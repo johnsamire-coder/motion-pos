@@ -195,6 +195,8 @@ const SERVER_REASON_MESSAGES = {
     table_has_orders: 'مينفعش تمسح طاولة عليها طلبات سابقة',
     no_open_shift: 'لازم تفتح ورديتك الأول من شاشة "الوردية"',
     shift_already_open: 'عندك وردية مفتوحة بالفعل',
+    branch_shift_open: 'فيه وردية مفتوحة في الفرع ده بالفعل. لازم تتقفل الأول قبل ما تتفتح وردية جديدة',
+    not_your_account: 'الرقم السري ده مش بتاعك. كل موظف يسجّل حضوره وهو فاتح البرنامج بحسابه هو',
     shift_not_found: 'الوردية غير موجودة',
     not_enough_cash: 'المبلغ أكبر من الموجود في الدرج',
     invalid_destination: 'الجهة غير صحيحة',
@@ -297,6 +299,7 @@ function canDo(perm) {
 
 function serverReasonMessage(res, fallback) {
     const reason = res && res.reason;
+    if (reason === 'branch_shift_open' && res.staff) return `فيه وردية مفتوحة في الفرع ده باسم ${res.staff}. لازم تتقفل الأول قبل ما تتفتح وردية جديدة`;
     return SERVER_REASON_MESSAGES[reason] || fallback || ('تعذر تنفيذ العملية' + (reason ? ` (${reason})` : ''));
 }
 

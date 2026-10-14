@@ -611,7 +611,13 @@ function renderOrderCartTicket() {
     const typeInfoElem = document.getElementById('ticket-type-info');
     if (typeInfoElem) typeInfoElem.innerText = `النوع: ${posState.selectedOrderType}`;
     const waiterSelect = document.getElementById('select-waiter');
-    if (waiterSelect) waiterSelect.value = posState.cart.waiter_id || '';
+    // الويتر اللي فاتح بحسابه: اسمه بيتحط لوحده على الطلب، ومش بيقدر يغيّره
+    const selfWaiter = posSelfWaiterId();
+    if (selfWaiter && !posState.cart.waiter_id) posState.cart.waiter_id = selfWaiter;
+    if (waiterSelect) {
+        waiterSelect.value = posState.cart.waiter_id || '';
+        waiterSelect.disabled = !!selfWaiter;
+    }
     const customerSelect = document.getElementById('select-customer');
     if (customerSelect) customerSelect.value = posState.cart.customer_id || '';
     renderPosCustomerInfo();
@@ -747,6 +753,9 @@ function resetActiveCart() {
     posState.cart = emptyCart();
     posState.paymentsList = []; posState.currentTip = 0; posState.tipStaffId = null;
     posState.splitState = { activeTab: 'items', splits: [], activeSplitIndex: 0 };
+}
+function posSelfWaiterId() {
+    return (typeof currentUser !== 'undefined' && currentUser && currentUser.roles && currentUser.roles.name === 'waiter' && currentUser.id) ? currentUser.id : null;
 }
 function renderWaitersAndCustomersDropdowns() {
     populateSelectOptions('select-waiter', posState.waiters, 'اختر الويتر', 'لا يوجد موظفون لهذا الفرع');

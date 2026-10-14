@@ -30,7 +30,7 @@ async function loadShiftScreen() {
     }
 
     const attendanceHtml = uiCard('الحضور والانصراف', `
-        <p class="text-xs font-bold text-slate-500 mb-2">أي موظف يكتب رقمه السري هنا: أول مرة حضور، والتانية انصراف.</p>
+        <p class="text-xs font-bold text-slate-500 mb-2">الحضور بيتسجل لـ <b class="text-slate-800">${uiEsc((currentUser && currentUser.name) || '')}</b> بس (اللي فاتح البرنامج دلوقتي). اكتب رقمك السري: أول مرة حضور، والتانية انصراف. أي موظف تاني يسجّل وهو فاتح بحسابه هو.</p>
         <div class="flex gap-2 max-w-sm">
             <input id="attendance-pin" type="password" inputmode="numeric" maxlength="4" placeholder="الرقم السري" class="${uiInputClass()} flex-1 text-center">
             ${uiBtn('تسجيل', 'attendancePunch()', 'blue')}
