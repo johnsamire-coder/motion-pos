@@ -680,7 +680,7 @@ function askManagerPin(message) {
 
 // اختيار سبب إلغاء من القايمة
 // سبب الإلغاء + رقم المدير في شاشة واحدة
-async function pickCancelReason(title, type, pinLabel) {
+async function pickCancelReason(title, type, pinLabel, extraFields = []) {
     if (!posState.cancelReasons.length) {
         showToast('لا توجد أسباب إلغاء مسجلة. أضف أسباب الإلغاء أولاً من الإعدادات.', 'error');
         return null;
@@ -688,6 +688,7 @@ async function pickCancelReason(title, type, pinLabel) {
     let list = posState.cancelReasons.filter(r => !type || !r.reason_type || r.reason_type === type);
     if (!list.length) list = posState.cancelReasons;
     const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' }];
+    fields.push(...extraFields);
     if (pinLabel) fields.push({ key: 'pin', label: pinLabel, type: 'pin', required: true });
     const v = await uiForm(title, fields, { ok: 'تأكيد', danger: true });
     if (!v) return null;
@@ -697,10 +698,10 @@ async function pickCancelReason(title, type, pinLabel) {
             p_reason: v.reason, p_reason_type: type || 'void_item', p_manager_pin: String(v.pin || '').trim()
         });
         if (!created || !created.ok) { showToast(serverReasonMessage(created, 'تعذر تسجيل السبب الجديد'), 'error'); return null; }
-        return { id: created.id, reason: v.reason, reason_type: type || 'void_item', pin: v.pin };
+        return { id: created.id, reason: v.reason, reason_type: type || 'void_item', pin: v.pin, charge: v.charge || null };
     }
     const reason = list.find(r => String(r.id) === String(v.reason));
-    return reason ? { ...reason, pin: v.pin } : null;
+    return reason ? { ...reason, pin: v.pin, charge: v.charge || null } : null;
 }
 
 async function voidCartItem(idx) {
@@ -1317,12 +1318,15 @@ async function cancelOrderPrompt() {
         renderOrderCartTicket();
         return;
     }
-    const reason = await pickCancelReason(`إلغاء الطلب ${posState.cart.order_number} بالكامل`, 'cancel_order', 'رقم المدير');
+    // لو الإلغاء غلطة موظف: الطلب بيتحسب هالك، وتكلفة خاماته (مش سعر البيع) بتتخصم من الموظف
+    const charge = { key: 'charge', label: 'الإلغاء غلطة موظف؟ (تكلفة الخامات تتخصم منه، مش سعر البيع)', type: 'select', full: true,
+        options: [['', 'لأ، مش غلطة موظف'], ...posState.waiters.map(w => [w.id, w.name])], value: '' };
+    const reason = await pickCancelReason(`إلغاء الطلب ${posState.cart.order_number} بالكامل`, 'cancel_order', 'رقم المدير', [charge]);
     if (!reason) return;
     const managerPin = reason.pin;
     try {
         const res = await serverRpc('cancel_order_secure', {
-            p_order_id: posState.cart.id, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim()
+            p_order_id: posState.cart.id, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim(), p_charge_staff_id: reason.charge || null
         });
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر إلغاء الطلب'), 'error');
         resetActiveCart();
@@ -1330,7 +1334,7 @@ async function cancelOrderPrompt() {
         if (currentBranch && currentBranch.has_tables) await fetchBranchTables();
         renderAreaAndTables();
         renderOrderCartTicket();
-        showToast('تم إلغاء الطلب بموافقة المدير');
+        showToast(res.charged_staff ? `تم إلغاء الطلب، واتخصم من ${res.charged_staff} تكلفة ${formatCurrency(res.charged_cost)}` : 'تم إلغاء الطلب بموافقة المدير');
     } catch (err) { console.error(err); showToast('تعذر إلغاء الطلب: ' + (err.message || ''), 'error'); }
 }
 

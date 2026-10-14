@@ -351,9 +351,14 @@ function uiDate(ts) {
     return d.toLocaleDateString('ar-EG') + ' ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 }
 
+// "today" = the shop's business day: before the day start hour (settings > الشركة) it is still yesterday
+function uiDayStartHour() {
+    const h = Number(typeof appSettings !== 'undefined' && appSettings && appSettings.general ? appSettings.general.day_start_hour : 0);
+    return Number.isFinite(h) && h > 0 && h <= 12 ? h : 0;
+}
 function uiToday(offsetDays = 0) {
-    const d = new Date(Date.now() + offsetDays * 86400000);
-    return d.toISOString().slice(0, 10);
+    const d = new Date(Date.now() - uiDayStartHour() * 3600000 + offsetDays * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // columns: [{ label, key }] or [{ label, render: row => html }]

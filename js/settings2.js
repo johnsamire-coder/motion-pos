@@ -47,7 +47,8 @@ async function initSettings2() {
 
 function set2RenderAll() {
     set2Form('general', 'الشركة', [['company_name', 'اسم الشركة', 'text'], ['address', 'العنوان', 'text'], ['phone', 'التليفون', 'text'],
-        ['tax_number', 'الرقم الضريبي', 'text'], ['commercial_register', 'السجل التجاري', 'text'], ['currency', 'العملة', 'text']],
+        ['tax_number', 'الرقم الضريبي', 'text'], ['commercial_register', 'السجل التجاري', 'text'], ['currency', 'العملة', 'text'],
+        ['day_start_hour', 'يوم الشغل بيبدأ الساعة كام الصبح؟ (للتقارير: لو المحل بيقفل 7 الصبح اكتب 8، و0 = من 12 بالليل)', 'number']],
         `<div class="mt-3 border-t pt-3"><p class="text-xs font-black mb-2">اللوجو (بيظهر في الشاشة والفاتورة والتقارير والمنيو)</p>
          <div class="flex flex-wrap items-center gap-3"><div id="set2-logo-preview">${set2.settings.general.logo ? `<img src="${uiEsc(set2.settings.general.logo)}" class="h-16 max-w-[160px] object-contain border rounded-xl p-1">` : '<span class="text-xs text-slate-400">مفيش لوجو</span>'}</div>
          <input type="file" accept="image/png,image/jpeg,image/webp" onchange="set2PickLogo(this)" class="text-xs">
@@ -103,6 +104,8 @@ function set2RenderAll() {
     if (work) {
         work.innerHTML = '';
         set2Form('shift', 'الوردية', [['default_float', 'العهدة (الفكة) الافتراضية عند فتح الوردية', 'number']], '', '', 'work', true);
+        set2Form('purchasing', 'المشتريات', [['manager_limit', 'مدير الفرع يعتمد أمر الشراء بنفسه لحد كام جنيه في اليوم (0 = المالك بس)', 'number']],
+            '<p class="text-[11px] text-slate-500 font-bold mt-2">أمر الشراء اللي يعمله مدير الفرع ويكون هو ومجموع أوامره في نفس اليوم تحت الحد ده، بيتعتمد على طول من غير المالك، والمدير يقدر يرحّل استلامه للمخزن. الحد ده المالك بس اللي يغيّره.</p>', '', 'work', true);
         set2Form('inventory', 'المخازن', [['default_min_stock', 'الحد الأدنى الافتراضي للخامة الجديدة', 'number']], '', '', 'work', true);
         set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'ميعاد بداية الشغل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'سماح التأخير بالدقايق', 'number']], '', '', 'work', true);
     }

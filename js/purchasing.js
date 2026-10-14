@@ -182,7 +182,7 @@ async function purRenderPost(status) {
             { label: 'وصل', render: l => uiEsc(Number(l.qty)) }, { label: 'سعر الوحدة', render: l => formatCurrency(l.unit_cost) }, { label: 'الإجمالي', render: l => formatCurrency(l.total) }])
         + `<p class="text-sm font-black mt-2">القيمة: ${formatCurrency(g.value)} | ${uiEsc(names[g.status] || g.status)}</p>`,
         uiBtn(`📎 صور الفاتورة (${Number(g.files) || 0})`, `purShowPhotos('${g.id}', ${!!(res.can_receive || res.can_post)})`, Number(g.files) ? 'blue' : 'gray')
-        + (g.status === 'pending' && res.can_post ? uiBtn('ترحيل للمخزن ✅', `purPostGrn('${g.id}','post')`, 'green') : '')
+        + (g.status === 'pending' && (res.can_post || g.small_post) ? uiBtn('ترحيل للمخزن ✅', `purPostGrn('${g.id}','post')`, 'green') : '')
         + (g.status === 'pending' && res.can_receive ? uiBtn('إلغاء الاستلام', `purPostGrn('${g.id}','void')`, 'gray') : ''))).join('');
     document.getElementById('pur-body').innerHTML =
         `<div class="flex gap-2 mb-3">${uiBtn('مستني ترحيل', "purRenderPost('pending')", purState.postFilter === 'pending' ? 'blue' : 'gray')}${uiBtn('الكل', "purRenderPost('all')", purState.postFilter === 'all' ? 'blue' : 'gray')}</div>`
@@ -317,7 +317,10 @@ async function purSubmitNew() {
     if (!sup || !wh || !purState.lines.length) return showToast('اختار المورد والمخزن وضيف خامة واحدة على الأقل', 'error');
     const res = await uiCall('po_create_secure', { p_supplier_id: sup, p_warehouse_id: wh, p_lines: purState.lines,
         p_notes: document.getElementById('pur-new-notes').value });
-    if (res) { showToast(`تم حفظ أمر الشراء ${res.po_number}. محتاج موافقة المدير.`); purState.lines = []; setPurchasingTab('orders'); }
+    if (res) {
+        showToast(res.auto_approved ? `أمر الشراء ${res.po_number} اتعتمد على طول ✅ (تحت حد المدير ${formatCurrency(res.manager_limit)} في اليوم)` : `تم حفظ أمر الشراء ${res.po_number}. محتاج موافقة المالك.`);
+        purState.lines = []; setPurchasingTab('orders');
+    }
 }
 
 function purRenderSuppliers() {

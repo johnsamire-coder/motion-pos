@@ -14,7 +14,7 @@ const REPORT_CATALOG = [
         ['unmatched_invoices', 'فواتير مش مطابقة'], ['supplier_aging', 'أعمار ديون الموردين']]],
     ['الخزينة', [['cash_movements', 'حركة النقدية'], ['shifts', 'الورديات وفروقها'], ['expenses_by_category', 'المصروفات بالبند']]],
     ['العملاء', [['customer_balances', 'أرصدة الآجل'], ['top_customers', 'أكتر العملاء شراء']]],
-    ['الموظفين', [['attendance', 'الحضور والتأخير'], ['tips_by_staff', 'الإكراميات'], ['staff_balances', 'أرصدة العجز والسلف']]],
+    ['الموظفين', [['staff_activity', 'حركات الموظفين بالتفصيل'], ['staff_summary', 'ملخص كل موظف'], ['attendance', 'الحضور والتأخير'], ['tips_by_staff', 'الإكراميات'], ['staff_balances', 'أرصدة العجز والسلف']]],
     ['الضرايب', [['vat_monthly', 'ضريبة القيمة المضافة الشهرية']]]
 ];
 
@@ -38,6 +38,7 @@ async function loadReportsScreen() {
             ${isOwner ? `<label class="text-xs font-bold">الفرع<br><select id="rpt-branch" class="${uiInputClass()}"><option value="">كل الفروع</option>${rptState.branches.map(b => `<option value="${uiEsc(b.id)}" ${b.id === rptState.branch ? 'selected' : ''}>${uiEsc(b.name)}</option>`).join('')}</select></label>` : ''}
             ${uiBtn('اليوم', "rptQuick(0)", 'gray')}${uiBtn('آخر ٧ أيام', "rptQuick(6)", 'gray')}${uiBtn('الشهر ده', "rptQuick('month')", 'gray')}${uiBtn('آخر ٣٠ يوم', "rptQuick(29)", 'gray')}
         </div>
+        <p class="text-[11px] font-bold text-slate-500 mb-3">${uiDayStartHour() ? `🕗 اليوم في التقارير هو يوم الشغل: من الساعة ${uiDayStartHour()} الصبح لحد الساعة ${uiDayStartHour()} الصبح اللي بعده (تتغير من الإعدادات ← الشركة).` : '🕛 اليوم في التقارير من 12 بالليل لـ 12 بالليل. لو المحل بيسهر بعد نص الليل، غيّر "يوم الشغل بيبدأ الساعة" من الإعدادات ← الشركة.'}</p>
         ${catalog}
         <div id="rpt-result" class="mt-4"></div>`);
     runReport(rptState.key);
