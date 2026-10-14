@@ -221,6 +221,7 @@ function purRenderNew() {
             <select id="pur-new-wh" class="${uiInputClass()}">${uiOptions(purState.warehouses, 'id', w => w.name, 'اختار المخزن')}</select>
         </div>
         <div class="flex flex-wrap items-center gap-2 mb-2">
+            ${uiSearchBox('pur-new-ing', '🔍 دوّر على الخامة')}
             <select id="pur-new-ing" onchange="purIngChanged()" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
             <span class="text-[11px] font-black text-slate-500 self-center">الكمية:</span><span id="pur-new-qty-box">${uiQtyPair('pur-new-qty', null, 'buy', '')}</span>
             <span class="text-[11px] font-black text-slate-500 self-center">السعر:</span><span id="pur-new-price-box">${uiQtyPair('pur-new-price', null, 'buy', '', '', '', 'price')}</span>
@@ -241,9 +242,10 @@ function purAddLine() {
     if (purState.lines.some(l => l.ingredient_id === ing)) return showToast('الخامة موجودة بالفعل', 'error');
     purState.lines.push({ ingredient_id: ing, qty, unit_price: price });
     // نفضّي الخانات عشان الخامة الجاية متاخدش كمية وسعر اللي قبلها
+    uiClearSearch('pur-new-ing');
     document.getElementById('pur-new-ing').value = '';
     ['pur-new-qty', 'pur-new-qty-alt', 'pur-new-price', 'pur-new-price-alt'].forEach(x => { const el = document.getElementById(x); if (el) el.value = ''; });
-    document.getElementById('pur-new-ing').focus();
+    document.getElementById('pur-new-ing-q').focus();
     const lp = document.getElementById('pur-last-price'); if (lp) lp.innerHTML = '';
     purRenderLines();
 }
@@ -371,7 +373,7 @@ async function purPay(id) {
 
 function purRenderPrices() {
     document.getElementById('pur-body').innerHTML = uiCard('تاريخ أسعار خامة', `
-        <div class="flex gap-2 mb-3"><select id="pur-price-ing" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
+        <div class="flex flex-wrap gap-2 mb-3">${uiSearchBox('pur-price-ing', '🔍 دوّر على الخامة')}<select id="pur-price-ing" onchange="purLoadPrices()" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختار الخامة')}</select>
         ${uiBtn('عرض', 'purLoadPrices()', 'gray')}</div><div id="pur-price-table"></div>`);
 }
 

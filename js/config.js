@@ -471,6 +471,37 @@ function uiPairMount(boxId, id, ing, purpose, kind = 'qty') {
     box.innerHTML = uiQtyPair(id, ing, purpose, old ? old.value : '', '', '', kind);
 }
 
+// Search box for a long list: typing filters the list under it (أ/إ/آ = ا، ة = ه، ى = ي, any word order).
+// If only one item is left it gets picked by itself; Enter picks the first one left.
+function uiNormAr(s) {
+    return String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '')
+        .replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim();
+}
+function uiSearchBox(selectId, placeholder) {
+    return `<input id="${selectId}-q" type="search" autocomplete="off" placeholder="${uiEsc(placeholder || '🔍 اكتب للبحث')}"
+        oninput="uiFilterSelect('${selectId}', this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); uiFilterSelect('${selectId}', this.value, true); }"
+        class="${uiInputClass()}">`;
+}
+function uiFilterSelect(selectId, text, pickFirst) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    if (!sel._allOptions) sel._allOptions = [...sel.options].map(o => ({ value: o.value, text: o.text }));
+    const words = uiNormAr(text).split(' ').filter(Boolean);
+    const before = sel.value;
+    const keep = sel._allOptions.filter(o => o.value === '' || words.every(w => uiNormAr(o.text).includes(w)));
+    const real = keep.filter(o => o.value !== '');
+    sel.innerHTML = keep.map(o => `<option value="${uiEsc(o.value)}">${uiEsc(o.value === '' && words.length ? `${o.text} (${real.length})` : o.text)}</option>`).join('');
+    if (words.length && (real.length === 1 || (pickFirst && real.length))) sel.value = real[0].value;
+    else if (keep.some(o => o.value === before)) sel.value = before;
+    else sel.value = '';
+    if (sel.value !== before) sel.dispatchEvent(new Event('change'));
+}
+function uiClearSearch(selectId) {
+    const q = document.getElementById(selectId + '-q');
+    if (q) q.value = '';
+    uiFilterSelect(selectId, '');
+}
+
 function uiOptions(items, valueKey, labelFn, placeholder) {
     return (placeholder ? `<option value="">${uiEsc(placeholder)}</option>` : '')
         + (items || []).map(i => `<option value="${uiEsc(i[valueKey])}">${uiEsc(labelFn(i))}</option>`).join('');
