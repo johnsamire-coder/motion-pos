@@ -26,7 +26,10 @@ function printHtml(html, pageCss) {
 
 function receiptPageCss() {
     const mm = Number(appSet('receipt', 'paper_mm', 80)) === 58 ? 58 : 80;
-    return `@page { size: ${mm}mm auto; margin: 0; } body { width: ${mm - 4}mm; padding: 2mm; font-size: ${mm === 58 ? 10 : 12}px; }
+    // thermal printers only print the middle of the roll (80 mm roll -> about 72 mm, 58 mm roll -> about 48 mm),
+    // so the receipt is kept inside that strip; wider content gets cut on the left (the amounts column)
+    const printable = mm === 58 ? 46 : 70;
+    return `@page { size: ${mm}mm auto; margin: 0; } body { width: ${printable}mm; margin: 0 auto; padding: 1mm 0; font-size: ${mm === 58 ? 10 : 12}px; }
         .c { text-align: center; } .b { font-weight: bold; } .big { font-size: 1.6em; } .line { border-top: 1px dashed #000; margin: 4px 0; }
         td { padding: 1px 0; vertical-align: top; } .num { text-align: left; white-space: nowrap; } img.logo { max-width: 60%; max-height: 70px; }`;
 }
