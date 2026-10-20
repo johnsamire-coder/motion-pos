@@ -1,13 +1,13 @@
 // js/sales.js - شاشة المبيعات: كل طلب بتفاصيله (الأصناف، الإضافات، الملاحظات، الأوقات، الدفع، مين عمل إيه)
 // وتحليل التأخير: كل مكان وكل صنف وكل ساعة، وأبطأ الطلبات.
 
-const SALES_STATUS_NAMES = { draft: 'مسودة', open: 'مفتوح', sent: 'في المطبخ', preparing: 'بيتحضر', ready: 'جاهز', served: 'اتقدم',
-    paid: 'مدفوع', closed: 'مدفوع', cancelled: 'ملغي' };
+const SALES_STATUS_NAMES = { draft: 'مسودة', open: 'مفتوح', sent: 'في المطبخ', preparing: 'قيد التحضير', ready: 'جاهز', served: 'تم تقديمه',
+    paid: 'مدفوع', closed: 'مدفوع', cancelled: 'ملغى' };
 const SALES_ACTION_NAMES = { SEND_TO_KITCHEN: 'فتح الطلب وإرساله للمطبخ', ADD_ITEMS_TO_ORDER: 'إضافة أصناف', KITCHEN_STATUS: 'تحضير',
-    APPLY_DISCOUNT: 'خصم', REMOVE_DISCOUNT: 'شيل الخصم', CHANGE_CHARGES: 'تغيير الضريبة / الخدمة', CANCEL_ORDER: 'إلغاء الطلب',
-    CLOSE_ORDER: 'دفع وقفل', REFUND_ORDER: 'مرتجع', REFUND: 'مرتجع', MERGE_ORDERS: 'دمج طلب فيه', MERGED_INTO: 'اتدمج في طلب تاني',
-    SPLIT_ORDER: 'تقسيم', SPLIT_FROM: 'طلب جاي من تقسيم', TRANSFER_TABLE: 'نقل طاولة', UPDATE_ORDER_INFO: 'تعديل بيانات الطلب',
-    VOID_ITEM: 'إلغاء صنف', VOID_ITEM_CANCEL_ORDER: 'إلغاء صنف (الطلب اتلغى)' };
+    APPLY_DISCOUNT: 'خصم', REMOVE_DISCOUNT: 'احذف الخصم', CHANGE_CHARGES: 'تغيير الضريبة / الخدمة', CANCEL_ORDER: 'إلغاء الطلب',
+    CLOSE_ORDER: 'دفع وإغلاق', REFUND_ORDER: 'مرتجع', REFUND: 'مرتجع', MERGE_ORDERS: 'دمج طلب فيه', MERGED_INTO: 'تم دمجه في طلب آخر',
+    SPLIT_ORDER: 'تقسيم', SPLIT_FROM: 'طلب ناتج عن تقسيم', TRANSFER_TABLE: 'نقل طاولة', UPDATE_ORDER_INFO: 'تعديل بيانات الطلب',
+    VOID_ITEM: 'إلغاء صنف', VOID_ITEM_CANCEL_ORDER: 'إلغاء صنف (تم إلغاء الطلب)' };
 const SALES_STATION_NAMES = { kitchen: 'المطبخ', bar: 'البار', shisha: 'الشيشة' };
 
 let salesState = { tab: 'orders', from: null, to: null, branch: '', branches: [], filters: { status: 'all', order_type: '', waiter_id: '', cashier_id: '', search: '', late_only: false },
@@ -38,7 +38,7 @@ async function loadSalesScreen() {
             <label class="text-xs font-bold">من<br><input id="sales-from" type="date" value="${uiEsc(salesState.from)}" class="${uiInputClass()}"></label>
             <label class="text-xs font-bold">إلى<br><input id="sales-to" type="date" value="${uiEsc(salesState.to)}" class="${uiInputClass()}"></label>
             ${isOwner ? `<label class="text-xs font-bold">الفرع<br><select id="sales-branch" class="${uiInputClass()}"><option value="">كل الفروع</option>${salesState.branches.map(b => `<option value="${uiEsc(b.id)}" ${b.id === salesState.branch ? 'selected' : ''}>${uiEsc(b.name)}</option>`).join('')}</select></label>` : ''}
-            ${uiBtn('النهارده', 'salesQuick(0)', 'gray')}${uiBtn('امبارح', "salesQuick('y')", 'gray')}${uiBtn('آخر ٧ أيام', 'salesQuick(6)', 'gray')}${uiBtn('الشهر ده', "salesQuick('month')", 'gray')}
+            ${uiBtn('اليوم', 'salesQuick(0)', 'gray')}${uiBtn('الأمس', "salesQuick('y')", 'gray')}${uiBtn('آخر ٧ أيام', 'salesQuick(6)', 'gray')}${uiBtn('هذا الشهر', "salesQuick('month')", 'gray')}
         </div>
         ${salesState.tab === 'orders' ? salesFiltersHtml() : ''}
         <div class="mt-2">${uiBtn('عرض 🔍', 'salesRun()', 'blue')}</div>
@@ -53,12 +53,12 @@ function salesFiltersHtml() {
     const staff = (salesState.last && salesState.last.staff) || [];
     const opt = (list, val) => list.map(([v, l]) => `<option value="${uiEsc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${uiEsc(l)}</option>`).join('');
     return `<div class="flex flex-wrap items-end gap-2">
-        <label class="text-xs font-bold">الحالة<br><select id="sales-status" class="${uiInputClass()}">${opt([['all', 'الكل'], ['closed', 'مدفوع'], ['open', 'مفتوح'], ['cancelled', 'ملغي']], f.status)}</select></label>
+        <label class="text-xs font-bold">الحالة<br><select id="sales-status" class="${uiInputClass()}">${opt([['all', 'الكل'], ['closed', 'مدفوع'], ['open', 'مفتوح'], ['cancelled', 'ملغى']], f.status)}</select></label>
         <label class="text-xs font-bold">النوع<br><select id="sales-type" class="${uiInputClass()}">${opt([['', 'الكل'], ...Object.entries(PRINT_TYPE_NAMES)], f.order_type)}</select></label>
         <label class="text-xs font-bold">الويتر<br><select id="sales-waiter" class="${uiInputClass()}">${opt([['', 'الكل'], ...staff.filter(s => s.role === 'waiter' || s.role === 'branch_manager').map(s => [s.id, s.name])], f.waiter_id)}</select></label>
         <label class="text-xs font-bold">الكاشير<br><select id="sales-cashier" class="${uiInputClass()}">${opt([['', 'الكل'], ...staff.filter(s => s.role !== 'waiter').map(s => [s.id, s.name])], f.cashier_id)}</select></label>
-        <label class="text-xs font-bold">بحث<br><input id="sales-search" value="${uiEsc(f.search)}" placeholder="رقم الطلب / العميل / الموبايل / الطاولة" onkeydown="if(event.key==='Enter')salesRun()" class="${uiInputClass()} w-56"></label>
-        <label class="text-xs font-bold flex items-center gap-1 pb-2"><input id="sales-late" type="checkbox" ${f.late_only ? 'checked' : ''}> المتأخر بس</label>
+        <label class="text-xs font-bold">بحث<br><input id="sales-search" value="${uiEsc(f.search)}" placeholder="رقم الطلب / العميل / الهاتف / الطاولة" onkeydown="if(event.key==='Enter')salesRun()" class="${uiInputClass()} w-56"></label>
+        <label class="text-xs font-bold flex items-center gap-1 pb-2"><input id="sales-late" type="checkbox" ${f.late_only ? 'checked' : ''}> المتأخرة فقط</label>
     </div>`;
 }
 
@@ -83,7 +83,7 @@ async function salesRun() {
     salesReadPeriod();
     const box = document.getElementById('sales-result');
     if (!box) return;
-    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جاري التحميل...</p>';
+    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جارٍ التحميل...</p>';
     if (salesState.tab === 'timing') return salesRunTiming(box);
     const f = salesState.filters;
     if (document.getElementById('sales-status')) {
@@ -108,12 +108,12 @@ async function salesRun() {
             ${card('المبيعات المدفوعة', formatCurrency(s.closed_total), 'emerald')}
             ${card('عدد الطلبات المدفوعة', uiEsc(s.closed_count || 0), 'blue')}
             ${card('متوسط الفاتورة', formatCurrency(s.avg_ticket), 'sky')}
-            ${card('مفتوح دلوقتي', uiEsc(s.open_count || 0), 'amber')}
-            ${card('ملغي', uiEsc(s.cancelled_count || 0), 'red')}
+            ${card('مفتوح الآن', uiEsc(s.open_count || 0), 'amber')}
+            ${card('ملغى', uiEsc(s.cancelled_count || 0), 'red')}
             ${card('متأخر', `${uiEsc(s.late_count || 0)}${s.avg_prep !== null && s.avg_prep !== undefined ? ` <span class="text-xs">(متوسط التحضير ${uiEsc(s.avg_prep)} د)</span>` : ''}`, 'rose')}
         </div>
         <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
-            <p class="text-[11px] font-bold text-slate-500">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | ${rows.length} طلب${rows.length >= 1000 ? ' (أول ١٠٠٠ بس، ضيّق الفترة)' : ''} | دوس على أي طلب عشان تشوف تفاصيله</p>
+            <p class="text-[11px] font-bold text-slate-500">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | ${rows.length} طلب${rows.length >= 1000 ? ' (أول ١٠٠٠ سجل، ضيّق الفترة)' : ''} | اضغط على أي طلب لعرض تفاصيله</p>
             <div class="flex gap-2">${uiBtn('تصدير Excel 📗', 'exportReportExcel(salesExportRep())', 'green')}${uiBtn('PDF / طباعة 📄', 'printReportPdf(salesExportRep())', 'red')}</div>
         </div>
         ${rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${['رقم الطلب', 'الوقت', 'النوع', 'الطاولة', 'العميل', 'الويتر', 'الكاشير', 'الأصناف', 'الإجمالي', 'وقت التحضير', 'الدفع', 'الحالة']
@@ -131,14 +131,14 @@ async function salesRun() {
                 <td class="p-2 border-b ${r.late ? 'text-red-600 font-black' : ''}">${r.late ? '⚠️ ' : ''}${salesMin(r.prep_minutes)}</td>
                 <td class="p-2 border-b">${uiEsc((r.methods || '').split(',').filter(Boolean).map(m => PRINT_METHOD_NAMES[m] || m).join(' + ') || '-')}</td>
                 <td class="p-2 border-b">${uiEsc(SALES_STATUS_NAMES[r.status] || r.status)}</td></tr>`).join('')}
-            </tbody></table></div>` : '<p class="text-center text-slate-400 font-bold text-xs py-6">مفيش طلبات بالشروط دي</p>'}`;
+            </tbody></table></div>` : '<p class="text-center text-slate-400 font-bold text-xs py-6">لا توجد طلبات بهذه الشروط</p>'}`;
 }
 
 function salesExportRep() {
     const res = salesState.last || { rows: [] };
     return { key: 'sales_orders', title: 'المبيعات بالتفصيل', from: res.from, to: res.to, branch: res.branch,
         columns: [{ key: 'order_number', label: 'رقم الطلب', type: 't' }, { key: 'time', label: 'الوقت', type: 't' }, { key: 'type', label: 'النوع', type: 't' },
-            { key: 'table_number', label: 'الطاولة', type: 't' }, { key: 'customer', label: 'العميل', type: 't' }, { key: 'customer_phone', label: 'الموبايل', type: 't' },
+            { key: 'table_number', label: 'الطاولة', type: 't' }, { key: 'customer', label: 'العميل', type: 't' }, { key: 'customer_phone', label: 'الهاتف', type: 't' },
             { key: 'waiter', label: 'الويتر', type: 't' }, { key: 'cashier', label: 'الكاشير', type: 't' }, { key: 'items_count', label: 'الأصناف', type: 'n' },
             { key: 'total_amount', label: 'الإجمالي', type: 'm' }, { key: 'avg_prep', label: 'وقت التحضير (دقيقة)', type: 'n' },
             { key: 'late_text', label: 'متأخر', type: 't' }, { key: 'pay', label: 'الدفع', type: 't' }, { key: 'state', label: 'الحالة', type: 't' }],
@@ -175,7 +175,7 @@ async function salesOpenOrder(orderId) {
         const late = i.total_minutes !== null && i.total_minutes !== undefined && Number(i.total_minutes) > Number(warn[i.station] || 999);
         const off = i.status !== 'active';
         return `<tr class="border-b text-xs font-bold ${off ? 'text-slate-400' : ''}">
-            <td class="p-2"><span class="${off ? 'line-through' : ''}">${uiEsc(i.name)}</span>${off ? ` <span class="text-red-500">(ملغي${i.void_reason ? ': ' + uiEsc(i.void_reason) : ''})</span>` : ''}
+            <td class="p-2"><span class="${off ? 'line-through' : ''}">${uiEsc(i.name)}</span>${off ? ` <span class="text-red-500">(ملغى${i.void_reason ? ': ' + uiEsc(i.void_reason) : ''})</span>` : ''}
                 ${(i.modifiers || []).length ? `<div class="text-[11px] text-amber-600">+ ${(i.modifiers || []).map(m => `${uiEsc(m.name)}${Number(m.price) ? ' (' + formatCurrency(m.price) + ')' : ''}`).join('، ')}</div>` : ''}
                 ${i.notes ? `<div class="text-[11px] text-red-600">📝 ${uiEsc(i.notes)}</div>` : ''}</td>
             <td class="p-2">${uiEsc(i.quantity)}</td><td class="p-2">${formatCurrency(i.unit_price)}</td><td class="p-2">${formatCurrency(i.total_price)}</td>
@@ -191,7 +191,7 @@ async function salesOpenOrder(orderId) {
     salesModal(`
         <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-3 mb-3">
             <h3 class="font-black text-lg text-blue-700">طلب ${uiEsc(o.order_number)} <span class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-lg">${uiEsc(SALES_STATUS_NAMES[o.status] || o.status)}</span></h3>
-            <div class="flex gap-2">${uiBtn('طباعة الفاتورة 🖨️', `printOrderReceipt('${o.id}')`, 'gray')}${uiBtn('قفل ✖', "document.getElementById('sales-modal').remove()", 'gray')}</div>
+            <div class="flex gap-2">${uiBtn('طباعة الفاتورة 🖨️', `printOrderReceipt('${o.id}')`, 'gray')}${uiBtn('إغلاق ✖', "document.getElementById('sales-modal').remove()", 'gray')}</div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-bold mb-4">
             <div class="bg-slate-50 rounded-2xl p-3 space-y-1">
@@ -202,11 +202,11 @@ async function salesOpenOrder(orderId) {
                 ${line('ملاحظات الطلب', uiEsc(o.notes || ''))}
             </div>
             <div class="bg-slate-50 rounded-2xl p-3 space-y-1">
-                ${line('اتفتح', uiEsc(uiDate(o.created_at)))}${line('أول إرسال للمطبخ', salesTime(sent))}
-                ${line('آخر صنف جهز', ready ? salesTime(ready) : '<span class="text-amber-600">لسه</span>')}
-                ${line('اتقفل', o.closed_at ? uiEsc(uiDate(o.closed_at)) : '<span class="text-amber-600">لسه مفتوح</span>')}
+                ${line('فُتح الطلب', uiEsc(uiDate(o.created_at)))}${line('أول إرسال للمطبخ', salesTime(sent))}
+                ${line('آخر صنف جهز', ready ? salesTime(ready) : '<span class="text-amber-600">بعد</span>')}
+                ${line('تم إغلاقه', o.closed_at ? uiEsc(uiDate(o.closed_at)) : '<span class="text-amber-600">ما زال مفتوحًا</span>')}
                 ${line('من الإرسال للتجهيز', sent && ready ? salesMin(Math.round((new Date(ready) - new Date(sent)) / 6000) / 10) : '')}
-                ${line('من الفتح للقفل', o.closed_at ? salesMin(Math.round((new Date(o.closed_at) - new Date(o.created_at)) / 6000) / 10) : '')}
+                ${line('من الفتح حتى الإغلاق', o.closed_at ? salesMin(Math.round((new Date(o.closed_at) - new Date(o.created_at)) / 6000) / 10) : '')}
             </div>
             <div class="bg-slate-50 rounded-2xl p-3 space-y-1">
                 ${line('المجموع', formatCurrency(o.sub_total))}
@@ -219,11 +219,11 @@ async function salesOpenOrder(orderId) {
         <h4 class="font-black text-sm mb-1">الأصناف <span class="text-[11px] text-slate-400">(حد التأخير: المطبخ ${uiEsc(warn.kitchen)} د، البار ${uiEsc(warn.bar)} د، الشيشة ${uiEsc(warn.shisha)} د)</span></h4>
         <div class="overflow-x-auto mb-4"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500">
             <th class="p-2">الصنف</th><th class="p-2">الكمية</th><th class="p-2">السعر</th><th class="p-2">الإجمالي</th><th class="p-2">المكان</th>
-            <th class="p-2">اتبعت</th><th class="p-2">بدأ</th><th class="p-2">جهز</th><th class="p-2">اتقدم</th><th class="p-2">الوقت</th></tr></thead><tbody>${itemRows}</tbody></table></div>
+            <th class="p-2">أُرسل</th><th class="p-2">بدأ</th><th class="p-2">جهز</th><th class="p-2">قُدِّم</th><th class="p-2">الوقت</th></tr></thead><tbody>${itemRows}</tbody></table></div>
         <h4 class="font-black text-sm mb-1">الدفع</h4>
-        ${pays ? `<div class="overflow-x-auto mb-4"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th class="p-2">الطريقة</th><th class="p-2">المبلغ</th><th class="p-2">إكرامية</th><th class="p-2">الوقت</th><th class="p-2">الكاشير</th></tr></thead><tbody>${pays}</tbody></table></div>` : '<p class="text-xs text-slate-400 font-bold mb-4">لسه مدفعش</p>'}
-        <h4 class="font-black text-sm mb-1">مين عمل إيه</h4>
-        <div class="overflow-x-auto"><table class="w-full text-right"><tbody>${logs || '<tr><td class="text-xs text-slate-400 p-2">مفيش</td></tr>'}</tbody></table></div>`);
+        ${pays ? `<div class="overflow-x-auto mb-4"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th class="p-2">الطريقة</th><th class="p-2">المبلغ</th><th class="p-2">إكرامية</th><th class="p-2">الوقت</th><th class="p-2">الكاشير</th></tr></thead><tbody>${pays}</tbody></table></div>` : '<p class="text-xs text-slate-400 font-bold mb-4">لم يُدفع بعد</p>'}
+        <h4 class="font-black text-sm mb-1">حسب الموظف</h4>
+        <div class="overflow-x-auto"><table class="w-full text-right"><tbody>${logs || '<tr><td class="text-xs text-slate-400 p-2">لا يوجد</td></tr>'}</tbody></table></div>`);
 }
 
 // ---------------------------------------------------------------- timing
@@ -235,9 +235,9 @@ async function salesRunTiming(box) {
     const stationCards = st.map(s => `<div class="p-3 rounded-2xl border ${Number(s.late_pct) > 20 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}">
         <p class="font-black text-sm">${uiEsc(SALES_STATION_NAMES[s.station] || s.station)} <span class="text-[11px] text-slate-500">(الحد ${uiEsc(s.limit)} د)</span></p>
         <p class="text-xs font-bold mt-1">متوسط الوقت كله: <b>${salesMin(s.avg_total)}</b> | أطول وقت: ${salesMin(s.max_total)}</p>
-        <p class="text-xs font-bold">انتظار لحد ما يبدأ: ${salesMin(s.avg_wait)} | التحضير نفسه: ${salesMin(s.avg_prep)}</p>
-        <p class="text-xs font-bold">اتأخر: ${uiEsc(s.late_items)} من ${uiEsc(s.items)} صنف (${uiEsc(s.late_pct)}%)</p></div>`).join('');
-    const tbl = (head, rows) => rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${head.map(h => `<th class="p-2 text-[11px] text-white bg-blue-700 font-black">${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : '<p class="text-center text-slate-400 font-bold text-xs py-4">مفيش بيانات</p>';
+        <p class="text-xs font-bold">انتظار حتى البدء: ${salesMin(s.avg_wait)} | وقت التحضير: ${salesMin(s.avg_prep)}</p>
+        <p class="text-xs font-bold">تأخّر: ${uiEsc(s.late_items)} من ${uiEsc(s.items)} صنف (${uiEsc(s.late_pct)}%)</p></div>`).join('');
+    const tbl = (head, rows) => rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${head.map(h => `<th class="p-2 text-[11px] text-white bg-blue-700 font-black">${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : '<p class="text-center text-slate-400 font-bold text-xs py-4">لا توجد بيانات</p>';
     const prodRows = (res.by_product || []).map((p, i) => `<tr class="text-xs font-bold ${i % 2 ? 'bg-slate-50' : ''}"><td class="p-2 border-b">${uiEsc(p.product)}</td>
         <td class="p-2 border-b">${uiEsc(SALES_STATION_NAMES[p.station] || p.station)}</td><td class="p-2 border-b">${uiEsc(p.items)}</td>
         <td class="p-2 border-b">${salesMin(p.avg_total)}</td><td class="p-2 border-b">${salesMin(p.max_total)}</td>
@@ -250,12 +250,12 @@ async function salesRunTiming(box) {
         <td class="p-2 border-b">${uiEsc(SALES_STATION_NAMES[l.station] || l.station)}</td><td class="p-2 border-b">${uiEsc(l.products)}</td>
         <td class="p-2 border-b text-red-600 font-black">${salesMin(l.minutes)} <span class="text-[10px] text-slate-400">(الحد ${uiEsc(l.limit)})</span></td></tr>`);
     box.innerHTML = `
-        <p class="text-[11px] font-bold text-slate-500 mb-2">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | الحساب على الأصناف اللي اتعلّم عليها "جاهز" بس</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">${stationCards || '<p class="text-xs text-slate-400 font-bold">مفيش أصناف اتجهزت في الفترة دي</p>'}</div>
-        <h4 class="font-black text-sm mb-1">أبطأ الطلبات (دوس على الطلب لتفاصيله)</h4>
+        <p class="text-[11px] font-bold text-slate-500 mb-2">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | يُحسب على الأصناف المُعلَّم عليها «جاهز» فقط</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">${stationCards || '<p class="text-xs text-slate-400 font-bold">لا توجد أصناف جاهزة خلال هذه الفترة</p>'}</div>
+        <h4 class="font-black text-sm mb-1">أبطأ الطلبات (اضغط على الطلب لتفاصيله)</h4>
         ${tbl(['الطلب', 'الوقت', 'الطاولة', 'الويتر', 'المكان', 'الأصناف', 'خد'], lateRows)}
-        <h4 class="font-black text-sm mb-1 mt-4">كل صنف بياخد قد إيه (الأبطأ الأول)</h4>
-        ${tbl(['الصنف', 'المكان', 'عدد مرات', 'المتوسط', 'أطول وقت', 'اتأخر'], prodRows)}
+        <h4 class="font-black text-sm mb-1 mt-4">زمن تحضير كل صنف (الأبطأ أولًا)</h4>
+        ${tbl(['الصنف', 'المكان', 'عدد مرات', 'المتوسط', 'أطول وقت', 'تأخّر'], prodRows)}
         <h4 class="font-black text-sm mb-1 mt-4">حسب ساعة اليوم</h4>
-        ${tbl(['الساعة', 'عدد الأصناف', 'المتوسط', 'اتأخر'], hourRows)}`;
+        ${tbl(['الساعة', 'عدد الأصناف', 'المتوسط', 'تأخّر'], hourRows)}`;
 }

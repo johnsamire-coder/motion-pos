@@ -98,16 +98,16 @@ async function serverRpc(name, params = {}) {
     const { data, error } = await _supabase.rpc(name, { p_token: (typeof staffSessionToken !== 'undefined' ? staffSessionToken : null), ...params });
     if (error) {
         if (String(error.message || '').includes('session_invalid')) {
-            throw new Error('انتهت صلاحية الوردية. اخرج وادخل تاني برقمك.');
+            throw new Error('انتهت صلاحية الوردية. سجّل الخروج ثم ادخل برقمك.');
         }
         if (String(error.message || '').includes('not_allowed')) {
-            throw new Error('العملية دي مش مسموحة لدورك.');
+            throw new Error('هذه العملية غير مسموحة لدورك.');
         }
         if (String(error.message || '').includes('table_number_taken')) {
-            throw new Error('فيه طاولة بنفس الرقم في المنطقة دي');
+            throw new Error('توجد طاولة بنفس الرقم في هذه المنطقة');
         }
         if (String(error.message || '').includes('store_server_only')) {
-            throw new Error('الفرع ده شغال من كمبيوتر المحل. فتح الوردية والطلبات وقفل اليوم بيتعملوا من المحل بس.');
+            throw new Error('هذا الفرع يعمل من كمبيوتر المحل. فتح الوردية والطلبات وإغلاق اليوم تتم من المحل فقط.');
         }
         throw error;
     }
@@ -115,43 +115,43 @@ async function serverRpc(name, params = {}) {
 }
 
 const SERVER_REASON_MESSAGES = {
-    order_not_found: 'الطلب غير موجود في الفرع ده',
-    order_not_open: 'الطلب ده مقفول أو ملغي',
+    order_not_found: 'الطلب غير موجود في هذا الفرع',
+    order_not_open: 'هذا الطلب مغلق أو ملغى',
     empty_order: 'الطلب مفيهوش أصناف',
-    payment_mismatch: 'مجموع الدفعات لازم يساوي إجمالي الفاتورة بالظبط',
+    payment_mismatch: 'يجب أن يساوي مجموع الدفعات إجمالي الفاتورة تمامًا',
     invalid_payments: 'بيانات الدفع غير صحيحة',
     invalid_payment_method: 'طريقة الدفع غير صحيحة',
-    hospitality_disabled: 'الضيافة مقفولة من الإعدادات',
-    hospitality_limit: 'الضيافة دي هتعدّي الحد اليومي للمدير، محتاجة رقم المالك',
+    hospitality_disabled: 'الضيافة مغلقة من الإعدادات',
+    hospitality_limit: 'هذه الضيافة تتجاوز الحد اليومي للمدير، وتحتاج رقم المالك',
     hospitality_locked: 'طلب الضيافة مايتلغيش ومايترجعش',
     invalid_payment_amount: 'مبلغ الدفع غير صحيح (أرقام موجبة وبحد أقصى قرشين بعد العلامة)',
     invalid_tip: 'مبلغ الإكرامية غير صحيح',
-    invalid_tip_staff: 'اختار موظف الإكرامية من موظفين الفرع',
-    tip_needs_cash_or_card: 'الإكرامية لازم تتدفع كاش أو كارت، مش آجل',
-    credit_needs_customer: 'الدفع الآجل محتاج تختار العميل الأول',
-    customer_not_allowed_credit: 'العميل ده مش مسموح له بالآجل',
-    credit_limit_exceeded: 'العميل هيعدّي الحد المسموح له في الآجل',
-    order_has_old_payments: 'الطلب عليه دفعات قديمة. راجع المدير',
+    invalid_tip_staff: 'اختر موظف الإكرامية من موظفي الفرع',
+    tip_needs_cash_or_card: 'يجب دفع الإكرامية نقدًا أو كارت، وليس آجلًا',
+    credit_needs_customer: 'الدفع الآجل يحتاج اختيار العميل أولًا',
+    customer_not_allowed_credit: 'هذا العميل غير مصرّح له بالآجل',
+    credit_limit_exceeded: 'سيتجاوز العميل الحد المسموح له في الآجل',
+    order_has_old_payments: 'الطلب عليه دفعات سابقة. راجع المدير',
     order_has_payments: 'الطلب عليه دفعات',
     manager_pin: 'رقم المدير غير صحيح، أو الموافقة متوقفة مؤقتاً بسبب محاولات خاطئة كثيرة',
     bad_reason: 'سبب الإلغاء غير صحيح',
-    item_not_found: 'الصنف غير موجود أو الطلب مقفول',
+    item_not_found: 'الصنف غير موجود أو الطلب مغلق',
     discount_not_found: 'الخصم غير موجود',
-    invalid_discount: 'الخصم ده متسجّل غلط في الإعدادات',
+    invalid_discount: 'هذا الخصم مسجّل بشكل غير صحيح في الإعدادات',
     invalid_amount: 'المبلغ غير صحيح',
-    table_not_available: 'الطاولة دي مش فاضية',
-    table_not_in_branch: 'الطاولة مش تبع الفرع ده',
-    table_area_mismatch: 'الطاولة مش في المنطقة المختارة',
-    area_not_in_branch: 'المنطقة مش تبع الفرع ده',
+    table_not_available: 'هذه الطاولة غير متاحة',
+    table_not_in_branch: 'الطاولة لا تتبع هذا الفرع',
+    table_area_mismatch: 'الطاولة ليست في المنطقة المختارة',
+    area_not_in_branch: 'المنطقة لا تتبع هذا الفرع',
     same_table: 'الطلب على نفس الطاولة أصلاً',
-    source_not_open: 'الطلب اللي هيتدمج مقفول',
-    target_not_open: 'الطلب الحالي مقفول',
+    source_not_open: 'الطلب الذي سيُدمج فيه مُغلق',
+    target_not_open: 'الطلب الحالي مغلق',
     invalid_orders: 'اختيار الطلبات غلط',
-    nothing_left: 'لازم يفضل صنف واحد على الأقل في الطلب الأصلي',
+    nothing_left: 'يجب أن يتبقى صنف واحد على الأقل في الطلب الأصلي',
     quantity_too_big: 'الكمية أكبر من الموجود',
     duplicate_item: 'الصنف متكرر في التقسيم',
     invalid_items: 'بيانات الأصناف غير صحيحة',
-    waiter_not_in_branch: 'الويتر مش من موظفين الفرع',
+    waiter_not_in_branch: 'الويتر ليس من موظفي الفرع',
     customer_not_in_company: 'العميل غير موجود',
     invalid_guest_count: 'عدد الضيوف غير صحيح',
     invalid_order_type: 'نوع الطلب غير صحيح',
@@ -159,103 +159,103 @@ const SERVER_REASON_MESSAGES = {
     invalid_quantity: 'الكمية غير صحيحة',
     invalid_product_id: 'صنف غير صحيح',
     product_not_found: 'الصنف غير موجود',
-    product_not_available: 'الصنف ده موقوف',
-    product_not_in_branch_brand: 'الصنف مش من منيو الفرع ده',
-    required_modifier_missing: 'في إضافة لازم تختارها للصنف',
+    product_not_available: 'هذا الصنف موقوف',
+    product_not_in_branch_brand: 'الصنف ليس في قائمة هذا الفرع',
+    required_modifier_missing: 'توجد إضافة يجب اختيارها للصنف',
     too_many_modifiers: 'اخترت إضافات أكتر من المسموح',
-    modifier_not_for_product: 'إضافة مش تبع الصنف',
+    modifier_not_for_product: 'إضافة لا تتبع الصنف',
     invalid_modifier_ids: 'إضافات غير صحيحة',
     duplicate_modifier_id: 'إضافة متكررة',
     item_notes_too_long: 'الملاحظة طويلة جداً',
     item_total_out_of_range: 'المبلغ كبير جداً',
-    branch_brand_not_configured: 'الفرع مش مربوط ببراند',
+    branch_brand_not_configured: 'الفرع غير مرتبط بعلامة تجارية',
     branch_not_found: 'الفرع غير موجود',
-    session_scope_missing: 'حساب الموظف مش مربوط بفرع',
+    session_scope_missing: 'حساب الموظف غير مرتبط بفرع',
     invalid_input: 'بيانات غير صحيحة',
     invalid_status: 'حالة غير صحيحة',
-    not_allowed: 'العملية دي مش مسموحة لدورك',
-    owner_only: 'الإعدادات دي للمالك بس',
-    pin_duplicate: 'الرقم السري ده مكرر لأكتر من موظف. كلم المالك يغيّره',
-    store_server_only: 'الفرع ده شغال من كمبيوتر المحل. العملية دي بتتعمل من المحل بس',
-    store_offline: 'النت في المحل واقف دلوقتي',
-    conflict_not_found: 'التعارض ده اتقفل قبل كده',
-    retry_failed: 'لسه مش نافع يتكتب. صلّح السبب الأول وجرّب تاني',
+    not_allowed: 'هذه العملية غير مسموحة لدورك',
+    owner_only: 'هذه الإعدادات للمالك فقط',
+    pin_duplicate: 'الرقم السري مكرر لأكثر من موظف. اتصل بالمالك لتغييره',
+    store_server_only: 'هذا الفرع يعمل من كمبيوتر المحل. تتم هذه العملية من المحل فقط',
+    store_offline: 'الإنترنت في المحل متوقف الآن',
+    conflict_not_found: 'تم إغلاق هذا التعارض بالفعل',
+    retry_failed: 'لا يمكن الحفظ بعد. أصلح السبب أولًا ثم حاول مرة أخرى',
     unknown_action: 'عملية غير معروفة',
     invalid_name: 'الاسم غير صحيح',
     invalid_price: 'السعر غير صحيح',
     invalid_category: 'القسم غير صحيح',
     invalid_value: 'قيمة غير صحيحة',
-    confirm_text: 'الجملة اللي اتكتبت مش مظبوطة',
+    confirm_text: 'الجملة المكتوبة غير صحيحة',
     invalid_branch: 'الفرع غير صحيح',
-    invalid_percentage: 'النسبة لازم تكون من 0 لـ 100',
-    invalid_capacity: 'السعة لازم تكون رقم من 1 لـ 999',
+    invalid_percentage: 'يجب أن تكون النسبة بين 0 و100',
+    invalid_capacity: 'يجب أن تكون السعة رقمًا بين 1 و999',
     table_not_found: 'الطاولة غير موجودة',
     invalid_table_number: 'رقم الطاولة غير صحيح',
     area_not_found: 'المنطقة غير موجودة',
-    table_has_orders: 'مينفعش تمسح طاولة عليها طلبات سابقة',
-    no_open_shift: 'لازم تفتح ورديتك الأول من شاشة "الوردية"',
-    shift_already_open: 'عندك وردية مفتوحة بالفعل',
-    branch_shift_open: 'فيه وردية مفتوحة في الفرع ده بالفعل. لازم تتقفل الأول قبل ما تتفتح وردية جديدة',
-    not_your_account: 'الرقم السري ده مش بتاعك. كل موظف يسجّل حضوره وهو فاتح البرنامج بحسابه هو',
+    table_has_orders: 'لا يمكن حذف طاولة عليها طلبات سابقة',
+    no_open_shift: 'افتح وردية أولًا من شاشة «الوردية»',
+    shift_already_open: 'لديك وردية مفتوحة بالفعل',
+    branch_shift_open: 'توجد وردية مفتوحة في هذا الفرع بالفعل. يجب إغلاقها أولًا قبل فتح وردية جديدة',
+    not_your_account: 'الرقم السري ليس خاصًا بك. يسجّل كل موظف حضوره من حسابه داخل البرنامج',
     shift_not_found: 'الوردية غير موجودة',
     not_enough_cash: 'المبلغ أكبر من الموجود في الدرج',
     invalid_destination: 'الجهة غير صحيحة',
-    reason_required: 'لازم تكتب السبب أو الوصف',
+    reason_required: 'اكتب السبب أو الوصف',
     role_exists: 'فيه دور بنفس الاسم',
-    role_builtin: 'الدور ده أساسي ومينفعش يتحذف',
-    role_in_use: 'فيه موظفين على الدور ده. غيّر دورهم الأول',
-    grn_not_pending: 'الاستلام ده اترحّل أو اتلغى قبل كده',
-    grn_not_found: 'الاستلام مش موجود',
-    open_shifts_exist: 'في ورديات لسه مفتوحة. لازم تتقفل الأول',
-    day_already_closed: 'اليوم ده اتقفل قبل كده',
-    warehouse_not_allowed: 'المخزن ده مش تبع فرعك',
+    role_builtin: 'هذا الدور أساسي ولا يمكن حذفه',
+    role_in_use: 'يوجد موظفون على هذا الدور. غيّر أدوارهم أولًا',
+    grn_not_pending: 'تم ترحيل هذا الاستلام أو إلغاؤه من قبل',
+    grn_not_found: 'الاستلام غير موجود',
+    open_shifts_exist: 'توجد ورديات ما زالت مفتوحة. يجب إغلاقها أولًا',
+    day_already_closed: 'تم إغلاق هذا اليوم بالفعل',
+    warehouse_not_allowed: 'هذا المخزن لا يتبع فرعك',
     ingredient_not_found: 'الخامة غير موجودة',
     invalid_warehouses: 'اختيار المخازن غلط',
     transfer_not_found: 'التحويل غير موجود',
-    wrong_transfer_status: 'الخطوة دي مش مناسبة لحالة التحويل',
+    wrong_transfer_status: 'هذه الخطوة غير مناسبة لحالة التحويل',
     invalid_role: 'الدور غير صحيح',
-    staff_not_found: 'الموظف غير موجود أو مش تبعك',
-    cannot_disable_self: 'مينفعش توقف نفسك',
-    invalid_pin: 'الرقم السري لازم يكون 4 أرقام',
-    pin_taken: 'الرقم السري ده مستخدم لموظف تاني. اختار رقم تاني',
+    staff_not_found: 'الموظف غير موجود أو لا يتبعك',
+    cannot_disable_self: 'لا يمكن إيقاف نفسك',
+    invalid_pin: 'يجب أن يتكوّن الرقم السري من 4 أرقام',
+    pin_taken: 'الرقم السري مستخدم لموظف آخر. اختر رقمًا آخر',
     wrong_pin: 'الرقم السري غلط',
-    locked: 'متوقف مؤقتاً بسبب محاولات غلط كتير. استنى 10 دقايق',
-    payroll_not_draft: 'المرتبات دي اتعتمدت، مينفعش تتعدل',
-    payroll_not_approved: 'لازم تعتمد المرتبات الأول',
+    locked: 'متوقف مؤقتًا بسبب محاولات خاطئة كثيرة. انتظر 10 دقائق',
+    payroll_not_draft: 'تم اعتماد هذه المرتبات، ولا يمكن تعديلها',
+    payroll_not_approved: 'يجب اعتماد المرتبات أولًا',
     not_found: 'غير موجود',
-    owner_pin_required: 'المبلغ فوق حد المدير، ومحتاج رقم المالك',
+    owner_pin_required: 'المبلغ فوق حد المدير، ويحتاج رقم المالك',
     invalid_account: 'الحساب غير صحيح',
-    recurring_already_paid: 'المصروف المتكرر ده اتصرف الشهر ده',
-    no_custody: 'الموظف ده معهوش عهدة',
-    custody_amount_mismatch: 'المجموع أكبر من العهدة اللي معاه',
+    recurring_already_paid: 'تم صرف هذا المصروف المتكرر هذا الشهر',
+    no_custody: 'هذا الموظف لا توجد لديه عهدة',
+    custody_amount_mismatch: 'المجموع أكبر من العهدة المتاحة',
     supplier_not_found: 'المورد غير موجود',
     po_not_found: 'أمر الشراء غير موجود',
-    wrong_po_status: 'الخطوة دي مش مناسبة لحالة أمر الشراء',
-    invoice_duplicate: 'رقم الفاتورة ده متسجل قبل كده للمورد ده',
-    nothing_to_invoice: 'مفيش بضاعة مستلمة لسه من غير فاتورة',
-    invalid_period: 'الفترة غلط (لازم البداية قبل النهاية، وبحد أقصى سنتين)',
-    not_balanced: 'القيد مش متوازن: المدين لازم يساوي الدائن',
-    cannot_reverse: 'القيد ده مينفعش يتعكس من هنا (القيود اللي السيستم بيعملها بتتعكس من شاشتها)',
+    wrong_po_status: 'هذه الخطوة غير مناسبة لحالة أمر الشراء',
+    invoice_duplicate: 'رقم الفاتورة مسجّل من قبل لهذا المورد',
+    nothing_to_invoice: 'لا توجد بضاعة مستلمة بدون فاتورة بعد',
+    invalid_period: 'الفترة غير صحيحة (يجب أن تكون البداية قبل النهاية، وبحد أقصى سنتين)',
+    not_balanced: 'القيد غير متوازن: يجب أن يساوي المدين الدائن',
+    cannot_reverse: 'لا يمكن عكس هذا القيد من هنا (القيود التي ينشئها النظام تُعكس من شاشتها)',
     value_too_long: 'القيمة طويلة جداً',
-    invalid_logo: 'اللوجو لازم يكون صورة (PNG أو JPG أو WEBP أو SVG)',
-    qr_disabled: 'الخدمة دي متوقفة من الإعدادات',
-    phone_taken: 'رقم الموبايل ده متسجّل لعميل تاني',
-    invalid_phone: 'رقم الموبايل غلط (لازم ٨ أرقام على الأقل)',
+    invalid_logo: 'الشعار يجب أن يكون صورة (PNG أو JPG أو WEBP أو SVG)',
+    qr_disabled: 'هذه الخدمة متوقفة من الإعدادات',
+    phone_taken: 'رقم الهاتف مسجّل لعميل آخر',
+    invalid_phone: 'رقم الهاتف غير صحيح (٨ أرقام على الأقل)',
     invalid_date: 'التاريخ غلط',
     group_not_found: 'مجموعة الإضافات غير موجودة',
     modifier_not_found: 'الإضافة غير موجودة',
     invalid_selection_limits: 'أقل وأكتر عدد غلط: الأقل ميزيدش عن الأكتر، والأكتر ميزيدش عن عدد الإضافات',
-    too_many: 'طلبات كتير. حاول بعد شوية',
+    too_many: 'طلبات كثيرة. حاول بعد قليل',
     invalid_status: 'حالة غير صحيحة',
-    name_taken: 'الاسم ده موجود قبل كده',
-    category_not_empty: 'القسم فيه أصناف. انقلها أو امسحها الأول',
-    invalid_image: 'الصورة لازم تكون PNG أو JPG أو WEBP ومش كبيرة',
-    qr_handled: 'الطلب ده اتأكد أو اترفض قبل كده',
-    invalid_url: 'اللينك لازم يبدأ بـ https://',
-    last_branch: 'ده آخر فرع، مينفعش يتمسح',
-    branch_in_use: 'الفرع ده عليه شغل ومينفعش يتمسح. تقدر تغيّر اسمه بس',
-    warehouse_in_use: 'المخزن ده اتحرّك فيه بضاعة قبل كده، فمينفعش يتمسح. تقدر تغيّر اسمه',
-    table_number_taken: 'فيه طاولة بنفس الرقم في المنطقة دي'
+    name_taken: 'هذا الاسم موجود من قبل',
+    category_not_empty: 'القسم يحتوي على أصناف. انقلها أو احذفها أولًا',
+    invalid_image: 'يجب أن تكون الصورة PNG أو JPG أو WEBP وألا تكون كبيرة',
+    qr_handled: 'تم تأكيد هذا الطلب أو رفضه من قبل',
+    invalid_url: 'يجب أن يبدأ الرابط بـ https://',
+    last_branch: 'هذا آخر فرع، ولا يمكن حذفه',
+    branch_in_use: 'هذا الفرع مرتبط بعمليات ولا يمكن حذفه. يمكنك تغيير اسمه فقط',
+    warehouse_in_use: 'تحركت بضاعة في هذا المخزن من قبل، لذا لا يمكن حذفه. يمكنك تغيير اسمه',
+    table_number_taken: 'توجد طاولة بنفس الرقم في هذه المنطقة'
 };
 
 // إعدادات الشركة والشاشات (بتتحمّل بعد الدخول)
@@ -299,7 +299,7 @@ function canDo(perm) {
 
 function serverReasonMessage(res, fallback) {
     const reason = res && res.reason;
-    if (reason === 'branch_shift_open' && res.staff) return `فيه وردية مفتوحة في الفرع ده باسم ${res.staff}. لازم تتقفل الأول قبل ما تتفتح وردية جديدة`;
+    if (reason === 'branch_shift_open' && res.staff) return `توجد وردية مفتوحة في هذا الفرع باسم ${res.staff}. يجب إغلاقها قبل فتح وردية جديدة`;
     return SERVER_REASON_MESSAGES[reason] || fallback || ('تعذر تنفيذ العملية' + (reason ? ` (${reason})` : ''));
 }
 
@@ -332,11 +332,11 @@ function waLink(phone, text) {
 }
 function waOpen(phone, text) {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        showToast('مفيش نت دلوقتي، الرسالة مش هتتبعت. ابعتها لما النت يرجع.', 'error');
+        showToast('لا يوجد اتصال بالإنترنت الآن، لن تُرسَل الرسالة. أرسلها بعد عودة الاتصال.', 'error');
         return false;
     }
     const url = waLink(phone, text);
-    if (!url) { showToast('رقم الموبايل مش صحيح', 'error'); return false; }
+    if (!url) { showToast('رقم الهاتف غير صحيح', 'error'); return false; }
     window.open(url, '_blank', 'noopener');
     return true;
 }
@@ -651,7 +651,7 @@ function uiForm(title, fields, opts = {}) {
                     if (!v) return showErr(f.key, 'اكتب الجديد');
                     values[f.key + '_new'] = true;
                 } else v = String(el.value).trim();
-                if (f.required && (v === '' || v === null)) return showErr(f.key, 'الخانة دي لازم تتملى');
+                if (f.required && (v === '' || v === null)) return showErr(f.key, 'يجب تعبئة هذه الخانة');
                 if ((f.type === 'number' || f.type === 'money') && v !== '') {
                     const n = Number(v);
                     if (!Number.isFinite(n)) return showErr(f.key, 'اكتب رقم صحيح');

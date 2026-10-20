@@ -61,8 +61,8 @@ function renderKDSCards() {
     const grid = document.getElementById('kds-cards-grid');
     if (!grid) return;
     const rushBox = document.getElementById('kds-rush');
-    const rushHtml = kdsRush && kdsRush.on ? `🔥 زحمة دلوقتي: ${uiEsc(kdsRush.open)} طلب مفتوح. الطلبات الجديدة واخدة ${uiEsc(kdsRush.extra)} دقايق زيادة.`
-        : (kdsRush && Number(kdsRush.limit) > 0 ? `الطلبات المفتوحة ${uiEsc(kdsRush.open)} من ${uiEsc(kdsRush.limit)} (عند ${uiEsc(kdsRush.limit)} بتبقى زحمة)` : '');
+    const rushHtml = kdsRush && kdsRush.on ? `🔥 زحام الآن: ${uiEsc(kdsRush.open)} طلب مفتوح. الطلبات الجديدة تحتاج ${uiEsc(kdsRush.extra)} دقيقة إضافية.`
+        : (kdsRush && Number(kdsRush.limit) > 0 ? `الطلبات المفتوحة ${uiEsc(kdsRush.open)} من ${uiEsc(kdsRush.limit)} (عند ${uiEsc(kdsRush.limit)} يصبح المكان مزدحمًا)` : '');
     if (rushBox) { rushBox.innerHTML = rushHtml; rushBox.className = 'text-xs font-black rounded-xl px-3 py-1.5 ' + (kdsRush && kdsRush.on ? 'bg-red-600 text-white animate-pulse' : (rushHtml ? 'bg-slate-100 text-slate-600' : 'hidden')); }
     if (kdsOrders.length === 0) {
         grid.innerHTML = `<div class="col-span-3 text-center py-16 bg-white rounded-3xl border border-slate-200"><p class="text-slate-400 font-extrabold text-base">🎉 لا توجد طلبات معلقة هنا الآن!</p></div>`;
@@ -99,7 +99,7 @@ function renderKDSCards() {
                 ${!isPreparing
                     ? `<button onclick="updateKDSStatus('${ord.id}', 'preparing')" class="flex-1 bg-amber-500 text-white py-2.5 rounded-xl font-extrabold text-xs">بدء التحضير</button>`
                     : `<button onclick="updateKDSStatus('${ord.id}', 'ready')" class="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-extrabold text-xs">جاهز ✅</button>`}
-                    <button onclick="printStationTicket('${ord.id}', '${kdsStation}')" title="طباعة ورقة المكان ده" class="px-4 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-extrabold text-xs">🖨️ طباعة</button>
+                    <button onclick="printStationTicket('${ord.id}', '${kdsStation}')" title="طباعة إيصال هذه المحطة" class="px-4 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-extrabold text-xs"><svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg> طباعة</button>
                 </div>
             </div>`;
     }).join('');

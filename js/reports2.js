@@ -4,14 +4,14 @@ const REPORT_CATALOG = [
     ['المبيعات', [['sales_daily', 'المبيعات اليومية'], ['sales_monthly', 'المبيعات الشهرية'], ['sales_hourly', 'أوقات الذروة (بالساعة)'],
         ['sales_weekday', 'بأيام الأسبوع'], ['sales_payment_method', 'بطريقة الدفع'], ['sales_order_type', 'بنوع الطلب'],
         ['sales_category', 'بالقسم'], ['sales_item', 'بالصنف'], ['sales_modifiers', 'أكتر الإضافات'], ['sales_waiter', 'بالويتر'],
-        ['sales_cashier', 'بالكاشير'], ['sales_compare', 'مقارنة بالفترة اللي قبلها']]],
-    ['الربحية', [['item_profit', 'ربحية الأصناف وتصنيف المنيو'], ['category_profit', 'ربحية الأقسام'], ['daily_profit', 'الربح اليومي']]],
-    ['الخصومات والإلغاءات', [['discounts_detail', 'الخصومات بالتفصيل'], ['hospitality', 'الضيافة 🎁'], ['voids_detail', 'الإلغاءات بالتفصيل'], ['order_cancellations', 'الطلبات الملغية (تفاصيل كاملة)'], ['cancelled_order_items', 'أصناف الطلبات الملغية'], ['refunds_detail', 'المرتجعات والطلبات الملغية']]],
+        ['sales_cashier', 'بالكاشير'], ['sales_compare', 'مقارنة بالفترة السابقة']]],
+    ['الربحية', [['item_profit', 'ربحية الأصناف وتصنيف القائمة'], ['category_profit', 'ربحية الأقسام'], ['daily_profit', 'الربح اليومي']]],
+    ['الخصومات والإلغاءات', [['discounts_detail', 'الخصومات بالتفصيل'], ['hospitality', 'الضيافة 🎁'], ['voids_detail', 'الإلغاءات بالتفصيل'], ['order_cancellations', 'الطلبات الملغاة (تفاصيل كاملة)'], ['cancelled_order_items', 'أصناف الطلبات الملغاة'], ['refunds_detail', 'المرتجعات والطلبات الملغاة']]],
     ['مؤشرات السرقة', [['theft_indicators', 'مؤشرات السرقة لكل موظف'], ['long_open_orders', 'طلبات مفتوحة من وقت طويل'], ['manager_approvals', 'موافقات المديرين']]],
     ['المخازن', [['stock_valuation', 'تقييم المخزون'], ['waste_by_reason', 'الهالك بالسبب'], ['count_variances', 'فروقات الجرد'],
         ['low_stock', 'خامات تحت الحد'], ['stock_turnover', 'دوران المخزون'], ['transfers', 'التحويلات']]],
     ['المشتريات', [['purchases_by_supplier', 'بالمورد'], ['purchases_by_ingredient', 'بالخامة'], ['price_changes', 'تغيّر الأسعار'],
-        ['unmatched_invoices', 'فواتير مش مطابقة'], ['supplier_aging', 'أعمار ديون الموردين']]],
+        ['unmatched_invoices', 'فواتير غير مطابقة'], ['supplier_aging', 'أعمار ديون الموردين']]],
     ['الخزينة', [['cash_movements', 'حركة النقدية'], ['shifts', 'الورديات وفروقها'], ['expenses_by_category', 'المصروفات بالبند']]],
     ['العملاء', [['customer_balances', 'أرصدة الآجل'], ['top_customers', 'أكتر العملاء شراء']]],
     ['الموظفين', [['staff_activity', 'حركات الموظفين بالتفصيل'], ['staff_summary', 'ملخص كل موظف'], ['attendance', 'الحضور والتأخير'], ['tips_by_staff', 'الإكراميات'], ['staff_balances', 'أرصدة العجز والسلف']]],
@@ -36,9 +36,9 @@ async function loadReportsScreen() {
             <label class="text-xs font-bold">من<br><input id="rpt-from" type="date" value="${uiEsc(rptState.from)}" class="${uiInputClass()}"></label>
             <label class="text-xs font-bold">إلى<br><input id="rpt-to" type="date" value="${uiEsc(rptState.to)}" class="${uiInputClass()}"></label>
             ${isOwner ? `<label class="text-xs font-bold">الفرع<br><select id="rpt-branch" class="${uiInputClass()}"><option value="">كل الفروع</option>${rptState.branches.map(b => `<option value="${uiEsc(b.id)}" ${b.id === rptState.branch ? 'selected' : ''}>${uiEsc(b.name)}</option>`).join('')}</select></label>` : ''}
-            ${uiBtn('اليوم', "rptQuick(0)", 'gray')}${uiBtn('آخر ٧ أيام', "rptQuick(6)", 'gray')}${uiBtn('الشهر ده', "rptQuick('month')", 'gray')}${uiBtn('آخر ٣٠ يوم', "rptQuick(29)", 'gray')}
+            ${uiBtn('اليوم', "rptQuick(0)", 'gray')}${uiBtn('آخر ٧ أيام', "rptQuick(6)", 'gray')}${uiBtn('هذا الشهر', "rptQuick('month')", 'gray')}${uiBtn('آخر ٣٠ يوم', "rptQuick(29)", 'gray')}
         </div>
-        <p class="text-[11px] font-bold text-slate-500 mb-3">${uiDayStartHour() ? `🕗 اليوم في التقارير هو يوم الشغل: من الساعة ${uiDayStartHour()} الصبح لحد الساعة ${uiDayStartHour()} الصبح اللي بعده (تتغير من الإعدادات ← الشركة).` : '🕛 اليوم في التقارير من 12 بالليل لـ 12 بالليل. لو المحل بيسهر بعد نص الليل، غيّر "يوم الشغل بيبدأ الساعة" من الإعدادات ← الشركة.'}</p>
+        <p class="text-[11px] font-bold text-slate-500 mb-3">${uiDayStartHour() ? `🕗 اليوم في التقارير هو يوم العمل: من الساعة ${uiDayStartHour()} صباحًا حتى الساعة ${uiDayStartHour()} صباحًا اليوم التالي (يمكن تغييرها من الإعدادات ← الشركة).` : '🕛 اليوم في التقارير من 12 منتصف الليل إلى 12 منتصف الليل. وإذا كان المحل يعمل بعد منتصف الليل، غيّر "يوم العمل يبدأ الساعة" من الإعدادات ← الشركة.'}</p>
         ${catalog}
         <div id="rpt-result" class="mt-4"></div>`);
     runReport(rptState.key);
@@ -72,7 +72,7 @@ async function runReport(key) {
     });
     const box = document.getElementById('rpt-result');
     if (!box) return;
-    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جاري التحميل...</p>';
+    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جارٍ التحميل...</p>';
     const res = await uiCall('report_secure', { p_key: key, p_from: rptState.from, p_to: rptState.to, p_branch_id: rptState.branch || null });
     if (!res) { box.innerHTML = ''; return; }
     rptState.last = res;
@@ -87,5 +87,5 @@ async function runReport(key) {
             <div class="flex gap-2">${uiBtn('تصدير Excel 📗', 'exportReportExcel(rptState.last)', 'green')}${uiBtn('PDF / طباعة 📄', 'printReportPdf(rptState.last)', 'red')}</div>
         </div>
         ${res.rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${head}</tr></thead><tbody>${body}${foot}</tbody></table></div>`
-            : '<p class="text-center text-slate-400 font-bold text-xs py-6">مفيش بيانات في الفترة دي</p>'}`;
+            : '<p class="text-center text-slate-400 font-bold text-xs py-6">لا توجد بيانات خلال هذه الفترة</p>'}`;
 }

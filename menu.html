@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1c1410">
-    <title>المنيو</title>
+    <title>القائمة</title>
     <link rel="stylesheet" href="vendor/fonts/cairo.css">
     <script src="vendor/supabase.js"></script>
     <style>
@@ -132,7 +132,7 @@
 <body>
     <!-- صفحة الزبون: بتتفتح من كود الـ QR على الطاولة. من غير تسجيل دخول.
          يتفرج على المنيو، أو يطلب بنفسه (الطلب بيستنى الويتر يأكّده)، ونداء الويتر وطلب الحساب. -->
-    <div id="app"><p class="center-msg">جاري تحميل المنيو... ☕</p></div>
+    <div id="app"><p class="center-msg">جارٍ تحميل القائمة... ☕</p></div>
     <div class="bottom" id="bottom" style="display:none"><div class="inner" id="bottom-inner"></div></div>
     <div class="sheet-bg" id="sheet-bg" onclick="closeSheet()"></div>
     <div class="sheet" id="sheet"><div class="in" id="sheet-in"></div></div>
@@ -168,12 +168,12 @@
             try {
                 const data = await rpc('qr_menu_public', { p_qr: qrToken });
                 if (!data || !data.ok) {
-                    app.innerHTML = `<p class="center-msg">${data && data.reason === 'qr_disabled' ? 'المنيو مش متاح دلوقتي 🙏' : 'الكود ده مش صحيح. امسح الكود اللي على الطرابيزة تاني.'}</p>`;
+                    app.innerHTML = `<p class="center-msg">${data && data.reason === 'qr_disabled' ? 'القائمة غير متاحة الآن 🙏' : 'هذا الكود غير صحيح. امسح الرمز الموجود على الطاولة مرة أخرى.'}</p>`;
                     return;
                 }
                 M = data;
                 (M.categories || []).forEach(c => (c.products || []).forEach(p => { products[p.id] = p; }));
-                document.title = M.company_name || 'المنيو';
+                document.title = M.company_name || 'القائمة';
                 cart = (store(KEY + '_cart') || []).filter(l => products[l.product_id]);
                 mode = M.ordering ? (sessionStorage.getItem(KEY + '_mode') || null) : 'browse';
                 render();
@@ -181,7 +181,7 @@
                 if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) pollStatus(last.ref, false);
                 if (!mode) chooseMode();
             } catch (err) {
-                app.innerHTML = '<p class="center-msg">في مشكلة في الاتصال بالنت. حاول تاني 🙏</p>';
+                app.innerHTML = '<p class="center-msg">حدثت مشكلة في الاتصال بالإنترنت. حاول مرة أخرى 🙏</p>';
             }
         }
 
@@ -196,9 +196,9 @@
             openSheet(`<div style="text-align:center">
                 ${M.logo ? `<img src="${esc(M.logo)}" style="height:60px;margin:6px auto 4px;display:block;object-fit:contain">` : ''}
                 <h3>أهلاً بيك في ${esc(M.company_name || '')} 👋</h3>
-                <p class="muted" style="font-size:14px">طاولة ${esc(M.table_number)} | تحب تعمل إيه؟</p></div>
-                <button class="primary" onclick="setMode('order')">🛒 أطلب بنفسي من الموبايل</button>
-                <button class="ghost" onclick="setMode('browse')">👀 أتفرّج على المنيو بس (والويتر ياخد الطلب)</button>
+                <p class="muted" style="font-size:14px">طاولة ${esc(M.table_number)} | ماذا تريد أن تفعل؟</p></div>
+                <button class="primary" onclick="setMode('order')">🛒 أطلب بنفسي من الهاتف</button>
+                <button class="ghost" onclick="setMode('browse')">👀 تصفّح القائمة فقط (والويتر يسجّل الطلب)</button>
                 <p class="muted" style="text-align:center;margin-top:10px">تقدر تغيّر اختيارك في أي وقت من فوق.</p>`);
         }
 
@@ -213,18 +213,18 @@
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="chip">🪑 طاولة ${esc(M.table_number)}</span>${M.branch ? `<span class="sub" style="display:inline-flex;flex-direction:column;line-height:1.35">${esc(M.branch)}${M.branch_address ? `<small class="addr">${esc(M.branch_address)}</small>` : ''}</span>` : ''}</div>
                     ${M.welcome ? `<p class="welcome">${esc(M.welcome)}</p>` : ''}
                     ${M.ordering ? `<div class="modebar"><button class="modebtn ${mode === 'order' ? 'on' : ''}" onclick="setMode('order')">🛒 هطلب بنفسي</button>
-                        <button class="modebtn ${mode !== 'order' ? 'on' : ''}" onclick="setMode('browse')">👀 بتفرّج بس</button></div>` : ''}
+                        <button class="modebtn ${mode !== 'order' ? 'on' : ''}" onclick="setMode('browse')">👀 تصفّح فقط</button></div>` : ''}
                 </div></header>
                 <div class="cats"><div class="wrap">
                     <div class="row" id="cat-row">${cats.map((c, i) => `<button class="cat ${i === 0 ? 'on' : ''}" data-cat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')">${esc(c.name)}</button>`).join('')}</div>
-                    <div class="search"><span>🔍</span><input id="q" placeholder="دوّر على اللي نفسك فيه" oninput="filter(this.value)"></div>
+                    <div class="search"><span>🔍</span><input id="q" placeholder="ابحث عن أي صنف" oninput="filter(this.value)"></div>
                 </div></div>
                 <div class="shell">
                 <aside class="side-cats"><div class="scat-title">🗂️ الأقسام</div>${cats.map((c, i) => `<button class="scat ${i === 0 ? 'on' : ''}" data-scat="${esc(c.id)}" onclick="goCat('${esc(c.id)}')"><span class="ic">${iconFor(c.name)}</span><span>${esc(c.name)}</span></button>`).join('')}</aside>
                 <div class="wrap">
-                    ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الموبايل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.</div>' : ''}
+                    ${M.store_offline && M.ordering ? '<div class="tag-off">الطلب من الهاتف متوقف الآن 🙏 من فضلك اطلب من الويتر.</div>' : ''}
                     ${cats.map(c => `<section class="menu-sec" id="sec-${esc(c.id)}" data-sec="${esc(c.id)}"><h2>${esc(c.name)}</h2>
-                        <div class="items">${(c.products || []).map(itemHtml).join('')}</div></section>`).join('') || '<p class="center-msg">المنيو لسه بيتجهّز 🙏</p>'}
+                        <div class="items">${(c.products || []).map(itemHtml).join('')}</div></section>`).join('') || '<p class="center-msg">القائمة قيد التجهيز 🙏</p>'}
                     ${M.show_prices && taxNote ? `<p class="muted" style="text-align:center;padding:4px 14px">الأسعار مضاف عليها ${esc(taxNote)}</p>` : ''}
                     ${payInfoHtml()}
                     <div class="footer">
@@ -248,13 +248,13 @@
             if (!p.instapay && !p.wallet) return '';
             const row = (label, val, link) => `<div class="payrow"><div><div class="muted" style="font-size:12px">${esc(label)}</div><div class="payval">${esc(val)}</div></div>
                 <div style="display:flex;gap:6px">${link ? `<a class="paybtn" href="${esc(link)}" target="_blank" rel="noopener">ادفع</a>` : ''}<button class="paybtn" onclick="copyText('${esc(val)}', this)">نسخ</button></div></div>`;
-            return `<div class="paybox"><h3>💳 تقدر تدفع بتحويل</h3>
+            return `<div class="paybox"><h3>💳 يمكنك الدفع عن طريق تحويل</h3>
                 ${p.instapay ? row('إنستاباي', p.instapay, /^https?:\/\//.test(p.instapay_link || '') ? p.instapay_link : '') : ''}
                 ${p.wallet ? row(p.wallet_name || 'محفظة', p.wallet, '') : ''}
                 <p class="muted" style="font-size:12px;margin:6px 2px 0">بعد التحويل وري الويتر أو الكاشير رسالة التحويل 🙏</p></div>`;
         }
         function copyText(t, btn) {
-            const done = () => { if (btn) { btn.textContent = 'اتنسخ ✓'; setTimeout(() => { btn.textContent = 'نسخ'; }, 1500); } };
+            const done = () => { if (btn) { btn.textContent = 'تم النسخ ✓'; setTimeout(() => { btn.textContent = 'نسخ'; }, 1500); } };
             try { navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done)); } catch (e) { fallbackCopy(t, done); }
         }
         function fallbackCopy(t, done) {
@@ -337,7 +337,7 @@
             if (!box) return;
             const n = cartCount();
             const svc = [
-                M.call_waiter ? `<button class="svc" onclick="svc('waiter')">🙋 نادي الويتر</button>` : '',
+                M.call_waiter ? `<button class="svc" onclick="svc('waiter')">🙋 استدعاء الويتر</button>` : '',
                 M.request_bill ? `<button class="svc" onclick="svc('bill')">🧾 الحساب</button>` : '',
             ].filter(Boolean).join('');
             const last = store(KEY + '_last');
@@ -349,14 +349,14 @@
                         <div class="n">${esc(p.name)}${mods.length ? `<small>+ ${esc(mods.join('، '))}</small>` : ''}${l.note ? `<small>📝 ${esc(l.note)}</small>` : ''}
                         ${M.show_prices ? `<small>${money(lineUnit(l) * l.qty)} ${esc(cur())}</small>` : ''}</div>
                         <div class="qty"><button onclick="lineQty(${i},-1)">${l.qty === 1 ? '🗑' : '−'}</button><b>${l.qty}</b><button onclick="lineQty(${i},1)">+</button></div>
-                        <button class="rm" onclick="removeLine(${i})" title="شيل الصنف">✕</button></div>`; }).join('');
+                        <button class="rm" onclick="removeLine(${i})" title="حذف الصنف">✕</button></div>`; }).join('');
                 body = `${lines}
                     ${M.show_prices && canOrder() ? `<div class="tot"><span>الإجمالي</span><span>${money(cartTotal())} ${esc(cur())}</span></div>` : ''}
                     ${canOrder() ? `<button class="primary" onclick="askInfo()">إتمام الطلب ✈️</button>`
-                        : `<p class="side-empty">حوّل لوضع "هطلب بنفسي" من فوق عشان تكمّل الطلب</p>`}`;
+                        : `<p class="side-empty">حوّل إلى وضع "أطلب بنفسي" من الأعلى لإكمال الطلب</p>`}`;
             } else {
-                body = `<div class="side-empty">${canOrder() ? 'السلة فاضية 🛒<br>دوس على أي صنف وضيفه هنا'
-                    : (M.ordering ? 'حوّل لوضع "هطلب بنفسي" من فوق عشان تطلب' : 'اطلب من الويتر على طول 🙋')}</div>`;
+                body = `<div class="side-empty">${canOrder() ? 'السلة فارغة 🛒<br>اضغط على أي صنف وأضفه هنا'
+                    : (M.ordering ? 'حوّل إلى وضع "أطلب بنفسي" من الأعلى للطلب' : 'اطلب من الويتر مباشرة 🙋')}</div>`;
             }
             box.innerHTML = `<h3>🛒 سلة الطلبات ${n ? `<span class="count">${n}</span>` : ''}</h3>${body}
                 ${(svc || myBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${svc}${myBtn}</div>` : ''}`;
@@ -376,7 +376,7 @@
             let html = '';
             if (canOrder() && n) html = `<button class="cartbar" onclick="openCart()"><span><span class="count">${n}</span>اعرض طلبك</span><span>${money(cartTotal())} ${esc(cur())}</span></button>`;
             else {
-                if (M.call_waiter) html += `<button class="svc" onclick="svc('waiter')">🙋 نادي الويتر</button>`;
+                if (M.call_waiter) html += `<button class="svc" onclick="svc('waiter')">🙋 استدعاء الويتر</button>`;
                 if (M.request_bill) html += `<button class="svc" onclick="svc('bill')">🧾 الحساب</button>`;
                 const last = store(KEY + '_last');
                 if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) html += `<button class="svc" onclick="pollStatus('${esc(last.ref)}', true)">📦 طلبي</button>`;
@@ -407,15 +407,15 @@
                 ${p.description ? `<p class="muted" style="font-size:14px;line-height:1.8">${esc(p.description)}</p>` : ''}
                 ${M.show_prices ? `<div class="price" style="font-size:19px">${money(p.price)} <small>${esc(cur())}</small></div>` : ''}
                 ${canOrder() ? `
-                ${groups.map((g, gi) => `<div class="grp"><div class="t">${esc(g.name)} <span>${g.min > 0 ? (g.max === 1 ? 'اختار واحد' : `اختار ${g.min} على الأقل`) : 'اختياري'}${g.max > 1 ? ` (لحد ${g.max})` : ''}</span></div>
+                ${groups.map((g, gi) => `<div class="grp"><div class="t">${esc(g.name)} <span>${g.min > 0 ? (g.max === 1 ? 'اختر واحدًا' : `اختر ${g.min} على الأقل`) : 'اختياري'}${g.max > 1 ? ` (حتى ${g.max})` : ''}</span></div>
                     ${g.modifiers.map(m => `<label class="opt"><span>${esc(m.name)} ${Number(m.price) ? `<small class="muted">+${money(m.price)}</small>` : ''}</span>
                         <input type="${g.max === 1 ? 'radio' : 'checkbox'}" name="g${gi}" value="${esc(m.id)}" onchange="pickMod(${gi}, this)"></label>`).join('')}</div>`).join('')}
-                <label class="l">ملاحظة (اختياري)</label><input class="field" id="item-note" maxlength="200" placeholder="مثلاً: سكر خفيف، من غير بصل">
+                <label class="l">ملاحظة (اختياري)</label><input class="field" id="item-note" maxlength="200" placeholder="مثلاً: سكر خفيف، بدون بصل">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
                     <div class="qty"><button onclick="setQty(-1)">−</button><b id="item-qty">1</b><button onclick="setQty(1)">+</button></div>
                     <span class="price" id="item-total"></span></div>
                 <p class="err" id="item-err"></p>
-                <button class="primary" onclick="addCurrent()">أضف للطلب 🛒</button>` : (M.ordering && !M.store_offline ? `<button class="primary" onclick="setMode('order'); openItem('${esc(id)}')">🛒 أطلب ده بنفسي</button>` : '')}
+                <button class="primary" onclick="addCurrent()">أضف إلى الطلب 🛒</button>` : (M.ordering && !M.store_offline ? `<button class="primary" onclick="setMode('order'); openItem('${esc(id)}')">🛒 أطلب بنفسي</button>` : '')}
                 <button class="ghost" onclick="closeSheet()">رجوع</button>`);
             if (p.has_image && !imgCache[id]) rpc('qr_image_public', { p_qr: qrToken, p_product_id: id }).then(x => { imgCache[id] = x || ''; const b = document.getElementById('big-img'); if (b && x) b.src = x; }).catch(() => {});
             itemTotal();
@@ -437,7 +437,7 @@
             const p = products[current.product_id];
             for (const g of (p.groups || [])) {
                 const n = current.mods.filter(id => g.modifiers.some(m => m.id === id)).length;
-                if (n < g.min) { const e = document.getElementById('item-err'); e.textContent = `لازم تختار من "${g.name}"`; e.style.display = 'block'; return; }
+                if (n < g.min) { const e = document.getElementById('item-err'); e.textContent = `اختر من "${g.name}"`; e.style.display = 'block'; return; }
             }
             current.note = (document.getElementById('item-note')?.value || '').trim();
             const key = current.product_id + '|' + [...current.mods].sort().join(',') + '|' + current.note;
@@ -445,7 +445,7 @@
             if (ex) ex.qty = Math.min(20, ex.qty + current.qty); else cart.push({ key, ...current });
             saveCart();
             closeSheet();
-            toast(`✅ ${p.name} اتضاف للطلب`);
+            toast(`✅ ${p.name} تمت إضافته للطلب`);
             render();
         }
 
@@ -457,11 +457,11 @@
                     return `<div class="cline"><div class="n">${esc(p.name)}${mods.length ? `<small>+ ${esc(mods.join('، '))}</small>` : ''}${l.note ? `<small>📝 ${esc(l.note)}</small>` : ''}
                         ${M.show_prices ? `<small>${money(lineUnit(l) * l.qty)} ${esc(cur())}</small>` : ''}</div>
                         <div class="qty"><button onclick="lineQty(${i},-1)">${l.qty === 1 ? '🗑' : '−'}</button><b>${l.qty}</b><button onclick="lineQty(${i},1)">+</button></div></div>`; }).join('')}
-                <label class="l">ملاحظة للطلب كله (اختياري)</label><input class="field" id="order-note" maxlength="300" value="${esc(store(KEY + '_note') || '')}" oninput="store(KEY + '_note', this.value)">
+                <label class="l">ملاحظة عامة للطلب (اختياري)</label><input class="field" id="order-note" maxlength="300" value="${esc(store(KEY + '_note') || '')}" oninput="store(KEY + '_note', this.value)">
                 ${M.show_prices ? `<div class="tot"><span>المجموع</span><span>${money(cartTotal())} ${esc(cur())}</span></div>
-                    <p class="muted">${M.vat_inclusive ? '' : 'الضريبة والخدمة بتتحسب على الفاتورة.'} الويتر هيأكّد طلبك قبل ما يدخل المطبخ.</p>` : ''}
+                    <p class="muted">${M.vat_inclusive ? '' : 'تُحسب الضريبة والخدمة على الفاتورة.'} سيؤكّد الويتر طلبك قبل دخوله المطبخ.</p>` : ''}
                 <button class="primary" onclick="askInfo()">إرسال الطلب ✈️</button>
-                <button class="ghost" onclick="closeSheet()">أضيف حاجة تانية</button>`);
+                <button class="ghost" onclick="closeSheet()">أضف صنفًا آخر</button>`);
         }
         function lineQty(i, d) {
             cart[i].qty += d;
@@ -476,9 +476,9 @@
             openSheet(`<h3>آخر خطوة 🙌</h3>
                 <div class="note"><span style="font-size:20px">🔒</span><span>${esc(M.privacy_note || '')}</span></div>
                 <label class="l">اسمك *</label><input class="field" id="c-name" maxlength="80" value="${esc(me.name || '')}" autocomplete="name">
-                <label class="l">رقم موبايلك *</label><input class="field" id="c-phone" type="tel" inputmode="tel" maxlength="16" dir="ltr" style="text-align:right" value="${esc(me.phone || '')}" autocomplete="tel" placeholder="01xxxxxxxxx">
+                <label class="l">رقم هاتفك *</label><input class="field" id="c-phone" type="tel" inputmode="tel" maxlength="16" dir="ltr" style="text-align:right" value="${esc(me.phone || '')}" autocomplete="tel" placeholder="01xxxxxxxxx">
                 <label class="l">تاريخ ميلادك (اختياري) 🎂</label><input class="field" id="c-bd" type="date" value="${esc(me.birthday || '')}">
-                <label class="opt" style="border:0;margin-top:6px"><span class="muted" style="font-size:13px">افتكر بياناتي على الموبايل ده</span><input type="checkbox" id="c-remember" ${me.name ? 'checked' : 'checked'}></label>
+                <label class="opt" style="border:0;margin-top:6px"><span class="muted" style="font-size:13px">تذكر بياناتي على هذا الجهاز</span><input type="checkbox" id="c-remember" ${me.name ? 'checked' : 'checked'}></label>
                 <p class="err" id="c-err"></p>
                 <button class="primary" id="send-btn" onclick="sendOrder()">تأكيد وإرسال للويتر ✅</button>
                 <button class="ghost" onclick="openCart()">رجوع للطلب</button>`);
@@ -490,18 +490,18 @@
             const bd = document.getElementById('c-bd').value;
             const err = document.getElementById('c-err');
             const digits = phone.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g, '');
-            if (!name) { err.textContent = 'اكتب اسمك من فضلك'; err.style.display = 'block'; return; }
-            if (digits.length < 8) { err.textContent = 'رقم الموبايل مش مظبوط'; err.style.display = 'block'; return; }
+            if (!name) { err.textContent = 'من فضلك اكتب اسمك'; err.style.display = 'block'; return; }
+            if (digits.length < 8) { err.textContent = 'رقم الهاتف غير صحيح'; err.style.display = 'block'; return; }
             if (document.getElementById('c-remember').checked) store('motion_menu_me', { name, phone, birthday: bd }); else store('motion_menu_me', {});
-            const btn = document.getElementById('send-btn'); btn.disabled = true; btn.textContent = 'جاري الإرسال...';
+            const btn = document.getElementById('send-btn'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال...';
             try {
                 const res = await rpc('qr_order_public', { p_qr: qrToken, p_items: cart.map(l => ({ product_id: l.product_id, quantity: l.qty, modifier_ids: l.mods, item_notes: l.note || null })),
                     p_name: name, p_phone: phone, p_birthday: bd || null, p_note: (store(KEY + '_note') || '').trim() || null });
                 if (!res || !res.ok) {
-                    const m = { too_many: 'عندك طلب لسه مستني الويتر. استنى ثانية لحد ما يأكّده 🙏', store_offline: 'النت في المحل واقف دلوقتي 🙏 من فضلك اطلب من الويتر.',
-                        product_not_available: 'صنف من اللي اخترتهم خلص دلوقتي. شيله وجرّب تاني.', invalid_phone: 'رقم الموبايل مش مظبوط', invalid_name: 'اكتب اسمك من فضلك',
-                        invalid_date: 'تاريخ الميلاد مش مظبوط', required_modifier_missing: 'في صنف محتاج تختار له إضافة', qr_disabled: 'الطلب من الموبايل متوقف دلوقتي' }[res && res.reason];
-                    err.textContent = m || 'تعذر الإرسال. حاول تاني.'; err.style.display = 'block';
+                    const m = { too_many: 'لديك طلب ما زال في انتظار تأكيد الويتر. انتظر لحظة 🙏', store_offline: 'الإنترنت في المحل متوقف الآن 🙏 من فضلك اطلب من الويتر.',
+                        product_not_available: 'أحد الأصناف المختارة غير متوفر الآن. احذفه وحاول مرة أخرى.', invalid_phone: 'رقم الهاتف غير صحيح', invalid_name: 'من فضلك اكتب اسمك',
+                        invalid_date: 'تاريخ الميلاد غير صحيح', required_modifier_missing: 'يوجد صنف يحتاج اختيار إضافة له', qr_disabled: 'الطلب من الهاتف متوقف الآن' }[res && res.reason];
+                    err.textContent = m || 'تعذّر الإرسال. حاول مرة أخرى.'; err.style.display = 'block';
                     btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
                     return;
                 }
@@ -510,7 +510,7 @@
                 render();
                 pollStatus(res.ref, true);
             } catch (e) {
-                err.textContent = 'في مشكلة في النت. حاول تاني.'; err.style.display = 'block';
+                err.textContent = 'حدثت مشكلة في الإنترنت. حاول مرة أخرى.'; err.style.display = 'block';
                 btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
             }
         }
@@ -521,10 +521,10 @@
                 if (!show && st.status === 'pending') { show = true; }
                 if (!show) return;
                 const body = st.status === 'accepted'
-                    ? `<div class="status"><div class="ic">🎉</div><h3>طلبك اتأكد!</h3><p class="muted" style="font-size:15px">رقم طلبك <b>${esc(st.order_number || '')}</b> والمطبخ بيجهّزه دلوقتي. بالهنا والشفا ❤️</p></div>`
+                    ? `<div class="status"><div class="ic">🎉</div><h3>تم تأكيد طلبك!</h3><p class="muted" style="font-size:15px">رقم طلبك <b>${esc(st.order_number || '')}</b> والمطبخ يجهّزه الآن. بالهنا والشفا ❤️</p></div>`
                     : st.status === 'rejected'
-                        ? `<div class="status"><div class="ic">🙏</div><h3>الطلب ماتأكدش</h3><p class="muted" style="font-size:15px">${esc(st.reject_reason || '')}</p></div>`
-                        : `<div class="status"><div class="spinner"></div><h3>طلبك وصل للويتر ✅</h3><p class="muted" style="font-size:15px">مستنيين الويتر يأكّده (ثواني). سيب الصفحة دي مفتوحة.</p></div>`;
+                        ? `<div class="status"><div class="ic">🙏</div><h3>لم يتم تأكيد الطلب</h3><p class="muted" style="font-size:15px">${esc(st.reject_reason || '')}</p></div>`
+                        : `<div class="status"><div class="spinner"></div><h3>وصل طلبك إلى الويتر ✅</h3><p class="muted" style="font-size:15px">في انتظار تأكيد الويتر (ثوانٍ). اترك هذه الصفحة مفتوحة.</p></div>`;
                 openSheet(body + `<button class="ghost" onclick="closeSheet()">تمام</button>`);
             };
             const tick = async () => {
@@ -543,12 +543,12 @@
             try {
                 const data = await rpc('qr_request_public', { p_qr: qrToken, p_type: type });
                 if (!data || !data.ok) {
-                    toast(data && data.reason === 'too_many' ? 'طلبات كتير. الويتر جاي حالاً 🙏'
-                        : data && data.reason === 'store_offline' ? 'النت في المحل واقف دلوقتي 🙏 من فضلك نادي الويتر بإيدك.' : 'تعذر الإرسال. حاول تاني.', 3500);
+                    toast(data && data.reason === 'too_many' ? 'طلبات كثيرة. الويتر قادم فورًا 🙏'
+                        : data && data.reason === 'store_offline' ? 'الإنترنت في المحل متوقف الآن 🙏 من فضلك استدعِ الويتر مباشرة.' : 'تعذّر الإرسال. حاول مرة أخرى.', 3500);
                     return;
                 }
-                toast(type === 'bill' ? '🧾 تم طلب الحساب، الويتر جاي بالفاتورة' : '🙋 تم النداء، الويتر جاي حالاً', 3500);
-            } catch (err) { toast('في مشكلة في الاتصال. حاول تاني.'); }
+                toast(type === 'bill' ? '🧾 تم طلب الحساب، الويتر قادم بالفاتورة' : '🙋 تم الاستدعاء، الويتر قادم فورًا', 3500);
+            } catch (err) { toast('حدثت مشكلة في الاتصال. حاول مرة أخرى.'); }
         }
 
         // لما حجم الشاشة يتغير بين الموبايل والشاشة الكبيرة، ارسم تاني بالشكل المناسب

@@ -75,18 +75,18 @@ function buildReceiptHtml(o, s) {
         ${receiptPayInfoHtml(s, o)}
         <div class="line"></div>
         ${r.footer ? `<div class="c">${uiEsc(r.footer)}</div>` : ''}
-        ${Number(o.loyalty_amount) ? `<div class="c">شكراً إنك من عملائنا الدايمين ⭐</div>` : ''}
-        ${o._fbqr ? `<div class="line"></div><div class="c">رأيك يهمنا 🙏 امسح الكود واكتبلنا</div><div class="c"><img src="${o._fbqr}" style="width:28mm;height:28mm"></div>` : ''}`;
+        ${Number(o.loyalty_amount) ? `<div class="c">شكراً إنك من عملائنا الدائمين ⭐</div>` : ''}
+        ${o._fbqr ? `<div class="line"></div><div class="c">رأيك يهمنا 🙏 امسح الرمز واكتب لنا</div><div class="c"><img src="${o._fbqr}" style="width:28mm;height:28mm"></div>` : ''}`;
 }
 
 // أرقام الدفع (إنستاباي والمحفظة) عشان العميل يقدر يحوّل
 function receiptPayInfoHtml(s, o) {
     const p = (s && s.payinfo) || {};
     if (p.show_on_receipt === false || (!p.instapay && !p.wallet)) return '';
-    return `<div class="line"></div><div class="c b">${o.status === 'closed' ? 'للدفع المرة الجاية' : 'تقدر تدفع بتحويل'}</div>
+    return `<div class="line"></div><div class="c b">${o.status === 'closed' ? 'للدفع المرة القادمة' : 'يمكنك الدفع عن طريق تحويل'}</div>
         ${p.instapay ? `<div class="c">إنستاباي: <b>${uiEsc(p.instapay)}</b></div>` : ''}
         ${p.wallet ? `<div class="c">${uiEsc(p.wallet_name || 'محفظة')}: <b>${uiEsc(p.wallet)}</b></div>` : ''}
-        ${o._payqr ? `<div class="c"><img src="${o._payqr}" style="width:24mm;height:24mm"></div><div class="c">امسح الكود للدفع بإنستاباي</div>` : ''}`;
+        ${o._payqr ? `<div class="c"><img src="${o._payqr}" style="width:24mm;height:24mm"></div><div class="c">امسح الرمز للدفع عبر إنستاباي</div>` : ''}`;
 }
 
 function buildKitchenTicketHtml(o, station) {
@@ -140,7 +140,7 @@ async function printStationTicket(orderId, station) {
     const res = await loadPrintData(orderId);
     if (!res) return;
     const html = buildKitchenTicketHtml(res.order, station);
-    if (!html) return showToast('مفيش أصناف للمكان ده في الطلب', 'error');
+    if (!html) return showToast('لا توجد أصناف لهذه المحطة في الطلب', 'error');
     printHtml(html, receiptPageCss());
 }
 
@@ -177,7 +177,7 @@ function printReportPdf(rep) {
             <div class="sub">${uiEsc([g.address, g.phone, g.tax_number ? 'رقم ضريبي ' + g.tax_number : ''].filter(Boolean).join(' | '))}</div></div>
         </div>
         <h1>${uiEsc(rep.title)}</h1>
-        <div class="meta">الفترة: ${uiEsc(rep.from)} إلى ${uiEsc(rep.to)} | الفرع: ${uiEsc(rep.branch || '')} | اتطبع: ${uiEsc(uiDate(new Date().toISOString()))} بواسطة ${uiEsc(currentUser?.name || '')}</div>
+        <div class="meta">الفترة: ${uiEsc(rep.from)} إلى ${uiEsc(rep.to)} | الفرع: ${uiEsc(rep.branch || '')} | تاريخ الطباعة: ${uiEsc(uiDate(new Date().toISOString()))} بواسطة ${uiEsc(currentUser?.name || '')}</div>
         <table><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${rep.columns.length}" class="c">لا توجد بيانات</td></tr>`}${foot}</tbody></table>`,
         `@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 12mm; } body { font-size: 11px; }
          .hdr { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #1d4ed8; padding-bottom: 8px; margin-bottom: 10px; }
@@ -202,7 +202,7 @@ function loadScriptOnce(src) {
     _motionScripts[src] = new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = src; s.onload = resolve;
-        s.onerror = () => { delete _motionScripts[src]; s.remove(); reject(new Error('تعذر تحميل مكتبة من الموقع. اعمل تحديث للصفحة.')); };
+        s.onerror = () => { delete _motionScripts[src]; s.remove(); reject(new Error('تعذر تحميل مكتبة من الموقع. حدّث الصفحة.')); };
         document.head.appendChild(s);
     });
     return _motionScripts[src];
@@ -228,7 +228,7 @@ async function exportReportExcel(rep) {
         ws.mergeCells(2, startCol, 2, n); ws.getCell(2, startCol).value = [g.address, g.phone, g.tax_number ? 'رقم ضريبي ' + g.tax_number : ''].filter(Boolean).join(' | ');
         ws.mergeCells(3, startCol, 3, n); ws.getCell(3, startCol).value = rep.title;
         ws.getCell(3, startCol).font = { bold: true, size: 13 };
-        ws.mergeCells(4, startCol, 4, n); ws.getCell(4, startCol).value = `الفترة: ${rep.from} إلى ${rep.to} | الفرع: ${rep.branch || ''} | اتطبع: ${uiDate(new Date().toISOString())}`;
+        ws.mergeCells(4, startCol, 4, n); ws.getCell(4, startCol).value = `الفترة: ${rep.from} إلى ${rep.to} | الفرع: ${rep.branch || ''} | تاريخ الطباعة: ${uiDate(new Date().toISOString())}`;
         ws.getRow(1).height = 26; ws.getRow(2).height = 18;
         const headerRow = ws.getRow(6);
         rep.columns.forEach((c, i) => {

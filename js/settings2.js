@@ -2,8 +2,8 @@
 // الوردية والمخازن والموظفين، الشغل من غير نت، الوصفات والخامات، القوايم، طرق الدفع والضرايب.
 // الأقسام دي بتتضاف جنب أقسام الإعدادات القديمة (الضرائب والطاولات، الفروع والمخازن، المنيو).
 
-const SET2_SECTIONS = [['general', 'الشركة واللوجو'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
-    ['qr', 'الويتر ومنيو الـ QR'], ['loyalty', 'خصم الانتماء والسوشيال'], ['work', 'الوردية والمخازن والموظفين'], ['offline', 'الشغل من غير نت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
+const SET2_SECTIONS = [['general', 'الشركة والشعار'], ['receipt', 'الطباعة والفاتورة'], ['poscfg', 'إعدادات الكاشير'], ['kdscfg', 'المطبخ والأماكن'],
+    ['qr', 'الويتر وقائمة الـ QR'], ['loyalty', 'خصم العملاء الدائمين والسوشيال'], ['work', 'الوردية والمخازن والموظفون'], ['offline', 'العمل بدون إنترنت'], ['recipes', 'الوصفات والخامات'], ['modifiers', 'الإضافات'],
     ['lists', 'الخصومات والأسباب والمناطق'], ['payacc', 'طرق الدفع والضرايب'], ['reset', '🧹 تصفير البرنامج']];
 
 let set2 = { settings: null, data: null, recipeProduct: '', recipeLines: [], products: [] };
@@ -48,66 +48,66 @@ async function initSettings2() {
 function set2RenderAll() {
     set2Form('general', 'الشركة', [['company_name', 'اسم الشركة', 'text'], ['address', 'العنوان', 'text'], ['phone', 'التليفون', 'text'],
         ['tax_number', 'الرقم الضريبي', 'text'], ['commercial_register', 'السجل التجاري', 'text'], ['currency', 'العملة', 'text'],
-        ['day_start_hour', 'يوم الشغل بيبدأ الساعة كام الصبح؟ (للتقارير: لو المحل بيقفل 7 الصبح اكتب 8، و0 = من 12 بالليل)', 'number']],
-        `<div class="mt-3 border-t pt-3"><p class="text-xs font-black mb-2">اللوجو (بيظهر في الشاشة والفاتورة والتقارير والمنيو)</p>
-         <div class="flex flex-wrap items-center gap-3"><div id="set2-logo-preview">${set2.settings.general.logo ? `<img src="${uiEsc(set2.settings.general.logo)}" class="h-16 max-w-[160px] object-contain border rounded-xl p-1">` : '<span class="text-xs text-slate-400">مفيش لوجو</span>'}</div>
+        ['day_start_hour', 'يوم العمل يبدأ الساعة كم صباحًا؟ (للتقارير: إذا كان المحل يغلق 7 صباحًا اكتب 8، و0 = من 12 ليلًا)', 'number']],
+        `<div class="mt-3 border-t pt-3"><p class="text-xs font-black mb-2">الشعار (يظهر في الشاشة والفاتورة والتقارير والقائمة)</p>
+         <div class="flex flex-wrap items-center gap-3"><div id="set2-logo-preview">${set2.settings.general.logo ? `<img src="${uiEsc(set2.settings.general.logo)}" class="h-16 max-w-[160px] object-contain border rounded-xl p-1">` : '<span class="text-xs text-slate-400">لا يوجد شعار</span>'}</div>
          <input type="file" accept="image/png,image/jpeg,image/webp" onchange="set2PickLogo(this)" class="text-xs">
-         ${set2.settings.general.logo ? uiBtn('شيل اللوجو', "set2Save('general', { logo: '' })", 'gray') : ''}</div></div>`, 'الإعدادات العامة للمالك بس');
+         ${set2.settings.general.logo ? uiBtn('احذف الشعار', "set2Save('general', { logo: '' })", 'gray') : ''}</div></div>`, 'الإعدادات العامة (للمالك فقط)');
     set2Form('receipt', 'الطباعة والفاتورة', [['header', 'سطر فوق الفاتورة', 'text'], ['footer', 'سطر تحت الفاتورة (رسالة شكر)', 'text'],
-        ['show_logo', 'اللوجو يظهر في الفاتورة', 'bool'], ['show_tax_number', 'الرقم الضريبي يظهر في الفاتورة', 'bool'],
+        ['show_logo', 'الشعار يظهر في الفاتورة', 'bool'], ['show_tax_number', 'الرقم الضريبي يظهر في الفاتورة', 'bool'],
         ['paper_mm', 'مقاس الورق', 'select', [[58, '58 مم'], [80, '80 مم']]], ['copies', 'عدد النسخ', 'number'],
         ['auto_print_after_pay', 'طباعة الفاتورة أوتوماتيك بعد الدفع', 'bool'],
-        ['show_feedback_qr', 'كود QR لصفحة الشكاوي والاقتراحات في آخر الفاتورة', 'bool']],
-        '<p class="text-[11px] text-slate-500 font-bold mt-2">ورقة المطبخ والبار بتتطبع من شاشة التحضير نفسها بزرار 🖨️ على كل طلب.</p>');
-    set2Form('whatsapp', 'رسايل الواتساب', [['customer_message', 'الرسالة اللي بتتبعت من شاشة العملاء (زرار 💬)', 'text'],
-        ['thanks_enabled', 'بعد الدفع: الكاشير يشوف زرار "ابعت رسالة شكر" لو الطلب عليه عميل بموبايل', 'bool'],
+        ['show_feedback_qr', 'رمز QR لصفحة الشكاوى والاقتراحات في آخر الفاتورة', 'bool']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">تُطبع ورقة المطبخ والبار من شاشة التحضير ذاتها بزر 🖨️ على كل طلب.</p>');
+    set2Form('whatsapp', 'رسائل واتساب', [['customer_message', 'الرسالة التي تُرسَل من شاشة العملاء (زر 💬)', 'text'],
+        ['thanks_enabled', 'بعد الدفع: يظهر للكاشير زر «ابعت رسالة شكر» إذا كان الطلب لعميل له رقم هاتف', 'bool'],
         ['thanks_message', 'رسالة الشكر بعد الدفع', 'text']],
-        '<p class="text-[11px] text-slate-500 font-bold mt-2">اكتب <b>{الاسم}</b> مكان اسم العميل، و<b>{المحل}</b> مكان اسم الشركة. الواتساب بيفتح والرسالة جاهزة، وانت تدوس إرسال. لازم واتساب المحل يكون مفتوح على الجهاز، ولازم يكون فيه نت.</p>',
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">اكتب <b>{الاسم}</b> مكان اسم العميل، و<b>{المحل}</b> مكان اسم الشركة. يفتح واتساب والرسالة جاهزة، وأنت تضغط إرسال. يجب أن يكون واتساب المحل مفتوحًا على الجهاز ومتصلًا بالإنترنت.</p>',
         '', 'receipt', true);
-    set2Form('payinfo', '💳 أرقام الدفع (إنستاباي والمحفظة)', [['instapay', 'عنوان أو رقم إنستاباي (مثلاً name@instapay أو رقم الموبايل)', 'text'],
-        ['instapay_link', 'لينك الدفع بإنستاباي (اختياري، بيطلع QR على الفاتورة)', 'text'],
+    set2Form('payinfo', '💳 أرقام الدفع (إنستاباي والمحفظة)', [['instapay', 'عنوان أو رقم إنستاباي (مثلاً name@instapay أو رقم الهاتف)', 'text'],
+        ['instapay_link', 'رابط الدفع بإنستاباي (اختياري، يظهر كرمز QR على الفاتورة)', 'text'],
         ['wallet', 'رقم المحفظة', 'text'], ['wallet_name', 'نوع المحفظة (فودافون كاش، اتصالات كاش...)', 'text'],
-        ['show_on_receipt', 'تظهر على الفاتورة والحساب', 'bool'], ['show_on_menu', 'تظهر في منيو الـ QR', 'bool']],
-        '<p class="text-[11px] text-slate-500 font-bold mt-2">العميل يقدر يحوّل على الأرقام دي، والكاشير يقفل الطلب بطريقة الدفع "إنستاباي" أو "محفظة" بعد ما يتأكد إن الفلوس وصلت.</p>',
+        ['show_on_receipt', 'تظهر على الفاتورة والحساب', 'bool'], ['show_on_menu', 'تظهر في قائمة الـ QR', 'bool']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">يمكن للعميل التحويل على هذه الأرقام، ويُغلق الكاشير الطلب بطريقة الدفع «إنستاباي» أو «محفظة» بعد التأكد من وصول المبلغ.</p>',
         '', 'receipt', true);
     set2Form('pos', 'إعدادات الكاشير', [['order_types', 'أنواع الطلبات المفعّلة', 'multi', [['dine_in', 'صالة'], ['takeaway', 'تيك أواي'], ['delivery', 'توصيل'], ['pickup', 'استلام']]],
         ['payment_methods', 'طرق الدفع المفعّلة', 'multi', [['cash', 'كاش'], ['card', 'كارت'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'آجل']]],
-        ['require_waiter', 'لازم يتختار ويتر قبل الإرسال للمطبخ', 'bool'],
-        ['quick_notes', 'الملاحظات الجاهزة اللي بتظهر للكاشير (كل ملاحظة في سطر، مثلاً: بدون بصل)', 'lines']], '', '', 'poscfg');
-    set2Form('hospitality', '🎁 الضيافة', [['enabled', 'الضيافة شغالة (زرار 🎁 في شاشة الدفع)', 'bool'],
-        ['manager_daily_limit', 'المدير يوافق لحد كام جنيه في اليوم بسعر المنيو (0 = المالك بس)', 'number'], ['auto_print', 'ورقة الضيافة تتطبع أوتوماتيك', 'bool']],
-        '<p class="text-[11px] text-slate-500 font-bold mt-2">طلب الضيافة بيتقفل من غير فلوس، والخامات بتتخصم من المخزن، والقيد بالتكلفة: ضيف المالك والموظفين على مصروف ضيافة 6600، والأهل على جاري صاحب المحل 3300، والدعاية على 6300. التقرير في التقارير ← الضيافة.</p>', '', 'poscfg', true);
+        ['require_waiter', 'يجب اختيار الويتر قبل الإرسال للمطبخ', 'bool'],
+        ['quick_notes', 'الملاحظات الجاهزة التي تظهر للكاشير (كل ملاحظة في سطر، مثلاً: بدون بصل)', 'lines']], '', '', 'poscfg');
+    set2Form('hospitality', '🎁 الضيافة', [['enabled', 'تفعيل الضيافة (زر 🎁 في شاشة الدفع)', 'bool'],
+        ['manager_daily_limit', 'حد موافقة المدير اليومي بالجنيه بسعر القائمة (0 = المالك فقط)', 'number'], ['auto_print', 'طباعة ورقة الضيافة تلقائيًا', 'bool']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">يُغلق طلب الضيافة بدون مبالغ، وتُخصم الخامات من المخزن، ويُحمَل القيد بالتكلفة: المالك والموظفين على مصروف ضيافة 6600، والأهل على جارٍ صاحب المحل 3300، والدعاية على 6300. التقرير في التقارير ← الضيافة.</p>', '', 'poscfg', true);
     set2Form('kds', 'شاشة التحضير', [['stations', 'الأماكن المفعّلة', 'multi', [['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']]],
-        ['warn_kitchen_minutes', 'المطبخ: الطلب يبقى متأخر بعد كام دقيقة', 'number'], ['warn_bar_minutes', 'البار: متأخر بعد كام دقيقة', 'number'],
-        ['warn_shisha_minutes', 'الشيشة: متأخر بعد كام دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'التحديث كل كام ثانية', 'number'],
-        ['rush_kitchen_orders', '🔥 زحمة المطبخ: لما يبقى فيه كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_kitchen_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة المطبخ', 'number'],
-        ['rush_bar_orders', '🔥 زحمة البار: لما يبقى فيه كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_bar_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة البار', 'number'],
-        ['rush_shisha_orders', '🔥 زحمة الشيشة: كام طلب مفتوح أو أكتر (0 = مقفول)', 'number'], ['rush_shisha_minutes', '🔥 وقت التحضير يزيد كام دقيقة في زحمة الشيشة', 'number']],
-        `<p class="text-[11px] text-slate-500 font-bold mt-2">🔥 الزحمة: أول ما عدد الطلبات المفتوحة في المكان يوصل للرقم ده، أي طلب جديد بياخد الدقايق الزيادة دي قبل ما يتحسب متأخر، والشاشة بتكتب "زحمة". مثال: البار 8 طلبات و5 دقايق.</p>
-         <div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في المنيو بيروح لأنهي مكان</p>
+        ['warn_kitchen_minutes', 'المطبخ: يُعتبر الطلب متأخرًا بعد كم دقيقة', 'number'], ['warn_bar_minutes', 'البار: يُعتبر متأخرًا بعد كم دقيقة', 'number'],
+        ['warn_shisha_minutes', 'الشيشة: يُعتبر متأخرًا بعد كم دقيقة', 'number'], ['sound', 'صوت تنبيه للطلب الجديد', 'bool'], ['refresh_seconds', 'مدة التحديث بالثواني', 'number'],
+        ['rush_kitchen_orders', '🔥 زحمة المطبخ: عدد الطلبات المفتوحة الذي يبدأ لديه الزحام (0 = بدون)', 'number'], ['rush_kitchen_minutes', '🔥 دقائق إضافية في وقت تحضير المطبخ عند الزحام', 'number'],
+        ['rush_bar_orders', '🔥 زحمة البار: عدد الطلبات المفتوحة الذي يبدأ لديه الزحام (0 = بدون)', 'number'], ['rush_bar_minutes', '🔥 دقائق إضافية في وقت تحضير البار عند الزحام', 'number'],
+        ['rush_shisha_orders', '🔥 زحام الشيشة: عدد الطلبات المفتوحة الذي يبدأ لديه الزحام (0 = بدون)', 'number'], ['rush_shisha_minutes', '🔥 زيادة زمن التحضير بالدقائق عند زحام الشيشة', 'number']],
+        `<p class="text-[11px] text-slate-500 font-bold mt-2">🔥 الزحام: عند وصول عدد الطلبات المفتوحة في المحطة إلى هذا الرقم، يُضاف هذا القدر من الدقائق إلى أي طلب جديد قبل اعتباره متأخرًا، وتكتب الشاشة "زحمة". مثال: البار 8 طلبات و5 دقائق.</p>
+         <div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">كل قسم في القائمة يُرسل إلى محطة تحضير</p>
          ${uiTable(set2.data.categories, [{ label: 'القسم', key: 'name' }, { label: 'المكان', render: c => `<select onchange="set2Station('${c.id}', this.value)" class="${uiInputClass()}">
-            ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].filter(([v]) => (set2.settings.kds.stations || []).includes(v) || c.station === v).map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}${(set2.settings.kds.stations || []).includes(v) ? '' : ' (مقفول! الأصناف مش هتظهر)'}</option>`).join('')}</select>` }], 'مفيش أقسام')}</div>`, '', 'kdscfg');
-    set2Form('waiter_qr', 'الويتر ومنيو الـ QR', [['qr_enabled', 'منيو الـ QR شغال', 'bool'], ['qr_ordering', 'العميل يقدر يطلب بنفسه من المنيو (والويتر يأكّد)', 'bool'],
-        ['qr_call_waiter', 'زرار نداء الويتر', 'bool'], ['qr_request_bill', 'زرار طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في المنيو', 'bool'],
-        ['qr_welcome', 'جملة الترحيب أول المنيو', 'text'],
-        ['qr_privacy_note', 'الجملة اللي بتطمّن العميل لما نطلب اسمه ورقمه وميلاده', 'text']],
+            ${[['kitchen', 'مطبخ'], ['bar', 'بار'], ['shisha', 'شيشة']].filter(([v]) => (set2.settings.kds.stations || []).includes(v) || c.station === v).map(([v, l]) => `<option value="${v}" ${c.station === v ? 'selected' : ''}>${l}${(set2.settings.kds.stations || []).includes(v) ? '' : ' (مغلق! لن تظهر الأصناف)'}</option>`).join('')}</select>` }], 'لا توجد أقسام')}</div>`, '', 'kdscfg');
+    set2Form('waiter_qr', 'الويتر وقائمة الـ QR', [['qr_enabled', 'تفعيل قائمة الـ QR', 'bool'], ['qr_ordering', 'يستطيع العميل الطلب بنفسه من القائمة (والويتر يؤكد)', 'bool'],
+        ['qr_call_waiter', 'زر نداء الويتر', 'bool'], ['qr_request_bill', 'زر طلب الحساب', 'bool'], ['qr_show_prices', 'الأسعار تظهر في القائمة', 'bool'],
+        ['qr_welcome', 'جملة الترحيب أول القائمة', 'text'],
+        ['qr_privacy_note', 'الجملة التي تطمئن العميل عند طلب اسمه ورقمه وتاريخ ميلاده', 'text']],
         `<div class="mt-4 border-t pt-3">${uiBtn('طباعة أكواد الطاولات (QR)', 'set2PrintQr()', 'blue')}
-         <p class="text-[11px] text-slate-500 font-bold mt-2">كل طاولة ليها كود سري مختلف. اطبعهم وحط كل واحد على طاولته.</p></div>`, '', 'qr');
-    set2Form('loyalty', '⭐ خصم الانتماء (للعميل الدايم)', [['enabled', 'شغال', 'bool'], ['min_spent', 'لو اشترى بمبلغ (جنيه) أو أكتر', 'number'],
-        ['period_days', 'خلال آخر كام يوم (365 = سنة)', 'number'], ['percent', 'ياخد خصم كام %', 'number'], ['label', 'اسم الخصم على الفاتورة', 'text']],
-        '<p class="text-[11px] text-slate-500 font-bold mt-2">بيتطبّق لوحده أول ما الكاشير يختار العميل بالموبايل (أو العميل يطلب من الـ QR)، ويظهر في الفاتورة سطر لوحده. بيتحسب من الطلبات المدفوعة بس.</p>', '', 'loyalty');
-    set2Form('social', '📣 السوشيال والشكاوي', [['facebook_url', 'لينك صفحة الفيسبوك', 'text'], ['instagram_url', 'لينك الإنستجرام', 'text'],
-        ['feedback_enabled', 'صفحة الشكاوي والاقتراحات شغالة', 'bool'], ['links_in_thanks', 'اللينكات دي تتبعت مع رسالة الشكر على الواتساب بعد الدفع', 'bool'],
-        ['feedback_intro', 'الجملة اللي أول صفحة الشكاوي', 'text']],
-        `<p class="text-[11px] text-slate-500 font-bold mt-2">صفحة الشكاوي: <span class="text-blue-700 select-all">${uiEsc((typeof appLinks !== 'undefined' && appLinks.feedback) || 'بتظهر بعد الحفظ')}</span> | الشكاوي بتوصل للمدير في تبويب "الشكاوي والاقتراحات".</p>`, '', 'loyalty', true);
+         <p class="text-[11px] text-slate-500 font-bold mt-2">لكل طاولة كود مختلف. اطبع اللوحات وضع كل كود على طاولته.</p></div>`, '', 'qr');
+    set2Form('loyalty', '⭐ خصم الولاء (للعميل الدائم)', [['enabled', 'تفعيل', 'bool'], ['min_spent', 'إذا اشترى بمبلغ (جنيه) أو أكثر', 'number'],
+        ['period_days', 'عدد الأيام السابقة (365 = سنة)', 'number'], ['percent', 'نسبة الخصم %', 'number'], ['label', 'اسم الخصم على الفاتورة', 'text']],
+        '<p class="text-[11px] text-slate-500 font-bold mt-2">يُطبَّق تلقائيًا عند اختيار الكاشير للعميل بالهاتف (أو طلب العميل من QR)، ويظهر في الفاتورة كسطر مستقل. يُحسب من الطلبات المدفوعة فقط.</p>', '', 'loyalty');
+    set2Form('social', '📣 السوشيال والشكاوى', [['facebook_url', 'رابط صفحة الفيسبوك', 'text'], ['instagram_url', 'رابط الإنستجرام', 'text'],
+        ['feedback_enabled', 'تفعيل صفحة الشكاوى والاقتراحات', 'bool'], ['links_in_thanks', 'تُرسل هذه الروابط مع رسالة الشكر على واتساب بعد الدفع', 'bool'],
+        ['feedback_intro', 'العبارة الافتتاحية في صفحة الشكاوى', 'text']],
+        `<p class="text-[11px] text-slate-500 font-bold mt-2">صفحة الشكاوى: <span class="text-blue-700 select-all">${uiEsc((typeof appLinks !== 'undefined' && appLinks.feedback) || 'تظهر بعد الحفظ')}</span> | تصل الشكاوى للمدير في تبويب "الشكاوى والاقتراحات".</p>`, '', 'loyalty', true);
     const work = document.getElementById('set-section-work');
     if (work) {
         work.innerHTML = '';
         set2Form('shift', 'الوردية', [['default_float', 'العهدة (الفكة) الافتراضية عند فتح الوردية', 'number']], '', '', 'work', true);
-        set2Form('purchasing', 'المشتريات', [['manager_limit', 'مدير الفرع يعتمد أمر الشراء بنفسه لحد كام جنيه في اليوم (0 = المالك بس)', 'number']],
-            '<p class="text-[11px] text-slate-500 font-bold mt-2">أمر الشراء اللي يعمله مدير الفرع ويكون هو ومجموع أوامره في نفس اليوم تحت الحد ده، بيتعتمد على طول من غير المالك، والمدير يقدر يرحّل استلامه للمخزن. الحد ده المالك بس اللي يغيّره.</p>', '', 'work', true);
+        set2Form('purchasing', 'المشتريات', [['manager_limit', 'يعتمد مدير الفرع أمر الشراء بنفسه حتى حد يومي محدد (0 = المالك فقط)', 'number']],
+            '<p class="text-[11px] text-slate-500 font-bold mt-2">أمر الشراء الذي ينشئه مدير الفرع ويكون هو ومجموع أوامره في نفس اليوم ضمن هذا الحد، يُعتمد مباشرة بدون المالك، ويستطيع المدير ترحيل استلامه للمخزن. هذا الحد يغيّره المالك فقط.</p>', '', 'work', true);
         set2Form('inventory', 'المخازن', [['default_min_stock', 'الحد الأدنى الافتراضي للخامة الجديدة', 'number']], '', '', 'work', true);
-        set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'ميعاد بداية الشغل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'سماح التأخير بالدقايق', 'number']], '', '', 'work', true);
+        set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'موعد بداية العمل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'مدة سماح التأخير بالدقائق', 'number']], '', '', 'work', true);
     }
     set2RenderSync();
     set2RenderRecipes();
@@ -123,35 +123,35 @@ function set2RenderReset() {
     if (!box) return;
     box.innerHTML = uiCard('🧹 تصفير البرنامج (بداية جديدة)', `
         <div class="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-bold leading-6 mb-3">
-            ⚠️ ده بيمسح نهائي ومفيش رجوع:<br>
+            ⚠️ هذا الإجراء يحذف البيانات نهائيًا ولا يمكن التراجع عنه:<br>
             كل الفواتير والطلبات والمدفوعات، والمشتريات والاستلامات وفواتير الموردين، والورديات وحركات الدرج والخزينة،
-            والقيود والمصروفات والمرتبات والسلف، وحركات المخزن وأرصدته (الرصيد بيبقى صفر)، والعملاء، والموردين، والشكاوي،
+            والقيود والمصروفات والمرتبات والسلف، وحركات المخزن وأرصدته (يصبح الرصيد صفرًا)، والعملاء، والموردين، والشكاوى،
             وكل اليوزرات ماعدا المالك.</div>
         <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs font-bold leading-6 mb-3">
-            ✅ بيفضل زي ما هو: الأصناف والأقسام، والخامات بأسعارها وعبواتها، والوصفات، والإضافات، وكل الإعدادات، والشركة واللوجو،
+            ✅ يبقى دون تغيير: الأصناف والأقسام، والخامات بأسعارها وعبواتها، والوصفات، والإضافات، وكل الإعدادات، والشركة والشعار،
             والفروع والمخازن والطاولات، وشجرة الحسابات، والصلاحيات.</div>
-        <p class="text-[11px] font-bold text-slate-500 mb-3">لو المحل عنده لابتوب شغال من غير نت، المسح بيوصله لوحده مع المزامنة. خد نسخة احتياطي الأول لو محتاج.</p>`,
-        uiBtn('🧹 امسح كل حاجة وابدأ من جديد', 'set2DoReset()', 'red'));
+        <p class="text-[11px] font-bold text-slate-500 mb-3">إذا كان بالمحل لابتوب يعمل بدون إنترنت، سيصله الحذف تلقائيًا مع المزامنة. خذ نسخة احتياطية أولًا عند الحاجة.</p>`,
+        uiBtn('🧹 احذف كل شيء وابدأ من جديد', 'set2DoReset()', 'red'));
 }
 
 async function set2DoReset() {
     const v = await uiForm('تأكيد تصفير البرنامج', [
-        { type: 'note', html: '<p class="text-sm font-bold text-red-700">المسح نهائي ومفيش رجوع. عشان تكمّل اكتب الجملة دي بالظبط: <b>امسح كل حاجة</b></p>' },
-        { key: 'confirm', label: 'اكتب: امسح كل حاجة', required: true },
-        { key: 'pin', label: 'رقمك السري (المالك)', type: 'pin', required: true }], { ok: 'امسح نهائي', danger: true,
-        validate: x => x.confirm !== 'امسح كل حاجة' ? { key: 'confirm', msg: 'اكتب الجملة زي ما هي بالظبط' } : null });
+        { type: 'note', html: '<p class="text-sm font-bold text-red-700">الحذف نهائي ولا يمكن التراجع. لإكمال العملية اكتب هذه الجملة بالضبط: <b>احذف كل شيء</b></p>' },
+        { key: 'confirm', label: 'اكتب: احذف كل شيء', required: true },
+        { key: 'pin', label: 'رقمك السري (المالك)', type: 'pin', required: true }], { ok: 'حذف نهائي', danger: true,
+        validate: x => x.confirm !== 'احذف كل شيء' ? { key: 'confirm', msg: 'اكتب العبارة كما هي بالضبط' } : null });
     if (!v) return;
     const res = await uiCall('system_reset_secure', { p_pin: v.pin, p_confirm: v.confirm });
     if (!res) return;
     const d = res.deleted || {};
     const total = Object.values(d).reduce((s, n) => s + (Number(n) || 0), 0);
-    await uiForm('تم التصفير ✅', [{ type: 'note', html: `<p class="text-sm font-bold">اتمسح ${total} سطر، منهم ${Number(d.orders) || 0} طلب و${Number(d.staff) || 0} يوزر.<br>البرنامج بقى نضيف ومستني أول يوم شغل.</p>` }], { ok: 'تمام' });
+    await uiForm('تم التصفير ✅', [{ type: 'note', html: `<p class="text-sm font-bold">تم حذف ${total} سطر، منها ${Number(d.orders) || 0} طلب و${Number(d.staff) || 0} مستخدم.<br>أصبح البرنامج جاهزًا لأول يوم عمل.</p>` }], { ok: 'موافق' });
     if (typeof motionDataChanged === 'function') motionDataChanged();
     location.reload();
 }
 
 // ---------------------------------------------------------------- الشغل من غير نت (المزامنة) - للمالك بس
-const SYNC_TABLE_NAMES = { customers: 'العملاء', products: 'الأصناف', categories: 'أقسام المنيو', staff: 'الموظفين', orders: 'الطلبات',
+const SYNC_TABLE_NAMES = { customers: 'العملاء', products: 'الأصناف', categories: 'أقسام القائمة', staff: 'الموظفين', orders: 'الطلبات',
     order_items: 'أصناف الطلبات', payments: 'الدفعات', ingredients: 'الخامات', recipes: 'الوصفات', suppliers: 'الموردين',
     purchase_orders: 'المشتريات', expenses: 'المصروفات', tables: 'الطاولات', areas: 'المناطق', branches: 'الفروع', discounts: 'الخصومات',
     app_settings: 'الإعدادات', modifier_groups: 'مجموعات الإضافات', modifiers: 'الإضافات', customer_ledger: 'حساب العميل',
@@ -161,11 +161,11 @@ let set2Sync = null;
 async function set2RenderSync() {
     const box = document.getElementById('set-section-offline');
     if (!box) return;
-    box.innerHTML = '<p class="text-center text-slate-400 font-bold text-xs py-6">جاري التحميل...</p>';
+    box.innerHTML = '<p class="text-center text-slate-400 font-bold text-xs py-6">جارٍ التحميل...</p>';
     let res = null;
     try { res = await serverRpc('sync_admin_secure', { p_action: 'status', p_data: null }); } catch (err) { res = { ok: false, reason: '', message: err.message }; }
     if (!res || res.ok === false) {
-        box.innerHTML = uiCard('الشغل من غير نت', `<p class="text-xs font-bold text-slate-500">${uiEsc(res && res.message ? res.message : serverReasonMessage(res, 'تعذر التحميل'))}</p>`);
+        box.innerHTML = uiCard('العمل بدون إنترنت', `<p class="text-xs font-bold text-slate-500">${uiEsc(res && res.message ? res.message : serverReasonMessage(res, 'تعذر التحميل'))}</p>`);
         return;
     }
     set2Sync = res;
@@ -174,26 +174,26 @@ async function set2RenderSync() {
     const mins = last ? Math.floor((Date.now() - last.getTime()) / 60000) : null;
     const fresh = mins !== null && mins < 3;
     const status = `<div class="grid md:grid-cols-3 gap-3 text-xs font-bold">
-        <div class="bg-slate-50 rounded-xl p-3">النسخة دي: <span class="font-black">${isStore ? '🖥️ كمبيوتر المحل' : '☁️ النت'}</span></div>
-        <div class="rounded-xl p-3 ${fresh ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}">${isStore ? 'آخر مزامنة ناجحة' : 'آخر مرة كمبيوتر المحل كلّم النت'}:
-            <span class="font-black">${last ? uiDate(res.last_sync) + (mins !== null ? ` (من ${mins} دقيقة)` : '') : 'لسه محصلش'}</span></div>
-        <div class="rounded-xl p-3 ${res.open_count ? 'bg-amber-50 text-amber-700' : 'bg-slate-50'}">تعارضات ومشاكل مفتوحة: <span class="font-black">${res.open_count}</span></div></div>
-        <p class="text-[11px] text-slate-500 font-bold mt-2">لو آخر مزامنة أكتر من ٣ دقايق، يبقى النت في المحل واقف أو برنامج المزامنة مقفول. الشغل في المحل مكمّل عادي، والبيانات هتتنقل لوحدها أول ما النت يرجع.</p>`;
+        <div class="bg-slate-50 rounded-xl p-3">هذه النسخة: <span class="font-black">${isStore ? '🖥️ كمبيوتر المحل' : '☁️ الإنترنت'}</span></div>
+        <div class="rounded-xl p-3 ${fresh ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}">${isStore ? 'آخر مزامنة ناجحة' : 'آخر مرة كمبيوتر المحل كلّم الإنترنت'}:
+            <span class="font-black">${last ? uiDate(res.last_sync) + (mins !== null ? ` (من ${mins} دقيقة)` : '') : 'لم يحدث بعد'}</span></div>
+        <div class="rounded-xl p-3 ${res.open_count ? 'bg-amber-50 text-amber-700' : 'bg-slate-50'}">تعارضات ومشاكل لم تُغلق: <span class="font-black">${res.open_count}</span></div></div>
+        <p class="text-[11px] text-slate-500 font-bold mt-2">إذا كانت آخر مزامنة منذ أكثر من ٣ دقائق، فالإنترنت في المحل متوقف أو برنامج المزامنة مغلق. العمل في المحل مستمر بشكل طبيعي، والبيانات تُنقل تلقائيًا عند عودة الإنترنت.</p>`;
     const branches = uiTable(res.branches, [{ label: 'الفرع', key: 'name' },
-        { label: 'عنده كمبيوتر في المحل', render: b => `<input type="checkbox" class="w-5 h-5" ${b.has_store_server ? 'checked' : ''} onchange="set2SyncBranch('${b.id}', this.checked, this)">` }], 'مفيش فروع');
+        { label: 'لديه كمبيوتر في المحل', render: b => `<input type="checkbox" class="w-5 h-5" ${b.has_store_server ? 'checked' : ''} onchange="set2SyncBranch('${b.id}', this.checked, this)">` }], 'لا توجد فروع');
     const rows = res.items.map(x => ({ ...x }));
     const items = uiTable(rows, [
         { label: 'الوقت', render: x => uiEsc(uiDate(x.created_at)) },
-        { label: 'النوع', render: x => x.kind === 'conflict' ? '<span class="text-amber-700">اتعدّل في المكانين</span>' : '<span class="text-red-700">متكتبش</span>' },
+        { label: 'النوع', render: x => x.kind === 'conflict' ? '<span class="text-amber-700">تعدّل في المكانين</span>' : '<span class="text-red-700">لم يُكتب</span>' },
         { label: 'فين', render: x => uiEsc(SYNC_TABLE_NAMES[x.tbl] || x.tbl) },
-        { label: 'إيه', render: x => uiEsc(set2SyncLabel(x)) },
-        { label: 'اللي اتطبق', render: x => x.kind === 'conflict' ? (x.winner === 'store' ? 'نسخة المحل' : 'نسخة النت') : '-' },
+        { label: 'الإجراء', render: x => uiEsc(set2SyncLabel(x)) },
+        { label: 'ما تم تطبيقه', render: x => x.kind === 'conflict' ? (x.winner === 'store' ? 'نسخة المحل' : 'نسخة الإنترنت') : '-' },
         { label: '', render: x => `<div class="flex flex-wrap gap-1">${uiBtn('تفاصيل', `set2SyncDetails('${x.id}')`, 'gray')}
-            ${x.kind === 'conflict' ? uiBtn('رجّع التانية', `set2SyncAct('${x.id}', 'use_other')`, 'amber') : uiBtn('جرّب تاني', `set2SyncAct('${x.id}', 'retry')`, 'amber')}
-            ${uiBtn('تمام', `set2SyncAct('${x.id}', 'keep')`, 'green')}</div>` }], 'مفيش تعارضات 👌');
-    box.innerHTML = uiCard('حالة الشغل من غير نت', status, uiBtn('تحديث', 'set2RenderSync()', 'gray'))
-        + uiCard('الفروع اللي ليها كمبيوتر في المحل', `${branches}<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ علّم على الفرع بس لما كمبيوتر المحل يكون شغال فعلاً. ساعتها الموقع على النت مش هيفتح وردية ولا طلبات للفرع ده، وكله يتعمل من المحل.</p>`)
-        + uiCard('التعارضات والمشاكل', `<p class="text-[11px] text-slate-500 font-bold mb-2">"اتعدّل في المكانين": آخر تعديل اتطبق، والتاني محفوظ هنا. "تمام" = سيب اللي اتطبق. "رجّع التانية" = طبّق النسخة التانية بدله.<br>"متكتبش": صف مقدرش يتنقل (مثلاً نفس الموبايل لعميلين). صلّح السبب وبعدها "جرّب تاني"، أو "تمام" لو مش مهم.</p>${items}`);
+            ${x.kind === 'conflict' ? uiBtn('استخدم الثانية', `set2SyncAct('${x.id}', 'use_other')`, 'amber') : uiBtn('أعد المحاولة', `set2SyncAct('${x.id}', 'retry')`, 'amber')}
+            ${uiBtn('موافق', `set2SyncAct('${x.id}', 'keep')`, 'green')}</div>` }], 'لا توجد تعارضات 👌');
+    box.innerHTML = uiCard('حالة العمل بدون إنترنت', status, uiBtn('تحديث', 'set2RenderSync()', 'gray'))
+        + uiCard('الفروع التي لديها كمبيوتر في المحل', `${branches}<p class="text-[11px] text-amber-700 font-bold mt-2">⚠️ فعّل خيار الفرع فقط عندما يكون كمبيوتر المحل يعمل فعليًا. عندئذٍ لن يفتح موقع الإنترنت ورديات أو طلبات لهذا الفرع، وستتم كل العمليات من المحل.</p>`)
+        + uiCard('التعارضات والمشاكل', `<p class="text-[11px] text-slate-500 font-bold mb-2">"تعدّل في المكانين": تم تطبيق آخر تعديل، والنسخة الأخرى محفوظة هنا. «موافق» = اترك ما تم تطبيقه. «استخدم الثانية» = طبّق النسخة الثانية بدلته.<br>"لم يُكتب": تعذّر نقل الصف (مثلاً نفس رقم الهاتف لعميلين). صلّح السبب ثم «أعد المحاولة»، أو «موافق» إن لم يكن مهمًا.</p>${items}`);
 }
 
 function set2SyncLabel(x) {
@@ -206,15 +206,15 @@ async function set2SyncDetails(id) {
     if (!x) return;
     const a = x.store_data || {}, b = x.cloud_data || {};
     const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
-    const fmt = v => v === undefined ? '-' : (v === null ? 'فاضي' : (typeof v === 'object' ? JSON.stringify(v) : String(v)));
+    const fmt = v => v === undefined ? '-' : (v === null ? 'فارغ' : (typeof v === 'object' ? JSON.stringify(v) : String(v)));
     const table = x.kind === 'conflict'
-        ? uiTable(keys.map(k => ({ k, s: fmt(a[k]), c: fmt(b[k]) })), [{ label: 'الخانة', key: 'k' }, { label: 'في المحل', key: 's' }, { label: 'على النت', key: 'c' }], x.store_data === null || x.cloud_data === null ? 'واحدة منهم اتمسحت' : 'مفيش فرق')
+        ? uiTable(keys.map(k => ({ k, s: fmt(a[k]), c: fmt(b[k]) })), [{ label: 'الخانة', key: 'k' }, { label: 'في المحل', key: 's' }, { label: 'على الإنترنت', key: 'c' }], x.store_data === null || x.cloud_data === null ? 'أحد الطرفين محذوف' : 'لا توجد فروق')
         : `<p class="text-red-700">${uiEsc(x.message || '')}</p>` + uiTable(Object.keys(a).length ? Object.keys(a).map(k => ({ k, v: fmt(a[k]) })) : Object.keys(b).map(k => ({ k, v: fmt(b[k]) })), [{ label: 'الخانة', key: 'k' }, { label: 'القيمة', key: 'v' }]);
-    await uiForm(`${SYNC_TABLE_NAMES[x.tbl] || x.tbl}: ${set2SyncLabel(x)}`, [{ type: 'note', html: table }], { ok: 'قفل' });
+    await uiForm(`${SYNC_TABLE_NAMES[x.tbl] || x.tbl}: ${set2SyncLabel(x)}`, [{ type: 'note', html: table }], { ok: 'إغلاق' });
 }
 
 async function set2SyncAct(id, action) {
-    const msg = { keep: 'تسيب اللي اتطبق وتقفل التعارض ده؟', use_other: 'تطبّق النسخة التانية بدل اللي اتطبقت؟ (هتتنقل للمكان التاني كمان)', retry: 'تجرّب تكتب الصف ده تاني؟' }[action];
+    const msg = { keep: 'هل تريد الإبقاء على ما تم تطبيقه وإغلاق هذا التعارض؟', use_other: 'تطبيق النسخة الثانية بدل الأولى؟ (سيتم نقلها إلى الموقع الآخر أيضًا)', retry: 'هل تريد إعادة كتابة هذا الصف؟' }[action];
     if (!(await uiConfirm(msg))) return;
     const res = await uiCall('sync_admin_secure', { p_action: action, p_data: { id } }, 'تم');
     if (res === null) { const x = ((set2Sync && set2Sync.items) || []).find(i => i.id === id); if (x) console.warn('sync action failed', action, x); }
@@ -222,8 +222,8 @@ async function set2SyncAct(id, action) {
 }
 
 async function set2SyncBranch(branchId, on, el) {
-    const ok = await uiConfirm(on ? 'الفرع ده هيشتغل من كمبيوتر المحل، والموقع على النت مش هيفتح له وردية ولا طلبات. متأكد إن كمبيوتر المحل شغال؟'
-                                  : 'الفرع ده هيرجع يشتغل من الموقع على النت عادي. متأكد؟', 'موافق', on);
+    const ok = await uiConfirm(on ? 'سيعمل هذا الفرع من كمبيوتر المحل، ولن يفتح موقع الإنترنت له ورديات أو طلبات. هل تأكدت أن كمبيوتر المحل يعمل؟'
+                                  : 'سيعود هذا الفرع للعمل من موقع الإنترنت بشكل طبيعي. هل أنت متأكد؟', 'موافق', on);
     if (!ok) { el.checked = !on; return; }
     if (!(await uiCall('sync_admin_secure', { p_action: 'set_store_server', p_data: { branch_id: branchId, on } }, 'تم'))) el.checked = !on;
     set2RenderSync();
@@ -291,10 +291,10 @@ function set2PickLogo(input) {
             canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
             canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
             const url = canvas.toDataURL('image/png');
-            if (url.length > 400000) return showToast('الصورة كبيرة جداً، اختار صورة أصغر', 'error');
+            if (url.length > 400000) return showToast('الصورة كبيرة جدًا، اختر صورة أصغر', 'error');
             set2Save('general', { logo: url });
         };
-        img.onerror = () => showToast('الملف ده مش صورة', 'error');
+        img.onerror = () => showToast('هذا الملف ليس صورة', 'error');
         img.src = reader.result;
     };
     reader.readAsDataURL(file);
@@ -315,9 +315,9 @@ async function set2PrintQr() {
     const cards = (res.tables || []).map(t => {
         const qr = qrcode(0, 'M'); qr.addData(base + t.qr_token); qr.make();
         return `<div class="card">${g.logo ? `<img class="logo" src="${uiEsc(g.logo)}">` : `<div class="co">${uiEsc(g.company_name || '')}</div>`}
-            <img class="qr" src="${qr.createDataURL(6, 2)}"><div class="t">طاولة ${uiEsc(t.table_number)}</div><div class="s">${uiEsc(t.area || '')} | امسح الكود للمنيو ونداء الويتر</div></div>`;
+            <img class="qr" src="${qr.createDataURL(6, 2)}"><div class="t">طاولة ${uiEsc(t.table_number)}</div><div class="s">${uiEsc(t.area || '')} | امسح الرمز للقائمة واستدعاء الويتر</div></div>`;
     }).join('');
-    if (!cards) return showToast('مفيش طاولات في الفرع', 'error');
+    if (!cards) return showToast('لا توجد طاولات في الفرع', 'error');
     printHtml(`<div class="grid">${cards}</div>`, `@page { size: A4; margin: 10mm; } .grid { display: flex; flex-wrap: wrap; gap: 8mm; justify-content: center; }
         .card { width: 60mm; border: 1px dashed #999; border-radius: 4mm; padding: 4mm; text-align: center; page-break-inside: avoid; }
         .logo { max-height: 14mm; max-width: 40mm; } .co { font-weight: bold; font-size: 14px; } .qr { width: 45mm; height: 45mm; }
@@ -329,11 +329,11 @@ async function set2RenderRecipes() {
     const box = document.getElementById('set-section-recipes');
     if (!box) return;
     const ings = set2.data.ingredients || [];
-    box.innerHTML = uiCard('الوصفات (الريسبي)', `<p class="text-xs font-bold text-slate-600">الوصفات بقت جوه كل صنف في <button onclick="switchSettingsSection('menu')" class="text-blue-700 underline font-black">المنيو والوصفات 🍽️</button>: افتح الصنف، وضيف الخامات والكميات، وتقدر تعمل خامة جديدة من نفس المكان.</p>`)
+    box.innerHTML = uiCard('الوصفات', `<p class="text-xs font-bold text-slate-600">أصبحت الوصفات داخل كل صنف في <button onclick="switchSettingsSection('menu')" class="text-blue-700 underline font-black">القائمة والوصفات 🍽️</button>: افتح الصنف، وأضف الخامات والكميات، ويمكنك إنشاء خامة جديدة من نفس المكان.</p>`)
         + uiCard('الخامات', uiTable(ings, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
-            { label: 'العبوة اللي بنشتري بيها', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
+            { label: 'عبوة الشراء', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
             { label: 'التكلفة (من المشتريات)', render: i => formatCurrency(i.cost_per_unit) }, { label: 'الحد الأدنى', key: 'min_stock_alert' },
-            { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'مفيش خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
+            { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'لا توجد خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
 }
 
 async function set2RecipeLoad(productId) {
@@ -349,7 +349,7 @@ async function set2RecipeLoad(productId) {
 function set2RecipeAdd() {
     const ing = document.getElementById('set2-rec-ing').value;
     const qty = Number(document.getElementById('set2-rec-qty').value);
-    if (!ing || !(qty > 0)) return showToast('اختار الخامة واكتب الكمية', 'error');
+    if (!ing || !(qty > 0)) return showToast('اختر الخامة واكتب الكمية', 'error');
     const ex = set2.recipeLines.find(l => l.ingredient_id === ing);
     if (ex) ex.qty = (Number(ex.qty) || 0) + qty; else set2.recipeLines.push({ ingredient_id: ing, qty });
     set2RenderRecipes();
@@ -375,19 +375,19 @@ async function set2EditIngredient(id) {
     const used = (set2.data.ingredients || []).map(x => x.unit).filter(Boolean);
     const units = [...new Set([...SET2_DEFAULT_UNITS, ...saved, ...used])];
     const fields = [
-        { key: 'name', label: 'اسم الخامة', value: i.name || '', required: true, list: SET2_INGREDIENT_CATALOG, help: 'اكتب حرفين وهتظهرلك أسماء جاهزة، أو اكتب اسم جديد' },
-        { key: 'unit', label: 'الوحدة', type: 'select', options: units.map(u => [u, u]), value: i.unit || '', placeholder: 'اختار الوحدة', addNew: 'وحدة جديدة', required: true },
+        { key: 'name', label: 'اسم الخامة', value: i.name || '', required: true, list: SET2_INGREDIENT_CATALOG, help: 'اكتب حرفين وستظهر لك أسماء جاهزة، أو اكتب اسمًا جديدًا' },
+        { key: 'unit', label: 'الوحدة', type: 'select', options: units.map(u => [u, u]), value: i.unit || '', placeholder: 'اختر الوحدة', addNew: 'وحدة جديدة', required: true },
         { key: 'min', label: 'الحد الأدنى للتنبيه', type: 'number', min: 0, value: i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5), required: true },
-        { type: 'note', html: '📦 <b>العبوة (اختياري):</b> لو بتشتري الخامة دي بعبوة (جالون، كرتونة، شوال...) اكتب اسمها وجواها كام وحدة. بعد كده في الشراء والاستلام والجرد تكتب بالعبوة والسيستم يحسب بالوحدة لوحده. مثال: الوحدة لتر، العبوة جالون، وجواها 3 (أو اللي مكتوب على الجالون).' },
+        { type: 'note', html: '📦 <b>العبوة (اختياري):</b> إذا كنت تشتري الخامة بعبوة (جالون، كرتونة، شوال...) فاكتب اسمها وعدد الوحدات داخلها. بعد ذلك في الشراء والاستلام والجرد تكتب بالعبوة ويحسب النظام الوحدات تلقائيًا. مثال: الوحدة لتر، العبوة جالون، وداخلها 3 (أو المكتوب على الجالون).' },
         { key: 'pack_unit', label: 'اسم العبوة', value: i.pack_unit || '', list: SET2_PACK_UNITS, placeholder: 'مثلاً جالون' },
-        { key: 'pack_size', label: 'العبوة فيها كام وحدة؟', type: 'number', min: 0, value: i.pack_size || '', placeholder: 'مثلاً 3' }];
-    if (!id) fields.push({ key: 'cost', label: 'تكلفة الوحدة المبدئية', type: 'money', min: 0, value: 0, help: 'بعد كده بتتحسب لوحدها من المشتريات' });
+        { key: 'pack_size', label: 'عدد الوحدات في العبوة', type: 'number', min: 0, value: i.pack_size || '', placeholder: 'مثلاً 3' }];
+    if (!id) fields.push({ key: 'cost', label: 'تكلفة الوحدة المبدئية', type: 'money', min: 0, value: 0, help: 'تُحسب تلقائيًا لاحقًا من المشتريات' });
     const v = await uiForm(id ? 'تعديل خامة' : 'خامة جديدة', fields, { validate: x => {
-        if (x.pack_unit && !(Number(x.pack_size) > 0)) return { key: 'pack_size', msg: 'اكتب العبوة فيها كام وحدة' };
+        if (x.pack_unit && !(Number(x.pack_size) > 0)) return { key: 'pack_size', msg: 'اكتب عدد الوحدات في العبوة' };
         if (!x.pack_unit && Number(x.pack_size) > 0) return { key: 'pack_unit', msg: 'اكتب اسم العبوة' };
-        if (x.pack_unit && x.pack_unit === x.unit) return { key: 'pack_unit', msg: 'العبوة لازم تبقى غير الوحدة' };
+        if (x.pack_unit && x.pack_unit === x.unit) return { key: 'pack_unit', msg: 'يجب أن تختلف العبوة عن الوحدة الأساسية' };
         const dup = (set2.data.ingredients || []).find(y => y.id !== id && String(y.name).trim() === x.name);
-        return dup ? { key: 'name', msg: 'الخامة دي موجودة قبل كده' } : null;
+        return dup ? { key: 'name', msg: 'هذه الخامة موجودة من قبل' } : null;
     } });
     if (!v) return;
     if (v.unit_new && !saved.includes(v.unit)) {
@@ -405,11 +405,11 @@ function set2RenderLists() {
     const typeNames = { void_item: 'إلغاء صنف', cancel_order: 'إلغاء طلب', return: 'مرتجع' };
     box.innerHTML = uiCard('الخصومات', uiTable(set2.data.discounts, [{ label: 'الاسم', key: 'name' },
         { label: 'القيمة', render: d => d.discount_type === 'percentage' ? `${uiEsc(d.value)}%` : formatCurrency(d.value) },
-        { label: 'محتاج موافقة المدير', render: d => d.requires_approval !== false ? 'نعم' : 'لا' },
-        { label: '', render: d => uiBtn('تعديل', `set2EditDiscount('${d.id}')`, 'gray') }], 'مفيش'), uiBtn('إضافة خصم', 'set2EditDiscount(null)', 'blue'))
+        { label: 'يتطلب موافقة المدير', render: d => d.requires_approval !== false ? 'نعم' : 'لا' },
+        { label: '', render: d => uiBtn('تعديل', `set2EditDiscount('${d.id}')`, 'gray') }], 'لا يوجد'), uiBtn('إضافة خصم', 'set2EditDiscount(null)', 'blue'))
         + uiCard('أسباب الإلغاء والمرتجع', uiTable(set2.data.cancel_reasons, [{ label: 'السبب', key: 'reason' }, { label: 'النوع', render: r => uiEsc(typeNames[r.reason_type] || r.reason_type) },
-            { label: '', render: r => uiBtn('تعديل', `set2EditReason('${r.id}')`, 'gray') }], 'مفيش'), uiBtn('إضافة سبب', 'set2EditReason(null)', 'blue'))
-        + uiCard('مناطق الصالة', uiTable(set2.data.areas, [{ label: 'المنطقة', key: 'name' }], 'مفيش'), uiBtn('إضافة منطقة', 'set2AddArea()', 'blue'));
+            { label: '', render: r => uiBtn('تعديل', `set2EditReason('${r.id}')`, 'gray') }], 'لا يوجد'), uiBtn('إضافة سبب', 'set2EditReason(null)', 'blue'))
+        + uiCard('مناطق الصالة', uiTable(set2.data.areas, [{ label: 'المنطقة', key: 'name' }], 'لا يوجد'), uiBtn('إضافة منطقة', 'set2AddArea()', 'blue'));
 }
 
 async function set2EditDiscount(id) {
@@ -418,7 +418,7 @@ async function set2EditDiscount(id) {
         { key: 'name', label: 'اسم الخصم', value: d.name || '', required: true },
         { key: 'type', label: 'النوع', type: 'select', options: [['percentage', 'نسبة %'], ['fixed', 'مبلغ ثابت']], value: d.discount_type || 'percentage', required: true },
         { key: 'value', label: 'القيمة (النسبة أو المبلغ)', type: 'money', min: 0.01, value: d.value || '', required: true },
-        { key: 'approval', label: 'محتاج موافقة المدير', type: 'check', value: d.requires_approval !== false }],
+        { key: 'approval', label: 'يتطلب موافقة المدير', type: 'check', value: d.requires_approval !== false }],
         { validate: x => x.type === 'percentage' && x.value > 100 ? { key: 'value', msg: 'النسبة متزيدش عن 100' } : null });
     if (!v) return;
     if (await uiCall('settings2_secure', { p_action: 'save_discount', p_data: { id: id || null, name: v.name, discount_type: v.type, value: String(v.value), requires_approval: String(v.approval) } }, 'تم الحفظ')) initSettings2();
@@ -445,14 +445,14 @@ function set2RenderPayAcc() {
     if (!box) return;
     const names = { cash: 'كاش', card: 'كارت', instapay: 'إنستاباي', wallet: 'محفظة', on_account: 'آجل' };
     const accOpts = set2.data.asset_accounts || [];
-    box.innerHTML = uiCard('ربط طرق الدفع بالحسابات (للمالك بس)', uiTable(set2.data.payment_accounts, [{ label: 'طريقة الدفع', render: p => uiEsc(names[p.method] || p.method) },
-        { label: 'الحساب', render: p => `<select onchange="set2PayAccount('${p.method}', this.value)" class="${uiInputClass()}">${accOpts.map(a => `<option value="${uiEsc(a.id)}" ${a.id === p.account_id ? 'selected' : ''}>${uiEsc(a.name)}</option>`).join('')}${p.account_id ? '' : '<option value="" selected>مش مربوط</option>'}</select>` }]))
+    box.innerHTML = uiCard('ربط طرق الدفع بالحسابات (للمالك فقط)', uiTable(set2.data.payment_accounts, [{ label: 'طريقة الدفع', render: p => uiEsc(names[p.method] || p.method) },
+        { label: 'الحساب', render: p => `<select onchange="set2PayAccount('${p.method}', this.value)" class="${uiInputClass()}">${accOpts.map(a => `<option value="${uiEsc(a.id)}" ${a.id === p.account_id ? 'selected' : ''}>${uiEsc(a.name)}</option>`).join('')}${p.account_id ? '' : '<option value="" selected>غير مرتبط</option>'}</select>` }]))
         + uiCard('الضرايب والخدمة لكل فرع', uiTable(set2.data.tax, [{ label: 'الفرع', key: 'branch' },
             { label: 'الضريبة %', key: 'vat_percentage' }, { label: 'الخدمة %', key: 'service_charge_percentage' },
             { label: 'الأسعار شاملة الضريبة', render: t => `<input type="checkbox" id="tx-inc-${uiEsc(t.branch_id)}" ${t.is_vat_inclusive ? 'checked' : ''}>` },
             { label: 'الضريبة على الخدمة', render: t => `<input type="checkbox" id="tx-srv-${uiEsc(t.branch_id)}" ${t.is_service_taxable ? 'checked' : ''}>` },
             { label: '', render: t => uiBtn('حفظ', `set2TaxFlags('${t.branch_id}')`, 'green') }]),
-            '<span class="text-[11px] text-slate-500 font-bold">النسب نفسها بتتعدل من "الضرائب والطاولات"</span>');
+            '<span class="text-[11px] text-slate-500 font-bold">النسب ذاتها تُعدَّل من "الضرائب والطاولات"</span>');
 }
 
 async function set2PayAccount(method, accountId) {

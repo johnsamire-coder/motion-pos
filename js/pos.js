@@ -151,7 +151,7 @@ async function renderTablesForArea() {
     if (!areaSelect) return;
     if (hasUnsentItems()) {
         areaSelect.value = String(posState.selectedAreaId || '');
-        showToast('في أصناف لسه ما اتبعتتش: ابعتها أو امسحها الأول', 'error');
+        showToast('توجد أصناف لم تُرسَل: أرسلها أو احذفها أولًا', 'error');
         return;
     }
 
@@ -268,7 +268,7 @@ async function loadOrderIntoCart(orderId, keepUnsent = false) {
 async function selectPosTable(tableId) {
     // الانتقال بين الطاولات مسموح، طول ما مفيش أصناف جديدة لسه ما اتبعتتش للمطبخ.
     if (hasUnsentItems() && posState.selectedTable?.id !== tableId) {
-        return showToast('في أصناف جديدة لسه ما اتبعتتش للمطبخ: ابعتها أو امسحها الأول قبل الانتقال لطاولة تانية', 'error');
+        return showToast('توجد أصناف جديدة لم تُرسَل للمطبخ: أرسلها أو احذفها أولًا قبل الانتقال إلى طاولة أخرى', 'error');
     }
 
     const previousTable = posState.selectedTable;
@@ -287,7 +287,7 @@ async function selectPosTable(tableId) {
         } else {
             let chosen = orders[0];
             if (orders.length > 1) {
-                const pick = await uiForm('الطاولة دي عليها أكتر من طلب', [{ key: 'id', label: 'الطلب', type: 'select', required: true,
+                const pick = await uiForm('هذه الطاولة عليها أكثر من طلب', [{ key: 'id', label: 'الطلب', type: 'select', required: true,
                     options: orders.map(o => [o.id, `${o.order_number} - ${formatCurrency(o.total_amount)}`]), value: orders[0].id }], { ok: 'فتح' });
                 if (!pick) {
                     posState.selectedTable = previousTable;
@@ -348,7 +348,7 @@ function renderProductsGrid() {
     grid.innerHTML = filtered.length ? filtered.map(p => `
         <button onclick="checkAndAddProduct('${p.id}')" class="text-right px-2.5 py-2 border rounded-xl bg-slate-50 hover:border-blue-500 hover:bg-blue-50 active:scale-95 transition flex flex-col justify-between gap-1 min-h-[58px] min-w-0">
             <span class="font-extrabold text-slate-800 text-[11px] leading-snug line-clamp-2 break-words">${uiEsc(p.name)}</span><span class="text-blue-600 font-black text-[11px]">${formatCurrency(p.price)}</span>
-        </button>`).join('') : `<p class="col-span-full text-center text-slate-400 font-bold text-xs py-8">${q ? 'مفيش صنف بالاسم ده' : 'مفيش أصناف'}</p>`;
+        </button>`).join('') : `<p class="col-span-full text-center text-slate-400 font-bold text-xs py-8">${q ? 'لا يوجد صنف بهذا الاسم' : 'لا توجد أصناف'}</p>`;
 }
 
 async function checkAndAddProduct(productId) {
@@ -364,7 +364,7 @@ async function checkAndAddProduct(productId) {
 function posModRule(g) {
     const min = Math.max(Number(g.min_selection) || 0, g.is_required ? 1 : 0);
     const max = Number(g.max_selection) || 1;
-    return { min, max, text: min > 0 ? (min === max ? `لازم تختار ${min}` : `لازم تختار من ${min} لـ ${max}`) : (max === 1 ? 'اختياري (واحدة)' : `اختياري (لحد ${max})`) };
+    return { min, max, text: min > 0 ? (min === max ? `اختر ${min}` : `اختر من ${min} لـ ${max}`) : (max === 1 ? 'اختياري (واحدة)' : `اختياري (حتى ${max})`) };
 }
 
 function openModifiersModal(product, groups) {
@@ -374,7 +374,7 @@ function openModifiersModal(product, groups) {
     let modal = document.getElementById('modifiers-modal');
     if (!modal) {
         modal = document.createElement('div'); modal.id = 'modifiers-modal';
-        modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        modal.className = 'fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4';
         document.body.appendChild(modal);
     }
     const groupsHtml = posState.modGroups.map((g, gi) => `
@@ -437,7 +437,7 @@ function posNotesHtml(inputId, value) {
     return `<div class="text-right border-t pt-3">
         <p class="text-[11px] font-black text-slate-600 mb-1.5">📝 ملاحظة للمطبخ / البار</p>
         <div class="flex flex-wrap gap-1.5 mb-2">${quick.map((q, i) => `<button type="button" onclick="posToggleQuickNote('${inputId}', ${i})" class="px-2 py-1 rounded-lg border text-[11px] font-bold bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100">${uiEsc(q)}</button>`).join('')}</div>
-        <input id="${inputId}" value="${uiEsc(value || '')}" maxlength="200" placeholder="اكتب أي ملاحظة (مثلاً: الصوص لوحده)" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
+        <input id="${inputId}" value="${uiEsc(value || '')}" maxlength="200" placeholder="اكتب أي ملاحظة (مثلاً: الصوص منفصل)" class="w-full bg-slate-50 border p-2 rounded-xl text-xs font-bold">
     </div>`;
 }
 
@@ -546,21 +546,21 @@ function renderPosCustomerInfo() {
     const c = posState.customers.find(x => x.id === id) || {};
     const extra = posState.lastCustomerInfo && posState.lastCustomerInfo.id === id ? posState.lastCustomerInfo : null;
     box.innerHTML = `👤 <span class="text-slate-800">${uiEsc(c.name || '')}</span> ${c.phone ? '| ' + uiEsc(c.phone) : ''}`
-        + (extra && extra.orders_count !== undefined ? ` | ${uiEsc(extra.orders_count)} طلب قبل كده` : '')
+        + (extra && extra.orders_count !== undefined ? ` | ${uiEsc(extra.orders_count)} طلب سابق` : '')
         + (extra && extra.notes ? `<div class="text-amber-700">📝 ${uiEsc(extra.notes)}</div>` : '')
-        + (extra && Number(extra.loyalty_percent) > 0 ? `<div class="text-emerald-700 font-black">⭐ عميل انتماء: خصم ${uiEsc(extra.loyalty_percent)}% بيتطبّق لوحده</div>` : '');
+        + (extra && Number(extra.loyalty_percent) > 0 ? `<div class="text-emerald-700 font-black">⭐ عميل الولاء: خصم ${uiEsc(extra.loyalty_percent)}% يُحسب تلقائيًا</div>` : '');
 }
 
 async function posFindCustomer() {
     const input = document.getElementById('pos-cust-phone');
     const phone = (input?.value || '').trim();
-    if (!phone) return showToast('اكتب موبايل العميل', 'error');
+    if (!phone) return showToast('اكتب رقم هاتف العميل', 'error');
     let res;
     try { res = await serverRpc('customer_lookup_secure', { p_phone: phone }); }
     catch (err) { return showToast(err.message || 'تعذر البحث', 'error'); }
     if (!res || res.ok === false) return showToast(serverReasonMessage(res, 'تعذر البحث'), 'error');
     if (res.found) { posSetCustomer(res.customer); showToast(`العميل: ${res.customer.name}`); return; }
-    const f = await uiForm('عميل جديد', [{ type: 'note', label: `الرقم ${res.phone} مش متسجّل.` }, { key: 'name', label: 'اسم العميل', required: true }], { ok: 'تسجيل' });
+    const f = await uiForm('عميل جديد', [{ type: 'note', label: `الرقم ${res.phone} غير متسجّل.` }, { key: 'name', label: 'اسم العميل', required: true }], { ok: 'تسجيل' });
     if (!f) return;
     let add;
     try { add = await serverRpc('customer_quick_add_secure', { p_name: f.name, p_phone: phone }); }
@@ -632,7 +632,7 @@ function renderOrderCartTicket() {
     } else {
         itemsContainer.innerHTML = posState.cart.items.map((item, idx) => {
             const modsText = (item.modifiers || []).map(m => `+ ${m.name || m.modifier_name}`).join(', ');
-            const sentBadge = item.db_item_id ? '' : '<span class="text-[9px] text-amber-600 font-bold">(لسه ما اتبعتش)</span>';
+            const sentBadge = item.db_item_id ? '' : '<span class="text-[9px] text-amber-600 font-bold">(لم يُرسَل بعد)</span>';
             return `<div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold space-y-1">
                 <div class="flex justify-between items-center"><span class="text-slate-800">${item.name} ${sentBadge}</span><span class="text-blue-600 font-extrabold">${formatCurrency(item.price * item.qty)}</span></div>
                 ${modsText ? `<p class="text-[10px] text-amber-600 font-bold">${uiEsc(modsText)}</p>` : ''}
@@ -687,7 +687,7 @@ async function pickCancelReason(title, type, pinLabel, extraFields = []) {
     }
     let list = posState.cancelReasons.filter(r => !type || !r.reason_type || r.reason_type === type);
     if (!list.length) list = posState.cancelReasons;
-    const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' }];
+    const fields = [{ key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختر السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' }];
     fields.push(...extraFields);
     if (pinLabel) fields.push({ key: 'pin', label: pinLabel, type: 'pin', required: true });
     const v = await uiForm(title, fields, { ok: 'تأكيد', danger: true });
@@ -711,7 +711,7 @@ async function voidCartItem(idx) {
     if (!item.db_item_id) { posState.cart.items.splice(idx, 1); renderOrderCartTicket(); return; }
 
     // مسح صنف اتبعت للمطبخ لازم موافقة المدير، والسيرفر هو اللي بيتأكد من رقمه
-    const reason = await pickCancelReason(`مسح "${item.name}" (اتبعت للمطبخ)`, 'void_item', 'رقم المدير');
+    const reason = await pickCancelReason(`مسح "${item.name}" (أُرسل للمطبخ)`, 'void_item', 'رقم المدير');
     if (!reason) return;
     const managerPin = reason.pin;
 
@@ -733,7 +733,7 @@ async function changeOrderCharges(vatOn, serviceOn, label) {
     const turningOff = (posState.cart.enable_vat && !vatOn) || (posState.cart.enable_service && !serviceOn);
     let pin = null;
     if (turningOff) {
-        pin = await askManagerPin(`شيل ${label} من الطلب محتاج موافقة المدير. أدخل رقم المدير:`);
+        pin = await askManagerPin(`احذف ${label} من الطلب يتطلب موافقة المدير. أدخل رقم المدير:`);
         if (!pin) return;
     }
     try {
@@ -744,7 +744,7 @@ async function changeOrderCharges(vatOn, serviceOn, label) {
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر التعديل'), 'error');
         await loadOrderIntoCart(posState.cart.id, true);
         renderOrderCartTicket();
-        showToast(turningOff ? `تم شيل ${label} بموافقة المدير` : `تم رجوع ${label}`);
+        showToast(turningOff ? `تم احذف ${label} بموافقة المدير` : `تم رجوع ${label}`);
     } catch (err) { console.error(err); showToast('حدث خطأ أثناء الاتصال بالسيرفر: ' + (err.message || ''), 'error'); }
 }
 function toggleVatTax() { changeOrderCharges(!posState.cart.enable_vat, posState.cart.enable_service, 'الضريبة'); }
@@ -764,7 +764,7 @@ function renderWaitersAndCustomersDropdowns() {
 }
 function setOrderType(type) {
     if (posState.cart.id) {
-        return showToast('نوع الطلب مينفعش يتغيّر بعد ما الطلب يتبعت للمطبخ', 'error');
+        return showToast('لا يمكن تغيير نوع الطلب بعد إرساله للمطبخ', 'error');
     }
     posState.selectedOrderType = type;
     refreshTypeButtons();
@@ -784,12 +784,12 @@ async function sendOrderToKitchen() {
         return false;
     }
     if (typeof appSet === 'function' && appSet('pos', 'require_waiter', false) && !(document.getElementById('select-waiter')?.value)) {
-        showToast('لازم تختار الويتر الأول (من الإعدادات)', 'error');
+        showToast('اختر الويتر أولًا (من الإعدادات)', 'error');
         return false;
     }
     // طلب الصالة لازم يكون على طاولة (لو الفرع فيه طاولات)، وإلا الكاشير مش هيلاقيه على الطاولة
     if (!posState.cart.id && posState.selectedOrderType === 'dine_in' && currentBranch && currentBranch.has_tables && !posState.selectedTable) {
-        showToast('اختار الطاولة الأول من خريطة الصالة، وبعدها ابعت الطلب', 'error');
+        showToast('اختر الطاولة أولًا من خريطة الصالة، ثم أرسل الطلب', 'error');
         return false;
     }
     orderSubmissionInProgress = true;
@@ -928,7 +928,7 @@ function removePaymentLine(idx) { posState.paymentsList.splice(idx, 1); renderPa
 
 async function confirmMultiplePaymentsAndClose() {
     if (paymentSubmissionInProgress) return;
-    if (!posState.cart.id) return showToast('الطلب لسه ما اتحفظش', 'error');
+    if (!posState.cart.id) return showToast('لم يُحفظ الطلب بعد', 'error');
     const due = round2(posState.cart.server_total);
     const tipValue = Number(document.getElementById('input-tip-amount')?.value ?? 0);
     const tip = Number.isFinite(tipValue) && tipValue >= 0 ? round2(tipValue) : NaN;
@@ -941,10 +941,10 @@ async function confirmMultiplePaymentsAndClose() {
         .map(p => ({ method: p.method, amount: round2(p.amount) }));
     const paidSum = round2(payments.reduce((s, p) => s + p.amount, 0));
     if (Math.abs(paidSum - due) > 0.004) {
-        return showToast(`مجموع الدفعات (${formatCurrency(paidSum)}) لازم يساوي إجمالي الفاتورة (${formatCurrency(due)})`, 'error');
+        return showToast(`يجب أن يساوي مجموع الدفعات (${formatCurrency(paidSum)}) إجمالي الفاتورة (${formatCurrency(due)})`, 'error');
     }
     if (payments.some(p => p.method === 'on_account') && !(document.getElementById('select-customer')?.value)) {
-        return showToast('الدفع الآجل محتاج تختار العميل الأول', 'error');
+        return showToast('الدفع الآجل يحتاج اختيار العميل أولًا', 'error');
     }
 
     paymentSubmissionInProgress = true;
@@ -987,7 +987,7 @@ async function confirmMultiplePaymentsAndClose() {
         if (paidCustomer && paidCustomer.phone && appSet('whatsapp', 'thanks_enabled', true)) posAskThanks(paidCustomer);
     } catch (err) {
         console.error('Payment completion error:', err);
-        showToast('لم تكتمل عملية الدفع، ومفيش أي حاجة اتسجلت: ' + (err.message || 'خطأ غير معروف'), 'error');
+        showToast('لم تكتمل عملية الدفع، ولم يُسجَّل أي شيء: ' + (err.message || 'خطأ غير معروف'), 'error');
     } finally {
         paymentSubmissionInProgress = false;
         if (confirmButton) confirmButton.disabled = false;
@@ -999,7 +999,7 @@ async function confirmMultiplePaymentsAndClose() {
 // -----------------------------------------
 function openSplitBillModal() {
     if (!posState.cart.id) return showToast('ابعت الطلب للمطبخ الأول قبل التقسيم', 'error');
-    if (hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها الأول', 'error');
+    if (hasUnsentItems()) return showToast('توجد أصناف لم تُرسَل: أرسلها أولًا', 'error');
     if (posState.cart.items.length === 0) return;
 
     const totals = calculateCartTotals();
@@ -1065,16 +1065,16 @@ function renderSplitModal() {
 async function applyDiscountPrompt() {
     if (!posState.cart.id) return showToast('ابعت الطلب للمطبخ الأول، وبعدين طبّق الخصم', 'error');
     const list = posState.discounts || [];
-    const opts = [['none', 'من غير خصم (إلغاء الخصم)']]
+    const opts = [['none', 'بدون خصم (إلغاء الخصم)']]
         .concat(list.map(d => [d.id, `${d.name} (${d.discount_type === 'percentage' ? d.value + '%' : formatCurrency(d.value)})${d.requires_approval !== false ? ' - بموافقة المدير' : ''}`]))
         .concat([['manual', 'خصم يدوي بمبلغ - بموافقة المدير']]);
     const needs = x => x.d === 'manual' || (list.find(d => d.id === x.d) || {}).requires_approval !== false && x.d !== 'none';
     const v = await uiForm('الخصم', [
-        { key: 'd', label: 'الخصم', type: 'select', options: opts, required: true, placeholder: 'اختار' },
+        { key: 'd', label: 'الخصم', type: 'select', options: opts, required: true, placeholder: 'اختر' },
         { key: 'amount', label: 'مبلغ الخصم اليدوي (لو اخترت يدوي)', type: 'money', min: 0 },
-        { key: 'pin', label: 'رقم المدير (لو الخصم محتاج موافقة)', type: 'pin' }], { ok: 'تطبيق', validate: x => {
+        { key: 'pin', label: 'رقم المدير (إن كان الخصم يحتاج موافقة)', type: 'pin' }], { ok: 'تطبيق', validate: x => {
             if (x.d === 'manual' && !(x.amount > 0)) return { key: 'amount', msg: 'اكتب مبلغ الخصم' };
-            if (needs(x) && !x.pin) return { key: 'pin', msg: 'الخصم ده محتاج رقم المدير' };
+            if (needs(x) && !x.pin) return { key: 'pin', msg: 'هذا الخصم يحتاج رقم المدير' };
             return null;
         } });
     if (!v) return;
@@ -1099,9 +1099,9 @@ function openTransferTableModal() {
     if (!posState.selectedTable) return showToast('اختر الطاولة الحالية أولًا', 'error');
 
     const availableTables = posState.tables.filter(table => table.id !== posState.selectedTable.id && table.status === 'available');
-    if (availableTables.length === 0) return showToast('لا توجد طاولات متاحة للنقل في المنطقة دي', 'error');
+    if (availableTables.length === 0) return showToast('لا توجد طاولات متاحة للنقل في هذه المنطقة', 'error');
 
-    uiForm('نقل الطلب لطاولة تانية', [{ key: 't', label: 'الطاولة الفاضية', type: 'select', required: true, placeholder: 'اختار الطاولة',
+    uiForm('نقل الطلب إلى طاولة أخرى', [{ key: 't', label: 'الطاولة المتاحة', type: 'select', required: true, placeholder: 'اختر الطاولة',
         options: availableTables.map(t => [t.id, 'طاولة ' + t.table_number]) }], { ok: 'نقل' }).then(v => { if (v) executeTransferTable(v.t); });
 }
 
@@ -1204,7 +1204,7 @@ async function executeSplitByItems() {
         closeSplitModal();
         await loadOrderIntoCart(posState.cart.id, false);
         renderOrderCartTicket();
-        showToast(`اتعمل طلب جديد رقم ${res.new_order_number} بالأصناف المنقولة. افتحه من "طلبات مفتوحة" أو من الطاولة.`);
+        showToast(`تم إنشاء طلب جديد رقم ${res.new_order_number} بالأصناف المنقولة. افتحه من «الطلبات المفتوحة» أو من الطاولة.`);
     } catch (err) { console.error(err); showToast('حدث خطأ أثناء الاتصال بالسيرفر: ' + (err.message || ''), 'error'); }
 }
 
@@ -1221,7 +1221,7 @@ function recalculateSplitAmounts() {
 function renderSplitByAmount(container) {
     container.innerHTML = `
         <div class="space-y-2">
-            <p class="text-xs font-bold text-slate-500 mb-2">معاينة بس: الدفع بأكتر من طريقة أو على أكتر من شخص بيتعمل من شاشة "دفع وإغلاق".</p>
+            <p class="text-xs font-bold text-slate-500 mb-2">معاينة فقط: الدفع بأكثر من طريقة أو على أكثر من شخص يتم من شاشة «دفع وإغلاق».</p>
             ${posState.splitState.splits.map((s, idx) => `
                 <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border text-xs font-bold">
                     <span>جزء #${s.split_number}</span>
@@ -1241,10 +1241,10 @@ function updateSplitAmount(idx, val) {
 function renderSplitByGuests(container) {
     container.innerHTML = `
         <div class="space-y-2">
-            <p class="text-xs font-bold text-slate-500 mb-2">معاينة: تقسيم متساوي على ${posState.cart.guest_count} ضيوف. الدفع نفسه من شاشة "دفع وإغلاق".</p>
+            <p class="text-xs font-bold text-slate-500 mb-2">معاينة: تقسيم بالتساوي على ${posState.cart.guest_count} ضيوف. الدفع من شاشة "دفع وإغلاق".</p>
             ${posState.splitState.splits.map(s => `
                 <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border text-xs font-bold">
-                    <span>ضيف #${s.split_number}</span>
+                    <span>أضف #${s.split_number}</span>
                     <span class="text-blue-600 font-black">${formatCurrency(s.amount_due)}</span>
                 </div>
             `).join('')}
@@ -1256,7 +1256,7 @@ function renderSplitByGuests(container) {
 // طلب جديد، الطلبات المفتوحة، الدمج، إلغاء الطلب، المرتجع
 // -----------------------------------------
 async function startNewOrder() {
-    if (hasUnsentItems() && !(await uiConfirm('في أصناف لسه ما اتبعتتش للمطبخ. تمسحها وتبدأ طلب جديد؟', 'امسح وابدأ جديد', true))) return;
+    if (hasUnsentItems() && !(await uiConfirm('توجد أصناف لم تُرسَل للمطبخ. هل تريد حذفها وبدء طلب جديد؟', 'حذف وبدء جديد', true))) return;
     resetActiveCart();
     posState.selectedTable = null;
     refreshTypeButtons();
@@ -1268,18 +1268,18 @@ async function chooseOpenOrder(title, excludeId) {
     const res = await serverRpc('list_open_orders_secure', { p_table_id: null });
     const orders = ((res && res.orders) || []).filter(o => o.id !== excludeId);
     if (orders.length === 0) {
-        showToast('مفيش طلبات مفتوحة', 'error');
+        showToast('لا توجد طلبات مفتوحة', 'error');
         return null;
     }
     const typeNames = { dine_in: 'صالة', takeaway: 'تيك أواي', delivery: 'توصيل', pickup: 'استلام' };
-    const v = await uiForm(title, [{ key: 'id', label: 'الطلب', type: 'select', required: true, placeholder: 'اختار الطلب',
+    const v = await uiForm(title, [{ key: 'id', label: 'الطلب', type: 'select', required: true, placeholder: 'اختر الطلب',
         options: orders.map(o => [o.id, `${o.order_number} - ${typeNames[o.order_type] || o.order_type}${o.table_number ? ' - طاولة ' + o.table_number : ''} - ${formatCurrency(o.total_amount)}`]) }], { ok: 'اختيار' });
     if (!v) return null;
     return orders.find(o => o.id === v.id) || null;
 }
 
 async function openOpenOrdersList() {
-    if (hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها أو امسحها الأول', 'error');
+    if (hasUnsentItems()) return showToast('توجد أصناف لم تُرسَل: أرسلها أو احذفها أولًا', 'error');
     try {
         const chosen = await chooseOpenOrder('افتح طلب مفتوح', null);
         if (!chosen) return;
@@ -1291,12 +1291,12 @@ async function openOpenOrdersList() {
 }
 
 async function mergeOrderPrompt() {
-    if (!posState.cart.id) return showToast('افتح الطلب اللي هيتجمع فيه الأول', 'error');
-    if (hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها الأول', 'error');
+    if (!posState.cart.id) return showToast('افتح الطلب الذي سيُجمَع فيه أولًا', 'error');
+    if (hasUnsentItems()) return showToast('توجد أصناف لم تُرسَل: أرسلها أولًا', 'error');
     try {
-        const chosen = await chooseOpenOrder(`الطلب اللي هيتنقل بأصنافه جوه ${posState.cart.order_number}`, posState.cart.id);
+        const chosen = await chooseOpenOrder(`الطلب الذي سينتقل بأصنافه إلى ${posState.cart.order_number}`, posState.cart.id);
         if (!chosen) return;
-        if (!(await uiConfirm(`كل أصناف ${chosen.order_number} هتتنقل لـ ${posState.cart.order_number}، والطلب ${chosen.order_number} هيتقفل. موافق؟`, 'دمج'))) return;
+        if (!(await uiConfirm(`كل أصناف ${chosen.order_number} ستنتقل لـ ${posState.cart.order_number}، والطلب ${chosen.order_number} سيُغلق. هل توافق؟`, 'دمج'))) return;
         const res = await serverRpc('merge_orders_secure', { p_source_order_id: chosen.id, p_target_order_id: posState.cart.id });
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر دمج الطلبات'), 'error');
         await loadOrderIntoCart(posState.cart.id, false);
@@ -1309,8 +1309,8 @@ async function mergeOrderPrompt() {
 
 async function cancelOrderPrompt() {
     if (!posState.cart.id) {
-        if (posState.cart.items.length === 0) return showToast('مفيش طلب مفتوح', 'error');
-        if (!(await uiConfirm('الطلب لسه ما اتبعتش. تمسحه من الشاشة؟', 'مسح', true))) return;
+        if (posState.cart.items.length === 0) return showToast('لا يوجد طلب مفتوح', 'error');
+        if (!(await uiConfirm('لم يُرسَل الطلب بعد. هل تريد حذفه من الشاشة؟', 'مسح', true))) return;
         resetActiveCart();
         posState.selectedTable = null;
         refreshTypeButtons();
@@ -1319,8 +1319,8 @@ async function cancelOrderPrompt() {
         return;
     }
     // لو الإلغاء غلطة موظف: الطلب بيتحسب هالك، وتكلفة خاماته (مش سعر البيع) بتتخصم من الموظف
-    const charge = { key: 'charge', label: 'الإلغاء غلطة موظف؟ (تكلفة الخامات تتخصم منه، مش سعر البيع)', type: 'select', full: true,
-        options: [['', 'لأ، مش غلطة موظف'], ...posState.waiters.map(w => [w.id, w.name])], value: '' };
+    const charge = { key: 'charge', label: 'الإلغاء خطأ موظف؟ (تُخصم تكلفة الخامات منه، وليس سعر البيع)', type: 'select', full: true,
+        options: [['', 'لأ، غير غلطة موظف'], ...posState.waiters.map(w => [w.id, w.name])], value: '' };
     const reason = await pickCancelReason(`إلغاء الطلب ${posState.cart.order_number} بالكامل`, 'cancel_order', 'رقم المدير', [charge]);
     if (!reason) return;
     const managerPin = reason.pin;
@@ -1343,9 +1343,9 @@ async function refundOrderPrompt() {
     if (!list.length) list = posState.cancelReasons;
     if (!list.length) return showToast('لا توجد أسباب مرتجع مسجلة. أضفها من الإعدادات.', 'error');
     const v = await uiForm('مرتجع كامل لطلب مدفوع', [
-        { type: 'note', label: 'الفلوس هترجع للزبون، والقيد هيتعكس.' },
-        { key: 'num', label: 'رقم الطلب (زي 1005)', required: true },
-        { key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختار السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' },
+        { type: 'note', label: 'سيُرد المبلغ للعميل، ويُعكس القيد.' },
+        { key: 'num', label: 'رقم الطلب (مثل 1005)', required: true },
+        { key: 'reason', label: 'السبب', type: 'select', options: list.map(r => [r.id, r.reason]), placeholder: 'اختر السبب', required: true, addNew: 'سبب آخر (اكتب السبب)' },
         { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }], { ok: 'مرتجع', danger: true });
     if (!v) return;
     const normalized = v.num.startsWith('#') ? v.num : '#' + v.num;
@@ -1363,7 +1363,7 @@ async function refundOrderPrompt() {
             p_order_number: normalized, p_reason_id: reason.id, p_manager_pin: String(managerPin).trim()
         });
         if (!res || !res.ok) return showToast(serverReasonMessage(res, 'تعذر عمل المرتجع'), 'error');
-        showToast(`تم مرتجع الطلب ${res.order_number} بمبلغ ${formatCurrency(res.total)}. رجّع الفلوس للزبون.`);
+        showToast(`تم مرتجع الطلب ${res.order_number} بمبلغ ${formatCurrency(res.total)}. سلّم العميل المبلغ.`);
     } catch (err) { console.error(err); showToast('تعذر عمل المرتجع: ' + (err.message || ''), 'error'); }
 }
 // -----------------------------------------
@@ -1372,13 +1372,13 @@ async function refundOrderPrompt() {
 // -----------------------------------------
 async function hospitalityClose() {
     if (paymentSubmissionInProgress) return;
-    if (!posState.cart.id) return showToast('الطلب لسه ما اتحفظش', 'error');
-    if (typeof hasUnsentItems === 'function' && hasUnsentItems()) return showToast('في أصناف لسه ما اتبعتتش: ابعتها الأول', 'error');
+    if (!posState.cart.id) return showToast('لم يُحفظ الطلب بعد', 'error');
+    if (typeof hasUnsentItems === 'function' && hasUnsentItems()) return showToast('توجد أصناف لم تُرسَل: أرسلها أولًا', 'error');
     const limit = Number(appSet('hospitality', 'manager_daily_limit', 500)) || 0;
     const v = await uiForm('🎁 ضيافة', [
-        { key: 'info', type: 'note', label: `الطلب هيتقفل من غير فلوس، والخامات هتتخصم من المخزن. قيمته بسعر المنيو ${formatCurrency(posState.cart.server_total)}. ` +
-            (limit > 0 ? `المدير يوافق لحد ${formatCurrency(limit)} في اليوم، والزيادة برقم المالك.` : 'الموافقة برقم المالك بس.') },
-        { key: 'category', label: 'الضيافة لمين', type: 'select', options: [['owner_guest', 'ضيف المالك'], ['family', 'أهل'], ['staff', 'موظفين'], ['marketing', 'دعاية']], placeholder: 'اختار', required: true },
+        { key: 'info', type: 'note', label: `سيُغلق الطلب بدون مبالغ، وتُخصم الخامات من المخزن. قيمته بسعر القائمة ${formatCurrency(posState.cart.server_total)}. ` +
+            (limit > 0 ? `المدير يوافق حتى ${formatCurrency(limit)} في اليوم، والزيادة برقم المالك.` : 'الموافقة برقم المالك فقط.') },
+        { key: 'category', label: 'فئة الضيافة', type: 'select', options: [['owner_guest', 'ضيف المالك'], ['family', 'أهل'], ['staff', 'موظفين'], ['marketing', 'دعاية']], placeholder: 'اختر', required: true },
         { key: 'guest', label: 'اسم الضيف (اختياري)', type: 'text' },
         { key: 'note', label: 'ملاحظة (اختياري)', type: 'text' },
         { key: 'pin', label: 'رقم المدير أو المالك', type: 'pin', required: true }
@@ -1400,8 +1400,8 @@ async function hospitalityClose() {
             p_note: v.note || null, p_pin: String(v.pin || '').trim()
         });
         if (!res || !res.ok) {
-            let message = serverReasonMessage(res, 'تعذر قفل الطلب ضيافة');
-            if (res && res.reason === 'hospitality_limit') message += ` (اتوافق النهارده على ${formatCurrency(res.used)} من ${formatCurrency(res.limit)}، والطلب ده ${formatCurrency(res.value)})`;
+            let message = serverReasonMessage(res, 'تعذر إغلاق الطلب ضيافة');
+            if (res && res.reason === 'hospitality_limit') message += ` (تمت الموافقة اليوم على ${formatCurrency(res.used)} من ${formatCurrency(res.limit)}، وقيمة هذا الطلب ${formatCurrency(res.value)})`;
             return showToast(message, 'error');
         }
         const closedOrderId = posState.cart.id;
@@ -1412,10 +1412,10 @@ async function hospitalityClose() {
         if (currentBranch && currentBranch.has_tables) await fetchBranchTables();
         renderAreaAndTables();
         renderOrderCartTicket();
-        showToast(`🎁 الطلب ${res.order_number || ''} اتقفل ضيافة`);
+        showToast(`🎁 الطلب ${res.order_number || ''} تم إغلاقه ضيافة`);
     } catch (err) {
         console.error('Hospitality error:', err);
-        showToast('الضيافة ما اتسجلتش، ومفيش أي حاجة اتغيرت: ' + (err.message || 'خطأ غير معروف'), 'error');
+        showToast('لم يتم تسجيل الضيافة، ولم يتغيّر أي شيء: ' + (err.message || 'خطأ غير معروف'), 'error');
     } finally {
         paymentSubmissionInProgress = false;
         if (hospBtn) hospBtn.disabled = false;

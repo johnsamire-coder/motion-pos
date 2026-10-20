@@ -3,7 +3,7 @@
 
 let accState = { tab: 'journal', accounts: [], branches: [], manualLines: [], customers: [] };
 const ACC_TYPE_NAMES = { asset: 'أصول', liability: 'خصوم', equity: 'حقوق ملكية', revenue: 'إيرادات', cogs: 'تكلفة', expense: 'مصروفات' };
-const JE_TYPE_NAMES = { sales: 'مبيعات', purchase: 'مشتريات', payment: 'دفع', receipt: 'تحصيل', expense: 'مصروف', inventory: 'مخزون', adjustment: 'تسوية', manual: 'يدوي', tax: 'ضرايب' };
+const JE_TYPE_NAMES = { sales: 'مبيعات', purchase: 'مشتريات', payment: 'دفع', receipt: 'تحصيل', expense: 'مصروف', inventory: 'مخزون', adjustment: 'تسوية', manual: 'يدوي', tax: 'ضرائب' };
 
 function setAccTab(tab) { accState.tab = tab; renderAccounting(); }
 
@@ -61,7 +61,7 @@ async function accJournalLoad() {
             { label: 'النوع', render: e => uiEsc(JE_TYPE_NAMES[e.journal_type] || e.journal_type) }, { label: 'الوصف', key: 'description' },
             { label: 'الفرع', key: 'branch' }, { label: 'المبلغ', render: e => formatCurrency(e.total) },
             { label: 'الحالة', render: e => e.status === 'reversed' ? '<span class="text-red-600">معكوس</span>' : 'مرحّل' },
-            { label: '', render: e => uiBtn('تفاصيل', `accShowEntry('${e.id}')`, 'gray') }], 'مفيش قيود');
+            { label: '', render: e => uiBtn('تفاصيل', `accShowEntry('${e.id}')`, 'gray') }], 'لا توجد قيود');
 }
 
 async function accShowEntry(id) {
@@ -85,7 +85,7 @@ async function accReverse(id) {
 }
 
 function accAccountOptions() {
-    return uiOptions(accState.accounts, 'id', a => `${a.code} - ${a.name}`, 'اختار الحساب');
+    return uiOptions(accState.accounts, 'id', a => `${a.code} - ${a.name}`, 'اختر الحساب');
 }
 
 function accManual() {
@@ -96,7 +96,7 @@ function accManual() {
         <td class="p-1"><input data-ml="${i}" data-f="credit" type="number" min="0" step="0.01" value="${uiEsc(l.credit)}" class="${uiInputClass()} w-28"></td>
         <td class="p-1"><input data-ml="${i}" data-f="description" type="text" value="${uiEsc(l.description)}" class="${uiInputClass()} w-full"></td>
         <td class="p-1">${uiBtn('✕', `accManualRemove(${i})`, 'gray')}</td></tr>`).join('');
-    document.getElementById('acc-body').innerHTML = uiCard('قيد يدوي (للمدير والمالك، ولازم يكون متوازن)', `
+    document.getElementById('acc-body').innerHTML = uiCard('قيد يدوي (للمدير والمالك، ويجب أن يكون متوازنًا)', `
         <div class="flex flex-wrap gap-2 mb-3"><input id="accm-date" type="date" value="${uiToday()}" class="${uiInputClass()}">
             <input id="accm-desc" type="text" placeholder="وصف القيد (إجباري)" class="${uiInputClass()} flex-1">${accBranchSelect('accm-branch')}</div>
         <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th>الحساب</th><th>مدين</th><th>دائن</th><th>البيان</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -114,7 +114,7 @@ function accManualTotals() {
     const d = round2(accState.manualLines.reduce((s, l) => s + (Number(l.debit) || 0), 0));
     const c = round2(accState.manualLines.reduce((s, l) => s + (Number(l.credit) || 0), 0));
     const el = document.getElementById('accm-totals');
-    if (el) el.innerHTML = `مدين ${formatCurrency(d)} | دائن ${formatCurrency(c)} ${d === c && d > 0 ? '<span class="text-emerald-600">✅ متوازن</span>' : '<span class="text-red-600">❌ مش متوازن</span>'}`;
+    if (el) el.innerHTML = `مدين ${formatCurrency(d)} | دائن ${formatCurrency(c)} ${d === c && d > 0 ? '<span class="text-emerald-600">✅ متوازن</span>' : '<span class="text-red-600">❌ غير متوازن</span>'}`;
 }
 function accManualAdd() { accState.manualLines.push({ account_id: '', debit: '', credit: '', description: '' }); accManual(); }
 function accManualRemove(i) { if (accState.manualLines.length > 2) { accState.manualLines.splice(i, 1); accManual(); } }
@@ -162,7 +162,7 @@ async function accBsLoad() {
         ...sec('equity'), { name: 'أرباح الفترة (لم ترحّل)', amount: res.profit_not_closed }, { name: 'إجمالي حقوق الملكية', amount: Number(res.equity) + Number(res.profit_not_closed), bold: true },
         { name: 'إجمالي الخصوم وحقوق الملكية', amount: res.liabilities_and_equity, bold: true }];
     accState.lastBs = { title: 'الميزانية', from: res.as_of, to: res.as_of, branch: 'كل الفروع', columns: [{ key: 'code', label: 'الكود', type: 't' }, { key: 'name', label: 'البند', type: 't' }, { key: 'amount', label: 'المبلغ', type: 'm' }], rows, key: 'sales_compare' };
-    document.getElementById('accb-body').innerHTML = `<p class="text-xs font-black mb-2 ${res.balanced ? 'text-emerald-600' : 'text-red-600'}">${res.balanced ? '✅ الميزانية متوازنة' : '❌ الميزانية مش متوازنة، راجع القيود'}</p>
+    document.getElementById('accb-body').innerHTML = `<p class="text-xs font-black mb-2 ${res.balanced ? 'text-emerald-600' : 'text-red-600'}">${res.balanced ? '✅ الميزانية متوازنة' : '❌ الميزانية غير متوازنة، راجع القيود'}</p>
         <div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastBs)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastBs)', 'red')}</div>`
         + uiTable(rows, [{ label: 'الكود', render: r => uiEsc(r.code || '') }, { label: 'البند', render: r => r.bold ? `<b>${uiEsc(r.name)}</b>` : uiEsc(r.name) },
             { label: 'المبلغ', render: r => r.bold ? `<b>${formatCurrency(r.amount)}</b>` : formatCurrency(r.amount) }]);
@@ -176,7 +176,7 @@ async function accGl() {
 
 async function accGlLoad() {
     const acc = document.getElementById('accg-acc').value;
-    if (!acc) return showToast('اختار الحساب', 'error');
+    if (!acc) return showToast('اختر الحساب', 'error');
     const res = await uiCall('general_ledger_secure', { p_account_id: acc, p_from: document.getElementById('accg-from').value, p_to: document.getElementById('accg-to').value, p_branch_id: document.getElementById('accg-branch')?.value || null });
     if (!res) return;
     const rows = [{ date: '', entry_number: '', description: 'رصيد أول المدة', debit: null, credit: null, balance: res.opening }, ...res.lines];
@@ -217,13 +217,13 @@ function accCoa() {
 
 async function accPeriods(id, action) {
     const params = { p_period_id: id || null, p_action: action || null };
-    if (id && !(await uiConfirm(action === 'close' ? 'قفل الفترة؟ مش هيتسجل أي قيد بتاريخ فيها بعد كده.' : 'إعادة فتح الفترة؟', action === 'close' ? 'قفل' : 'إعادة فتح', action === 'close'))) return;
+    if (id && !(await uiConfirm(action === 'close' ? 'إغلاق الفترة؟ لن يُسجَّل أي قيد في تاريخها بعد ذلك.' : 'إعادة فتح الفترة؟', action === 'close' ? 'إغلاق' : 'إعادة فتح', action === 'close'))) return;
     const res = await uiCall('fiscal_periods_secure', params, id ? 'تم' : null);
     if (!res) return;
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
-    document.getElementById('acc-body').innerHTML = uiCard('الفترات المالية (القفل للمالك بس)', uiTable(res.periods, [{ label: 'الفترة', key: 'name' },
-        { label: 'من', key: 'start' }, { label: 'إلى', key: 'end' }, { label: 'الحالة', render: p => p.status === 'closed' ? '<b class="text-red-600">مقفولة</b>' : 'مفتوحة' },
-        { label: '', render: p => isOwner ? (p.status === 'open' ? uiBtn('قفل', `accPeriods('${p.id}','close')`, 'red') : uiBtn('إعادة فتح', `accPeriods('${p.id}','reopen')`, 'gray')) : '' }]));
+    document.getElementById('acc-body').innerHTML = uiCard('الفترات المالية (الإغلاق للمالك فقط)', uiTable(res.periods, [{ label: 'الفترة', key: 'name' },
+        { label: 'من', key: 'start' }, { label: 'إلى', key: 'end' }, { label: 'الحالة', render: p => p.status === 'closed' ? '<b class="text-red-600">مغلقة</b>' : 'مفتوحة' },
+        { label: '', render: p => isOwner ? (p.status === 'open' ? uiBtn('إغلاق', `accPeriods('${p.id}','close')`, 'red') : uiBtn('إعادة فتح', `accPeriods('${p.id}','reopen')`, 'gray')) : '' }]));
 }
 
 async function accCustomers() {
@@ -235,7 +235,7 @@ async function accCustomers() {
         { label: 'النوع', render: c => uiEsc(typeNames[c.customer_type] || c.customer_type) }, { label: 'الحد', render: c => formatCurrency(c.credit_limit) },
         { label: 'الرصيد عليه', render: c => `<b class="${Number(c.balance) > 0 ? 'text-red-600' : ''}">${formatCurrency(c.balance)}</b>` },
         { label: '', render: c => '<div class="flex flex-wrap gap-1">' + uiBtn('تعديل', `accEditCustomer('${c.id}')`, 'gray') + uiBtn('كشف', `accCustomerStatement('${c.id}')`, 'gray')
-            + (Number(c.balance) > 0 ? uiBtn('تحصيل', `accCustomerReceive('${c.id}')`, 'green') : '') + '</div>' }], 'مفيش عملاء'),
+            + (Number(c.balance) > 0 ? uiBtn('تحصيل', `accCustomerReceive('${c.id}')`, 'green') : '') + '</div>' }], 'لا يوجد عملاء'),
         uiBtn('إضافة عميل', 'accEditCustomer(null)', 'blue')) + '<div id="acc-cust-statement"></div>';
 }
 
@@ -243,9 +243,9 @@ async function accEditCustomer(id) {
     const c = id ? accState.customers.find(x => x.id === id) : {};
     const v = await uiForm(id ? 'تعديل عميل' : 'عميل جديد', [
         { key: 'name', label: 'اسم العميل', value: c.name || '', required: true },
-        { key: 'phone', label: 'الموبايل', value: c.phone || '' },
+        { key: 'phone', label: 'الهاتف', value: c.phone || '' },
         { key: 'type', label: 'النوع', type: 'select', options: [['cash', 'كاش'], ['registered', 'متسجّل'], ['on_account', 'آجل']], value: c.customer_type || 'registered', required: true },
-        { key: 'limit', label: 'الحد المسموح في الآجل (صفر = من غير حد)', type: 'money', min: 0, value: c.credit_limit || 0 },
+        { key: 'limit', label: 'الحد المسموح في الآجل (صفر = بدون حد)', type: 'money', min: 0, value: c.credit_limit || 0 },
         { key: 'address', label: 'العنوان', value: c.address || '', full: true }]);
     if (!v) return;
     if (await uiCall('customers_secure', { p_data: { id: id || null, name: v.name, phone: v.phone, customer_type: v.type, credit_limit: String(v.limit || 0), address: v.address || '' } }, 'تم الحفظ')) accCustomers();
@@ -257,7 +257,7 @@ async function accCustomerStatement(id) {
     const names = { credit_sale: 'بيع آجل', payment_received: 'تحصيل', refund: 'مرتجع', adjustment: 'تسوية' };
     if (res) document.getElementById('acc-cust-statement').innerHTML = uiCard(`كشف حساب ${c.name || ''}`, uiTable(res.entries, [{ label: 'التاريخ', render: e => uiEsc(uiDate(e.at)) },
         { label: 'النوع', render: e => uiEsc(names[e.type] || e.type) }, { label: 'المبلغ', render: e => formatCurrency(e.amount) },
-        { label: 'الرصيد بعدها', render: e => formatCurrency(e.balance_after) }, { label: 'المرجع', key: 'reference' }], 'مفيش حركات'));
+        { label: 'الرصيد بعدها', render: e => formatCurrency(e.balance_after) }, { label: 'المرجع', key: 'reference' }], 'لا توجد حركات'));
 }
 
 async function accCustomerReceive(id) {
@@ -265,7 +265,7 @@ async function accCustomerReceive(id) {
     const v = await uiForm(`تحصيل من ${c.name || ''}`, [
         { type: 'note', label: `عليه ${formatCurrency(c.balance)}` },
         { key: 'amount', label: 'المبلغ', type: 'money', min: 0.01, required: true, value: c.balance },
-        { key: 'source', label: 'الفلوس هتدخل فين', type: 'select', options: UI_BOX_OPTIONS(['drawer', 'main_cash', 'bank']), required: true },
+        { key: 'source', label: 'مصدر المبلغ', type: 'select', options: UI_BOX_OPTIONS(['drawer', 'main_cash', 'bank']), required: true },
         { key: 'ref', label: 'رقم الإيصال (اختياري)' }], { ok: 'تحصيل' });
     if (!v) return;
     if (await uiCall('customer_receive_secure', { p_customer_id: id, p_amount: v.amount, p_source: v.source, p_reference: v.ref || '' }, 'تم التحصيل')) accCustomers();
@@ -276,7 +276,7 @@ async function accExpense() {
     const cats = ((res && res.categories) || []).filter(c => c.is_active);
     document.getElementById('acc-body').innerHTML = uiCard('تسجيل مصروف (نفس قواعد شاشة المصروفات)', `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-2xl">
-            <select id="exp-account-select" class="${uiInputClass()}">${uiOptions(cats, 'id', c => c.name, 'اختار البند')}</select>
+            <select id="exp-account-select" class="${uiInputClass()}">${uiOptions(cats, 'id', c => c.name, 'اختر البند')}</select>
             <input id="exp-amount-input" type="number" min="0" step="0.01" placeholder="المبلغ" class="${uiInputClass()}">
             <select id="exp-method-select" class="${uiInputClass()}"><option value="cash">من الخزينة الرئيسية</option><option value="card">من البنك</option></select>
             <input id="exp-desc-input" type="text" placeholder="وصف المصروف" class="${uiInputClass()}">

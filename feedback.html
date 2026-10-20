@@ -41,7 +41,7 @@
 </head>
 <body>
     <!-- صفحة الشكاوي والاقتراحات: العميل بيفتحها من رسالة الواتساب أو من الكود اللي على الفاتورة، والمدير بيشوفها في البرنامج -->
-    <div id="app"><p class="center">جاري التحميل...</p></div>
+    <div id="app"><p class="center">جارٍ التحميل...</p></div>
     <script src="js/config.js"></script>
     <script>
         const q = new URLSearchParams(location.search);
@@ -52,12 +52,12 @@
             const app = document.getElementById('app');
             try {
                 const { data, error } = await _supabase.rpc('feedback_info_public', { p_b: B });
-                if (error || !data || !data.ok) { app.innerHTML = '<p class="center">اللينك ده مش صحيح 🙏</p>'; return; }
+                if (error || !data || !data.ok) { app.innerHTML = '<p class="center">هذا الرابط غير صحيح 🙏</p>'; return; }
                 F = data;
                 document.title = 'رأيك يهمنا | ' + (F.company_name || '');
-                if (!F.enabled) { app.innerHTML = `<p class="center">الصفحة دي متوقفة دلوقتي. كلمنا على ${uiEsc(F.phone || 'رقم المحل')} 🙏</p>`; return; }
+                if (!F.enabled) { app.innerHTML = `<p class="center">هذه الصفحة متوقفة الآن. تواصل معنا على ${uiEsc(F.phone || 'رقم المحل')} 🙏</p>`; return; }
                 render();
-            } catch (e) { app.innerHTML = '<p class="center">في مشكلة في النت. حاول تاني 🙏</p>'; }
+            } catch (e) { app.innerHTML = '<p class="center">حدثت مشكلة في الإنترنت. حاول مرة أخرى 🙏</p>'; }
         }
 
         function links() {
@@ -78,10 +78,10 @@
                     </div>
                     <label style="text-align:center">قيّم زيارتك</label>
                     <div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${n <= rating ? 'on' : ''}" onclick="setRating(${n})" aria-label="${n}">★</button>`).join('')}</div>
-                    <label>${kind === 'complaint' ? 'حصل إيه؟ احكيلنا بالتفصيل' : kind === 'suggestion' ? 'اقتراحك إيه؟' : 'إيه اللي عجبك؟'} *</label>
+                    <label>${kind === 'complaint' ? 'ما الذي حدث؟ اكتب التفاصيل' : kind === 'suggestion' ? 'ما اقتراحك؟' : 'ما الذي أعجبك؟'} *</label>
                     <textarea class="field" id="msg" rows="5" maxlength="2000" placeholder="اكتب هنا..."></textarea>
                     <div class="row"><div><label>اسمك (اختياري)</label><input class="field" id="name" maxlength="80" value="${uiEsc(me.name || '')}"></div>
-                        <div><label>موبايلك (عشان نرد عليك)</label><input class="field" id="phone" type="tel" dir="ltr" style="text-align:right" maxlength="16" value="${uiEsc(me.phone || '')}"></div></div>
+                        <div><label>موبايلك (للتواصل معك)</label><input class="field" id="phone" type="tel" dir="ltr" style="text-align:right" maxlength="16" value="${uiEsc(me.phone || '')}"></div></div>
                     <label>رقم الطلب أو الفاتورة (لو معاك)</label><input class="field" id="order" maxlength="30" value="${uiEsc(q.get('o') || '')}">
                     <p class="err" id="err"></p>
                     <button class="primary" id="send" onclick="send()">إرسال 🙏</button>
@@ -95,20 +95,20 @@
         async function send() {
             const msg = document.getElementById('msg').value.trim();
             const err = document.getElementById('err');
-            if (!msg) { err.textContent = 'اكتب رسالتك الأول'; err.style.display = 'block'; return; }
-            const btn = document.getElementById('send'); btn.disabled = true; btn.textContent = 'جاري الإرسال...';
+            if (!msg) { err.textContent = 'اكتب رسالتك أولًا'; err.style.display = 'block'; return; }
+            const btn = document.getElementById('send'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال...';
             try {
                 const { data, error } = await _supabase.rpc('feedback_submit_public', { p_b: B, p_kind: kind, p_rating: rating || null, p_message: msg,
                     p_name: document.getElementById('name').value.trim() || null, p_phone: document.getElementById('phone').value.trim() || null,
                     p_order: document.getElementById('order').value.trim() || null });
                 if (error || !data || !data.ok) {
-                    err.textContent = { too_many: 'بعت رسايل كتير. جرّب بعد شوية 🙏', invalid_phone: 'رقم الموبايل مش مظبوط', reason_required: 'اكتب رسالتك الأول' }[data && data.reason] || 'تعذر الإرسال. حاول تاني.';
+                    err.textContent = { too_many: 'لقد أرسلت رسائل كثيرة. حاول بعد قليل 🙏', invalid_phone: 'رقم الهاتف غير صحيح', reason_required: 'اكتب رسالتك أولًا' }[data && data.reason] || 'تعذّر الإرسال. حاول مرة أخرى.';
                     err.style.display = 'block'; btn.disabled = false; btn.textContent = 'إرسال 🙏';
                     return;
                 }
                 document.querySelector('.card').innerHTML = `<div class="done"><div class="ic">${kind === 'praise' ? '❤️' : '🙏'}</div>
-                    <h2>شكراً ليك!</h2><p class="muted" style="font-size:15px">${kind === 'complaint' ? 'آسفين جداً على اللي حصل. المدير هيشوف رسالتك ويتابعها بنفسه.' : 'رسالتك وصلت، وبتفرق معانا جداً.'}</p></div>${links()}`;
-            } catch (e) { err.textContent = 'في مشكلة في النت. حاول تاني.'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'إرسال 🙏'; }
+                    <h2>شكرًا لك!</h2><p class="muted" style="font-size:15px">${kind === 'complaint' ? 'نعتذر عمّا حدث. سيقوم المدير بمراجعة رسالتك ومتابعتها بنفسه.' : 'رسالتك وصلت، وهي تفرق معنا جدًا.'}</p></div>${links()}`;
+            } catch (e) { err.textContent = 'حدثت مشكلة في الإنترنت. حاول مرة أخرى.'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'إرسال 🙏'; }
         }
         load();
     </script>

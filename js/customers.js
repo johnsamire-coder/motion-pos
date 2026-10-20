@@ -7,10 +7,10 @@ let custState = { search: '', filter: 'all', list: [], today: null, canCredit: f
 async function loadCustomersScreen() {
     const root = document.getElementById('customers-root');
     if (!root) return;
-    const filters = [['all', 'الكل'], ['due', '📞 متابعات النهارده'], ['inactive', '😴 مجوش من ٣٠ يوم'], ['birthday', '🎂 عيد ميلادهم الشهر ده']];
+    const filters = [['all', 'الكل'], ['due', '📞 متابعات اليوم'], ['inactive', '😴 لم يتعاملوا منذ ٣٠ يومًا'], ['birthday', '🎂 عيد ميلادهم هذا الشهر']];
     root.innerHTML = `<div id="cust-due"></div>` + uiCard('العملاء', `
         <div class="flex flex-wrap items-end gap-2 mb-3">
-            <input id="cust-search" value="${uiEsc(custState.search)}" placeholder="دوّر بالاسم أو الموبايل" onkeydown="if(event.key==='Enter')custSearch()" class="${uiInputClass()} w-64">
+            <input id="cust-search" value="${uiEsc(custState.search)}" placeholder="ابحث بالاسم أو رقم الهاتف" onkeydown="if(event.key==='Enter')custSearch()" class="${uiInputClass()} w-64">
             ${uiBtn('بحث 🔍', 'custSearch()', 'blue')}
         </div>
         <div class="flex flex-wrap gap-1.5 mb-3">${filters.map(([k, l]) => `<button onclick="custSetFilter('${k}')" class="px-3 py-1.5 rounded-xl text-xs font-black ${k === custState.filter ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}">${uiEsc(l)}</button>`).join('')}</div>
@@ -29,12 +29,12 @@ async function custLoadDue() {
     if (!res) return;
     custState.due = res.followups || [];
     if (!custState.due.length) { box.innerHTML = ''; return; }
-    box.innerHTML = uiCard(`📞 متابعات (لحد ٧ أيام قدام): ${custState.due.length}`, uiTable(custState.due, [
-        { label: 'الميعاد', render: f => `<span class="${f.next_date <= res.today ? 'text-red-600 font-black' : ''}">${uiEsc(f.next_date)}${f.next_date < res.today ? ' (فات)' : (f.next_date === res.today ? ' (النهارده)' : '')}</span>` },
+    box.innerHTML = uiCard(`📞 متابعات (٧ أيام قادمة): ${custState.due.length}`, uiTable(custState.due, [
+        { label: 'الميعاد', render: f => `<span class="${f.next_date <= res.today ? 'text-red-600 font-black' : ''}">${uiEsc(f.next_date)}${f.next_date < res.today ? ' (فات)' : (f.next_date === res.today ? ' (اليوم)' : '')}</span>` },
         { label: 'العميل', render: f => `<button class="text-blue-700 underline" onclick="custOpen('${f.customer_id}')">${uiEsc(f.name)}</button>` },
-        { label: 'الموبايل', render: f => custPhoneLinks(f.phone, f.name) },
+        { label: 'الهاتف', render: f => custPhoneLinks(f.phone, f.name) },
         { label: 'آخر ملاحظة', key: 'note' }, { label: 'بواسطة', key: 'by' },
-        { label: '', render: f => uiBtn('سجّل مكالمة', `custOpen('${f.customer_id}')`, 'blue') + ' ' + uiBtn('خلصت', `custFollowDone('${f.id}')`, 'gray') }]));
+        { label: '', render: f => uiBtn('سجّل مكالمة', `custOpen('${f.customer_id}')`, 'blue') + ' ' + uiBtn('تمت', `custFollowDone('${f.id}')`, 'gray') }]));
 }
 
 function custPhoneLinks(phone, name) {
@@ -47,21 +47,21 @@ function custPhoneLinks(phone, name) {
 async function custLoadList() {
     const box = document.getElementById('cust-list');
     if (!box) return;
-    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جاري التحميل...</p>';
+    box.innerHTML = '<p class="text-xs text-slate-400 font-bold">جارٍ التحميل...</p>';
     const res = await uiCall('customers_list2_secure', { p_search: custState.search || null, p_filter: custState.filter });
     if (!res) { box.innerHTML = ''; return; }
     custState.list = res.customers || [];
     custState.today = res.today;
     custState.canCredit = !!res.can_credit;
-    box.innerHTML = `<p class="text-[11px] text-slate-500 font-bold mb-2">${custState.list.length} عميل${custState.list.length >= 1000 ? ' (أول ١٠٠٠، دوّر بالاسم أو الرقم)' : ''}</p>` + uiTable(custState.list, [
+    box.innerHTML = `<p class="text-[11px] text-slate-500 font-bold mb-2">${custState.list.length} عميل${custState.list.length >= 1000 ? ' (أول ١٠٠٠، ابحث بالاسم أو الرقم)' : ''}</p>` + uiTable(custState.list, [
         { label: 'الاسم', render: c => `<button class="text-blue-700 font-black underline" onclick="custOpen('${c.id}')">${uiEsc(c.name)}</button>${c.customer_type === 'on_account' ? ' <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded">آجل</span>' : ''}` },
-        { label: 'الموبايل', render: c => custPhoneLinks(c.phone, c.name) },
+        { label: 'الهاتف', render: c => custPhoneLinks(c.phone, c.name) },
         { label: 'الطلبات', key: 'orders_count' },
         { label: 'صرف', render: c => formatCurrency(c.total_spent) },
         { label: 'آخر زيارة', render: c => c.last_visit ? uiEsc(uiDate(c.last_visit)) : '-' },
-        { label: 'المتابعة الجاية', render: c => c.next_followup ? `<span class="${c.next_followup <= custState.today ? 'text-red-600 font-black' : ''}">${uiEsc(c.next_followup)}</span>` : '-' },
-        { label: 'عليه (آجل)', render: c => Number(c.balance) ? `<span class="text-red-600">${formatCurrency(c.balance)}</span>` : '-' }
-    ], 'مفيش عملاء');
+        { label: 'المتابعة القادمة', render: c => c.next_followup ? `<span class="${c.next_followup <= custState.today ? 'text-red-600 font-black' : ''}">${uiEsc(c.next_followup)}</span>` : '-' },
+        { label: 'المستحق عليه (آجل)', render: c => Number(c.balance) ? `<span class="text-red-600">${formatCurrency(c.balance)}</span>` : '-' }
+    ], 'لا يوجد عملاء');
 }
 
 // ---------------------------------------------------------------- one customer
@@ -88,7 +88,7 @@ async function custOpen(id) {
     const stat = (label, value) => `<div class="bg-slate-50 rounded-xl p-2"><p class="text-[10px] text-slate-400 font-bold">${uiEsc(label)}</p><p class="text-sm font-black">${value}</p></div>`;
     const follow = (res.followups || []).map(f => `<div class="border-b py-1.5 text-xs font-bold">
         <div class="flex justify-between gap-2"><span>${uiEsc(f.note)}</span><span class="text-[10px] text-slate-400 whitespace-nowrap">${uiEsc(uiDate(f.created_at))} - ${uiEsc(f.by || '')}</span></div>
-        ${f.next_date ? `<div class="text-[11px] ${f.done_at ? 'text-slate-400' : 'text-blue-700'}">📅 المكالمة الجاية: ${uiEsc(f.next_date)}${f.done_at ? ' (خلصت)' : ` ${uiBtn('خلصت', `custFollowDone('${f.id}', '${c.id}')`, 'gray')}`}</div>` : ''}</div>`).join('');
+        ${f.next_date ? `<div class="text-[11px] ${f.done_at ? 'text-slate-400' : 'text-blue-700'}">📅 المكالمة القادمة: ${uiEsc(f.next_date)}${f.done_at ? ' (اكتملت)' : ` ${uiBtn('تمت', `custFollowDone('${f.id}', '${c.id}')`, 'gray')}`}</div>` : ''}</div>`).join('');
     const orders = (res.orders || []).map(o => `<tr class="border-b text-xs font-bold ${canSales ? 'cursor-pointer hover:bg-blue-50' : ''}" ${canSales ? `onclick="salesOpenOrder('${o.id}')"` : ''}>
         <td class="p-1.5 text-blue-700">${uiEsc(o.order_number)}</td><td class="p-1.5">${uiEsc(uiDate(o.created_at))}</td>
         <td class="p-1.5">${uiEsc(PRINT_TYPE_NAMES[o.order_type] || o.order_type)}</td><td class="p-1.5">${formatCurrency(o.total_amount)}</td>
@@ -98,29 +98,29 @@ async function custOpen(id) {
             <div><h3 class="font-black text-lg">${uiEsc(c.name)} <span class="text-[11px] bg-slate-100 px-2 py-0.5 rounded-lg">${uiEsc(CUST_TYPE_NAMES[c.customer_type] || c.customer_type)}</span></h3>
                 <div class="text-xs font-bold mt-1">${custPhoneLinks(c.phone, c.name)}${c.address ? ' | ' + uiEsc(c.address) : ''}${c.birthday ? ' | 🎂 ' + uiEsc(c.birthday) : ''}</div>
                 ${c.notes ? `<div class="text-[11px] text-amber-700 font-bold mt-1">📝 ${uiEsc(c.notes)}</div>` : ''}
-                <div class="text-[10px] text-slate-400 font-bold mt-1">اتسجّل ${uiEsc(uiDate(c.created_at))}${c.created_by ? ' بواسطة ' + uiEsc(c.created_by) : ''}</div></div>
-            <div class="flex gap-2">${uiBtn('تعديل ✏️', `custEdit('${c.id}')`, 'gray')}${uiBtn('قفل ✖', 'custCloseModal()', 'gray')}</div>
+                <div class="text-[10px] text-slate-400 font-bold mt-1">تم تسجيله ${uiEsc(uiDate(c.created_at))}${c.created_by ? ' بواسطة ' + uiEsc(c.created_by) : ''}</div></div>
+            <div class="flex gap-2">${uiBtn('تعديل ✏️', `custEdit('${c.id}')`, 'gray')}${uiBtn('إغلاق ✖', 'custCloseModal()', 'gray')}</div>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
-            ${stat('عدد الطلبات', uiEsc(s.orders_count || 0))}${stat('إجمالي اللي صرفه', formatCurrency(s.total_spent))}${stat('متوسط الفاتورة', formatCurrency(s.avg_ticket))}
+            ${stat('عدد الطلبات', uiEsc(s.orders_count || 0))}${stat('إجمالي ما أنفقه', formatCurrency(s.total_spent))}${stat('متوسط الفاتورة', formatCurrency(s.avg_ticket))}
             ${stat('أول زيارة', s.first_visit ? uiEsc(uiDate(s.first_visit)) : '-')}${stat('آخر زيارة', s.last_visit ? uiEsc(uiDate(s.last_visit)) : '-')}
-            ${stat('عليه (آجل)', Number(s.balance) ? `<span class="text-red-600">${formatCurrency(s.balance)}</span>` : '-')}
+            ${stat('المستحق عليه (آجل)', Number(s.balance) ? `<span class="text-red-600">${formatCurrency(s.balance)}</span>` : '-')}
         </div>
-        ${(res.favorites || []).length ? `<p class="text-xs font-black mb-1">أكتر حاجة بيطلبها:</p><div class="flex flex-wrap gap-1 mb-4">${res.favorites.map(f => `<span class="bg-blue-50 text-blue-800 border border-blue-200 rounded-lg px-2 py-1 text-[11px] font-bold">${uiEsc(f.name)} ×${uiEsc(f.quantity)}</span>`).join('')}</div>` : ''}
+        ${(res.favorites || []).length ? `<p class="text-xs font-black mb-1">أكثر ما يطلبه:</p><div class="flex flex-wrap gap-1 mb-4">${res.favorites.map(f => `<span class="bg-blue-50 text-blue-800 border border-blue-200 rounded-lg px-2 py-1 text-[11px] font-bold">${uiEsc(f.name)} ×${uiEsc(f.quantity)}</span>`).join('')}</div>` : ''}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <h4 class="font-black text-sm mb-2">المتابعة</h4>
-                <textarea id="cust-fu-note" rows="2" placeholder="كلمته وقلتله إيه / قالك إيه" class="${uiInputClass()} w-full"></textarea>
+                <textarea id="cust-fu-note" rows="2" placeholder="ملخص المكالمة" class="${uiInputClass()} w-full"></textarea>
                 <div class="flex flex-wrap items-center gap-2 mt-1 text-xs font-bold">
-                    <label>أكلمه تاني يوم <input id="cust-fu-date" type="date" class="${uiInputClass()}"></label>
+                    <label>الاتصال به غدًا <input id="cust-fu-date" type="date" class="${uiInputClass()}"></label>
                     ${uiBtn('+٣ أيام', "custFuQuick(3)", 'gray')}${uiBtn('+أسبوع', "custFuQuick(7)", 'gray')}${uiBtn('+شهر', "custFuQuick(30)", 'gray')}
                     ${uiBtn('حفظ', `custFollowAdd('${c.id}')`, 'green')}
                 </div>
-                <div class="mt-2 max-h-64 overflow-y-auto">${follow || '<p class="text-xs text-slate-400 font-bold py-2">مفيش متابعات لسه</p>'}</div>
+                <div class="mt-2 max-h-64 overflow-y-auto">${follow || '<p class="text-xs text-slate-400 font-bold py-2">لا توجد متابعات حتى الآن</p>'}</div>
             </div>
             <div>
-                <h4 class="font-black text-sm mb-2">آخر الطلبات${canSales ? ' <span class="text-[10px] text-slate-400">(دوس على الطلب لتفاصيله)</span>' : ''}</h4>
-                <div class="max-h-80 overflow-y-auto"><table class="w-full text-right"><tbody>${orders || '<tr><td class="text-xs text-slate-400 p-2">مطلبش حاجة لسه</td></tr>'}</tbody></table></div>
+                <h4 class="font-black text-sm mb-2">آخر الطلبات${canSales ? ' <span class="text-[10px] text-slate-400">(اضغط على الطلب لعرض التفاصيل)</span>' : ''}</h4>
+                <div class="max-h-80 overflow-y-auto"><table class="w-full text-right"><tbody>${orders || '<tr><td class="text-xs text-slate-400 p-2">لم يطلب شيئًا بعد</td></tr>'}</tbody></table></div>
             </div>
         </div>`);
 }
@@ -157,16 +157,16 @@ function custEdit(id) {
         <div class="grid grid-cols-2 gap-2 border-t pt-2 mt-2">
             <label class="text-xs font-bold">النوع<br><select id="cust-e-type" class="${uiInputClass()} w-full">${Object.entries(CUST_TYPE_NAMES).map(([k, l]) => `<option value="${k}" ${(c.customer_type || 'registered') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
             <label class="text-xs font-bold">حد الآجل<br><input id="cust-e-limit" type="number" min="0" value="${uiEsc(c.credit_limit || 0)}" class="${uiInputClass()} w-full"></label>
-        </div>` : '<p class="text-[11px] text-slate-400 font-bold mt-2">الآجل بيتحدد من المدير أو الحسابات.</p>';
+        </div>` : '<p class="text-[11px] text-slate-400 font-bold mt-2">الآجل يُحدَّد من المدير أو الحسابات.</p>';
     custModal(`
         <h3 class="font-black text-base mb-3">${id ? 'تعديل عميل' : 'عميل جديد'}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             <label class="text-xs font-bold">الاسم *<br><input id="cust-e-name" value="${uiEsc(c.name || '')}" class="${uiInputClass()} w-full"></label>
-            <label class="text-xs font-bold">الموبايل *<br><input id="cust-e-phone" type="tel" value="${uiEsc(c.phone || '')}" class="${uiInputClass()} w-full"></label>
+            <label class="text-xs font-bold">الهاتف *<br><input id="cust-e-phone" type="tel" value="${uiEsc(c.phone || '')}" class="${uiInputClass()} w-full"></label>
             <label class="text-xs font-bold">العنوان / المنطقة<br><input id="cust-e-address" value="${uiEsc(c.address || '')}" class="${uiInputClass()} w-full"></label>
             <label class="text-xs font-bold">تاريخ الميلاد<br><input id="cust-e-birthday" type="date" value="${uiEsc(c.birthday || '')}" class="${uiInputClass()} w-full"></label>
         </div>
-        <label class="text-xs font-bold block mt-2">ملاحظات ثابتة (بيحب إيه، حساسية من حاجة...)<br><textarea id="cust-e-notes" rows="2" class="${uiInputClass()} w-full">${uiEsc(c.notes || '')}</textarea></label>
+        <label class="text-xs font-bold block mt-2">ملاحظات ثابتة (ما يحبه، حساسيات...)<br><textarea id="cust-e-notes" rows="2" class="${uiInputClass()} w-full">${uiEsc(c.notes || '')}</textarea></label>
         ${credit}
         <div class="flex gap-2 mt-4">${uiBtn('حفظ', `custSave(${id ? `'${id}'` : 'null'})`, 'green')}${uiBtn('إلغاء', id ? `custOpen('${id}')` : 'custCloseModal()', 'gray')}</div>`);
 }
@@ -184,12 +184,12 @@ async function custSave(id) {
         data.customer_type = document.getElementById('cust-e-type').value;
         data.credit_limit = String(Number(document.getElementById('cust-e-limit').value) || 0);
     }
-    if (!data.name || !data.phone) return showToast('الاسم والموبايل لازم يتكتبوا', 'error');
+    if (!data.name || !data.phone) return showToast('اكتب الاسم والهاتف', 'error');
     try {
         const res = await serverRpc('customer_save2_secure', { p_data: data });
         if (!res || res.ok === false) {
             if (res && res.reason === 'phone_taken' && res.customer) {
-                if (await uiConfirm(`الرقم ده متسجل باسم "${res.customer.name}". تفتح صفحته؟`, 'افتح صفحته')) custOpen(res.customer.id);
+                if (await uiConfirm(`هذا الرقم مسجّل باسم "${res.customer.name}". تفتح صفحته؟`, 'افتح صفحته')) custOpen(res.customer.id);
                 return;
             }
             return showToast(serverReasonMessage(res, 'تعذر الحفظ'), 'error');

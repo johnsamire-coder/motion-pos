@@ -18,8 +18,8 @@ async function set2RenderModifiers() {
 function modRuleText(g) {
     const min = Number(g.min_selection) || 0;
     const max = Number(g.max_selection) || 1;
-    if (min > 0) return min === max ? `لازم يختار ${min}` : `لازم يختار من ${min} لـ ${max}`;
-    return max === 1 ? 'اختياري (واحدة بس)' : `اختياري (لحد ${max})`;
+    if (min > 0) return min === max ? `اختر ${min}` : `اختر من ${min} لـ ${max}`;
+    return max === 1 ? 'اختياري (إضافة واحدة فقط)' : `اختياري (حتى ${max})`;
 }
 
 function modRender() {
@@ -35,12 +35,12 @@ function modRender() {
                 <div class="flex gap-1">${uiBtn('تعديل', `modEdit('${g.id}')`, 'gray')}${uiBtn('مسح', `modDelete('${g.id}')`, 'red')}</div>
             </div>
             <div class="flex flex-wrap gap-1 mb-2">${(g.modifiers || []).map(m => `<span class="bg-white border rounded-lg px-2 py-1 text-[11px] font-bold">${uiEsc(m.name)} <span class="text-blue-600">${Number(m.price) > 0 ? '+' + formatCurrency(m.price) : 'مجاني'}</span>${m.ingredient_id ? ' 📦' : ''}</span>`).join('')}</div>
-            <p class="text-[11px] text-slate-500 font-bold">الأصناف: ${(g.product_ids || []).length ? uiEsc((g.product_ids || []).map(id => pname[id] || '').filter(Boolean).join('، ')) : '<span class="text-red-500">مش مربوطة بأي صنف</span>'}</p>
+            <p class="text-[11px] text-slate-500 font-bold">الأصناف: ${(g.product_ids || []).length ? uiEsc((g.product_ids || []).map(id => pname[id] || '').filter(Boolean).join('، ')) : '<span class="text-red-500">غير مرتبطة بأي صنف</span>'}</p>
         </div>`).join('');
     box.innerHTML = uiCard('الإضافات', `
-        <p class="text-[11px] text-slate-500 font-bold mb-3">اعمل مجموعة (مثلاً "إضافات البرجر" أو "نوع اللبن")، وحط فيها الإضافات بأسعارها، واختار الأصناف اللي تظهر معاها.
-        لما الكاشير يدوس على الصنف هيظهرله شباك الإضافات. 📦 = الإضافة بتخصم خامة من المخزن.</p>
-        ${cards || '<p class="text-center text-slate-400 font-bold text-xs py-6">مفيش مجموعات إضافات لسه</p>'}`, uiBtn('مجموعة جديدة ➕', 'modEdit(null)', 'blue'));
+        <p class="text-[11px] text-slate-500 font-bold mb-3">أنشئ مجموعة (مثلاً "إضافات البرجر" أو "نوع اللبن")، وأضف فيها الإضافات بأسعارها، واختر الأصناف التي تظهر معها.
+        عند ضغط الكاشير على الصنف تظهر نافذة الإضافات. 📦 = الإضافة تخصم خامة من المخزن.</p>
+        ${cards || '<p class="text-center text-slate-400 font-bold text-xs py-6">لا توجد مجموعات إضافات حتى الآن</p>'}`, uiBtn('مجموعة جديدة ➕', 'modEdit(null)', 'blue'));
 }
 
 function modEdit(id) {
@@ -60,7 +60,7 @@ function modEditorHtml() {
             <td class="p-1"><input type="number" min="0" step="any" value="${uiEsc(m.price)}" oninput="modState.edit.modifiers[${i}].price = this.value" class="${uiInputClass()} w-24"></td>
             <td class="p-1"><select onchange="modState.edit.modifiers[${i}].ingredient_id = this.value || null; modRender()" class="${uiInputClass()}">${ingOpts(m.ingredient_id)}</select></td>
             <td class="p-1">${m.ingredient_id ? `<input type="number" min="0" step="any" value="${uiEsc(m.ingredient_quantity || '')}" oninput="modState.edit.modifiers[${i}].ingredient_quantity = this.value" placeholder="الكمية" class="${uiInputClass()} w-24">` : '-'}</td>
-            <td class="p-1">${uiBtn('شيل', `modState.edit.modifiers.splice(${i},1); modRender()`, 'gray')}</td>
+            <td class="p-1">${uiBtn('احذف', `modState.edit.modifiers.splice(${i},1); modRender()`, 'gray')}</td>
         </tr>`).join('');
     const cats = {};
     modState.products.forEach(p => { const k = p.category || 'بدون قسم'; (cats[k] = cats[k] || []).push(p); });
@@ -73,15 +73,15 @@ function modEditorHtml() {
     return uiCard(e.id ? 'تعديل مجموعة إضافات' : 'مجموعة إضافات جديدة', `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3 text-xs font-bold">
             <label>اسم المجموعة<br><input value="${uiEsc(e.name)}" oninput="modState.edit.name = this.value" placeholder="مثلاً: إضافات البرجر" class="${uiInputClass()} w-full"></label>
-            <label>أقل عدد لازم يتختار (0 = اختياري)<br><input type="number" min="0" max="50" value="${uiEsc(e.min_selection)}" oninput="modState.edit.min_selection = this.value" class="${uiInputClass()} w-full"></label>
+            <label>أقل عدد للاختيار (0 = اختياري)<br><input type="number" min="0" max="50" value="${uiEsc(e.min_selection)}" oninput="modState.edit.min_selection = this.value" class="${uiInputClass()} w-full"></label>
             <label>أكتر عدد يتختار<br><input type="number" min="1" max="50" value="${uiEsc(e.max_selection)}" oninput="modState.edit.max_selection = this.value" class="${uiInputClass()} w-full"></label>
         </div>
-        <p class="text-[11px] text-slate-500 font-bold mb-2">مثال: "نوع اللبن" = أقل 1 وأكتر 1 (لازم يختار واحد). "إضافات البرجر" = أقل 0 وأكتر 3.</p>
+        <p class="text-[11px] text-slate-500 font-bold mb-2">مثال: "نوع اللبن" = أقل 1 وأكتر 1 (يجب اختيار واحد). "إضافات البرجر" = أقل 0 وأكتر 3.</p>
         <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500">
-            <th class="p-1">الإضافة</th><th class="p-1">السعر</th><th class="p-1">بتخصم من المخزن</th><th class="p-1">الكمية من الخامة</th><th></th></tr></thead>
+            <th class="p-1">الإضافة</th><th class="p-1">السعر</th><th class="p-1">تخصم من المخزن</th><th class="p-1">الكمية من الخامة</th><th></th></tr></thead>
             <tbody>${rows}</tbody></table></div>
         <div class="mt-2">${uiBtn('إضافة سطر ➕', "modState.edit.modifiers.push({ name: '', price: 0 }); modRender()", 'gray')}</div>
-        <div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">تظهر مع الأصناف دي:</p>${prodHtml || '<p class="text-xs text-slate-400">مفيش أصناف</p>'}</div>`,
+        <div class="mt-4 border-t pt-3"><p class="text-xs font-black mb-2">تظهر مع الأصناف هذه:</p>${prodHtml || '<p class="text-xs text-slate-400">لا توجد أصناف</p>'}</div>`,
         uiBtn('حفظ', 'modSave()', 'green') + uiBtn('رجوع', 'modCancel()', 'gray'));
 }
 
@@ -108,10 +108,10 @@ async function modSave() {
     const e = modState.edit;
     const mods = e.modifiers.filter(m => String(m.name || '').trim());
     if (!String(e.name || '').trim()) return showToast('اكتب اسم المجموعة', 'error');
-    if (!mods.length) return showToast('لازم إضافة واحدة على الأقل', 'error');
+    if (!mods.length) return showToast('مطلوب إضافة واحدة على الأقل', 'error');
     for (const m of mods) {
         if (!(Number(m.price) >= 0)) return showToast(`سعر "${m.name}" غلط`, 'error');
-        if (m.ingredient_id && !(Number(m.ingredient_quantity) > 0)) return showToast(`اكتب كمية الخامة اللي "${m.name}" بتخصمها`, 'error');
+        if (m.ingredient_id && !(Number(m.ingredient_quantity) > 0)) return showToast(`اكتب كمية الخامة التي يخصمها "${m.name}"`, 'error');
     }
     const data = {
         id: e.id || null, name: String(e.name).trim(),
@@ -128,6 +128,6 @@ async function modSave() {
 
 async function modDelete(id) {
     const g = modState.groups.find(x => x.id === id);
-    if (!g || !(await uiConfirm(`مسح مجموعة "${g.name}"؟\nالفواتير القديمة مش هتتأثر.`, 'مسح', true))) return;
+    if (!g || !(await uiConfirm(`مسح مجموعة "${g.name}"؟\nالفواتير القديمة لن تتأثر.`, 'مسح', true))) return;
     if (await uiCall('modifiers_admin_secure', { p_action: 'delete_group', p_data: { id } }, 'تم المسح')) set2RenderModifiers();
 }

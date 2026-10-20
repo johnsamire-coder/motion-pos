@@ -89,7 +89,7 @@ function renderMenuSettings() {
 
     if (productsContainer) {
         if (settingsState.products.length === 0) {
-            productsContainer.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-slate-400 font-bold">لا يوجد أصناف في المنيو حتى الآن</td></tr>`;
+            productsContainer.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-slate-400 font-bold">لا توجد أصناف في القائمة حتى الآن</td></tr>`;
             return;
         }
 
@@ -133,7 +133,7 @@ async function addNewProductPrompt() {
     const v = await uiForm('صنف جديد', [
         { key: 'name', label: 'اسم الصنف (مثال: عصير مانجو)', required: true, full: true },
         { key: 'price', label: 'سعر البيع', type: 'money', min: 0, required: true },
-        { key: 'cat', label: 'القسم', type: 'select', options: settingsState.categories.map(c => [c.id, c.name]), placeholder: 'اختار القسم', addNew: 'قسم جديد', required: true }]);
+        { key: 'cat', label: 'القسم', type: 'select', options: settingsState.categories.map(c => [c.id, c.name]), placeholder: 'اختر القسم', addNew: 'قسم جديد', required: true }]);
     if (!v) return;
     try {
         let categoryId = v.cat;
@@ -201,7 +201,7 @@ function renderBranchesSettings() {
                     <div class="bg-slate-50 border p-3 rounded-2xl text-xs font-bold space-y-2">
                         <div class="flex justify-between items-start gap-2">
                             <div><p class="text-slate-800 font-black">${uiEsc(b.name)}</p><p class="text-[10px] text-slate-400">${uiEsc(b.address || 'بدون عنوان')}</p></div>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap ${b.has_tables ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">${b.has_tables ? 'يدعم طاولات' : 'تيك أواي بس'}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap ${b.has_tables ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">${b.has_tables ? 'يدعم طاولات' : 'تيك أواي فقط'}</span>
                         </div>
                         ${isOwner ? `<div class="flex gap-2"><button onclick="editBranchPrompt('${b.id}')" class="text-blue-700 bg-white border rounded-lg px-2 py-1">✏️ تعديل</button>
                             <button onclick="deleteBranchPrompt('${b.id}')" class="text-red-600 bg-white border border-red-100 rounded-lg px-2 py-1">🗑️ مسح</button></div>` : ''}
@@ -223,7 +223,7 @@ async function editBranchPrompt(id) {
     const v = await uiForm('تعديل الفرع', [
         { key: 'name', label: 'اسم الفرع', value: b.name || '', required: true },
         { key: 'address', label: 'العنوان', value: b.address || '' },
-        { key: 'tables', label: 'الفرع فيه طاولات وصالة (لو لأ: تيك أواي بس)', type: 'check', value: b.has_tables !== false, full: true }]);
+        { key: 'tables', label: 'الفرع به طاولات وصالة (بخلاف ذلك: تيك أواي فقط)', type: 'check', value: b.has_tables !== false, full: true }]);
     if (!v) return;
     if (await setupAction('edit_branch', { id, name: v.name, address: v.address || '', has_tables: v.tables }, 'تم تعديل الفرع') && currentBranch && currentUser?.branch_id === id) {
         currentBranch.name = v.name; currentBranch.has_tables = v.tables;
@@ -233,10 +233,10 @@ async function editBranchPrompt(id) {
 
 async function deleteBranchPrompt(id) {
     const b = settingsState.branches.find(x => x.id === id) || {};
-    if (!(await uiConfirm(`تمسح فرع "${b.name}"؟\nمناطقه وطاولاته ومخازنه الفاضية هتتمسح معاه.\nالفرع اللي عليه أي شغل (طلبات، موظفين، مشتريات...) مش هيتمسح.`, 'مسح', true))) return;
+    if (!(await uiConfirm(`تمسح فرع "${b.name}"؟\nمناطقه وطاولاته ومخازنه الفارغة ستُحذف معه.\nالفرع الذي عليه أي عمليات (طلبات، موظفين، مشتريات...) لن يُحذف.`, 'مسح', true))) return;
     const res = await uiCall('setup_admin_secure', { p_action: 'delete_branch', p_data: { id } });
     if (res === null) return;
-    showToast('اتمسح الفرع');
+    showToast('تم حذف الفرع');
     await loadSettingsData(); renderBranchesSettings(); renderWarehousesSettings(); renderTablesSettings(); renderTaxSettings();
 }
 
@@ -244,7 +244,7 @@ async function addNewBranchPrompt() {
     const v = await uiForm('فرع جديد', [
         { key: 'name', label: 'اسم الفرع (مثال: فرع مدينة نصر)', required: true },
         { key: 'address', label: 'العنوان' },
-        { key: 'tables', label: 'الفرع فيه طاولات وصالة (لو لأ: تيك أواي بس)', type: 'check', value: true, full: true }]);
+        { key: 'tables', label: 'الفرع به طاولات وصالة (بخلاف ذلك: تيك أواي فقط)', type: 'check', value: true, full: true }]);
     if (!v) return;
     try {
         if (await settingsAction('add_branch', { name: v.name, address: v.address || '', has_tables: String(v.tables) })) {
@@ -266,7 +266,7 @@ function renderWarehousesSettings() {
                 ${settingsState.warehouses.map(w => `
                     <div class="bg-slate-50 border p-3 rounded-2xl text-xs font-bold space-y-2">
                         <div class="flex justify-between items-start gap-2">
-                            <div><p class="text-slate-800 font-black">${uiEsc(w.name)}</p><p class="text-[10px] text-blue-600">${w.branches ? 'تابع لـ: ' + uiEsc(w.branches.name) : 'مخزن رئيسي مشترك'}</p></div>
+                            <div><p class="text-slate-800 font-black">${uiEsc(w.name)}</p><p class="text-[10px] text-blue-600">${w.branches ? 'الفرع التابع له: ' + uiEsc(w.branches.name) : 'مخزن رئيسي مشترك'}</p></div>
                             ${w.is_main ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">رئيسي</span>' : ''}
                         </div>
                         <div class="flex gap-2"><button onclick="editWarehousePrompt('${w.id}')" class="text-blue-700 bg-white border rounded-lg px-2 py-1">✏️ تعديل الاسم</button>
@@ -284,14 +284,14 @@ async function editWarehousePrompt(id) {
 
 async function deleteWarehousePrompt(id) {
     const w = settingsState.warehouses.find(x => x.id === id) || {};
-    if (!(await uiConfirm(`تمسح مخزن "${w.name}"؟ (المخزن اللي اتحرّك فيه أي بضاعة مش هيتمسح)`, 'مسح', true))) return;
-    await setupAction('delete_warehouse', { id }, 'اتمسح المخزن');
+    if (!(await uiConfirm(`تمسح مخزن "${w.name}"؟ (المخزن الذي حُرّكت فيه أي بضاعة لن يُحذف)`, 'مسح', true))) return;
+    await setupAction('delete_warehouse', { id }, 'حذف المخزن');
 }
 
 async function addNewWarehousePrompt() {
     const v = await uiForm('مخزن جديد', [
         { key: 'name', label: 'اسم المخزن', required: true },
-        { key: 'branch', label: 'تابع لـ', type: 'select', options: [['', 'مخزن رئيسي مشترك'], ...settingsState.branches.map(b => [b.id, b.name])], value: '' }]);
+        { key: 'branch', label: 'الفرع التابع له', type: 'select', options: [['', 'مخزن رئيسي مشترك'], ...settingsState.branches.map(b => [b.id, b.name])], value: '' }]);
     if (!v) return;
     try {
         if (await settingsAction('add_warehouse', { name: v.name, branch_id: v.branch || null })) {
@@ -356,9 +356,9 @@ function renderTablesSettings() {
                         <p class="text-slate-500">${uiEsc(t.capacity)} كراسي</p>
                         <div class="flex gap-1 justify-center"><button onclick="editTablePrompt('${t.id}')" class="text-blue-700 bg-white border rounded px-1.5" title="تعديل">✏️</button>
                             <button onclick="deleteTable('${t.id}')" class="text-red-600 bg-white border border-red-100 rounded px-1.5" title="حذف">🗑️</button></div>
-                    </div>`).join('') || '<p class="col-span-full text-center text-slate-400 text-xs py-3">مفيش طاولات</p>'}
+                    </div>`).join('') || '<p class="col-span-full text-center text-slate-400 text-xs py-3">لا توجد طاولات</p>'}
             </div>
-        </div>`).join('') || '<p class="text-xs text-slate-400 font-bold">مفيش مناطق. اعمل منطقة من: الخصومات والأسباب والمناطق.</p>';
+        </div>`).join('') || '<p class="text-xs text-slate-400 font-bold">لا توجد مناطق. أنشئ منطقة من: الخصومات والأسباب والمناطق.</p>';
 }
 
 async function editTablePrompt(tableId) {
@@ -377,8 +377,8 @@ async function renameAreaPrompt(id) {
 
 async function deleteAreaPrompt(id) {
     const a = settingsState.areas.find(x => x.id === id) || {};
-    if (!(await uiConfirm(`تمسح منطقة "${a.name}" وطاولاتها؟ (لو أي طاولة عليها طلبات قديمة مش هتتمسح)`, 'مسح', true))) return;
-    await setupAction('delete_area', { id }, 'اتمسحت المنطقة');
+    if (!(await uiConfirm(`تمسح منطقة "${a.name}" وطاولاتها؟ (إذا كان على أي طاولة طلبات قديمة لن تُحذف)`, 'مسح', true))) return;
+    await setupAction('delete_area', { id }, 'حذف المنطقة');
 }
 
 async function editTableCapacity(tableId, currentCapacity) {

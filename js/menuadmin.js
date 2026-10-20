@@ -53,7 +53,7 @@ async function renderMenuAdmin() {
     const root = document.getElementById('menuadmin-root');
     if (!root) return;
     if (!ma.data) {
-        root.innerHTML = '<p class="text-center text-slate-400 font-bold py-10 text-xs">جاري تحميل المنيو...</p>';
+        root.innerHTML = '<p class="text-center text-slate-400 font-bold py-10 text-xs">جارٍ تحميل القائمة...</p>';
         if (!(await maCall('get'))) { root.innerHTML = ''; return; }
     }
     const d = ma.data;
@@ -74,15 +74,15 @@ async function renderMenuAdmin() {
                 <span class="font-black text-sm text-blue-700 whitespace-nowrap">${formatCurrency(p.price)}</span></div>
             <span class="text-[11px] font-bold text-slate-500 truncate">${uiEsc(catName[p.category_id] || '')}${p.description ? ' | ' + uiEsc(p.description) : ''}</span>
             <div class="flex flex-wrap gap-1 mt-1">
-                <span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 ${p.recipe.length && (!Number(p.cost) || zeroN(p)) ? 'bg-amber-100 text-amber-800' : pctCls}">${!p.recipe.length ? '⚠️ ناقص وصفة' : zeroN(p) ? `⚠️ ناقص كميات (${zeroN(p)} خامة)` : (Number(p.cost) ? `التكلفة ${formatCurrency(p.cost)} (${pct}%)` : '⚠️ الوصفة موجودة بس الخامات لسه من غير سعر')}</span>
+                <span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 ${p.recipe.length && (!Number(p.cost) || zeroN(p)) ? 'bg-amber-100 text-amber-800' : pctCls}">${!p.recipe.length ? '⚠️ ناقص وصفة' : zeroN(p) ? `⚠️ ناقص كميات (${zeroN(p)} خامة)` : (Number(p.cost) ? `التكلفة ${formatCurrency(p.cost)} (${pct}%)` : '⚠️ الوصفة موجودة لكن الخامات بدون سعر بعد')}</span>
                 ${p.is_available ? '' : '<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-red-100 text-red-700">موقوف</span>'}
-                ${p.show_in_menu ? '' : '<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-slate-200 text-slate-600">مش ظاهر في منيو الـ QR</span>'}
+                ${p.show_in_menu ? '' : '<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-slate-200 text-slate-600">غير ظاهر في قائمة QR</span>'}
                 ${p.group_ids.length ? `<span class="text-[10px] font-black rounded-lg px-1.5 py-0.5 bg-violet-100 text-violet-700">إضافات ${p.group_ids.length}</span>` : ''}
             </div></button>`;
     }).join('');
-    root.innerHTML = uiCard('🍽️ المنيو والوصفات', `
+    root.innerHTML = uiCard('🍽️ القائمة والوصفات', `
         <div class="flex flex-wrap gap-2 items-center mb-3">
-            <input value="${uiEsc(ma.search)}" oninput="ma.search=this.value; clearTimeout(window._maT); window._maT=setTimeout(renderMenuAdmin, 250)" placeholder="🔍 دوّر على صنف" class="${uiInputClass()} flex-1 min-w-[160px]">
+            <input value="${uiEsc(ma.search)}" oninput="ma.search=this.value; clearTimeout(window._maT); window._maT=setTimeout(renderMenuAdmin, 250)" placeholder="🔍 ابحث عن صنف" class="${uiInputClass()} flex-1 min-w-[160px]">
             <span class="text-[11px] font-bold text-slate-500">${(d.products || []).length} صنف | ${cats.length} قسم${noRecipe ? ` | <button onclick="ma.cat='norecipe'; renderMenuAdmin()" class="text-amber-700 underline">${noRecipe} ناقص وصفة</button>` : ''}${noQty ? ` | <button onclick="ma.cat='noqty'; renderMenuAdmin()" class="text-amber-700 underline">${noQty} ناقص كميات</button>` : ''}</span>
         </div>
         <div class="flex gap-2 overflow-x-auto pb-2 mb-3">
@@ -91,20 +91,20 @@ async function renderMenuAdmin() {
             ${noRecipe ? pill('norecipe', '⚠️ ناقص وصفة', noRecipe, ma.cat === 'norecipe') : ''}
             ${noQty ? pill('noqty', '⚠️ ناقص كميات', noQty, ma.cat === 'noqty') : ''}
         </div>
-        ${ma.cat !== 'all' && ma.cat !== 'norecipe' && ma.cat !== 'noqty' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم ده', `maEditCategory('${ma.cat}')`, 'gray')}
+        ${ma.cat !== 'all' && ma.cat !== 'norecipe' && ma.cat !== 'noqty' && catName[ma.cat] ? `<div class="flex flex-wrap gap-2 mb-3 text-xs">${uiBtn('✏️ تعديل القسم هذا', `maEditCategory('${ma.cat}')`, 'gray')}
             ${(cats.find(c => c.id === ma.cat) || {}).products ? '' : uiBtn('🗑️ مسح القسم', `maDeleteCategory('${ma.cat}')`, 'red')}</div>` : ''}
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards || '<p class="text-center text-slate-400 font-bold text-xs py-8 sm:col-span-2 xl:col-span-3">مفيش أصناف هنا. دوس "➕ صنف جديد".</p>'}</div>`,
-        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال المنيو مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')}`);
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards || '<p class="text-center text-slate-400 font-bold text-xs py-8 sm:col-span-2 xl:col-span-3">لا توجد أصناف هنا. اضغط "➕ صنف جديد".</p>'}</div>`,
+        `${uiBtn('➕ صنف جديد', 'maOpen(null)', 'green')} ${uiBtn('➕ قسم جديد', 'maEditCategory(null)', 'blue')} ${uiBtn('📥 إدخال القائمة مرة واحدة', 'maImport()', 'gray')} ${uiBtn('🧪 إدخال الوصفات مرة واحدة', 'maImportRecipes()', 'gray')}`);
 }
 
 async function maEditCategory(id) {
     const c = id ? (ma.data.categories || []).find(x => x.id === id) : {};
     const v = await uiForm(id ? 'تعديل القسم' : 'قسم جديد', [
         { key: 'name', label: 'اسم القسم', value: c.name || '', required: true },
-        { key: 'station', label: 'أصنافه بتتحضّر فين', type: 'select', options: MA_STATIONS, value: c.station || 'kitchen', required: true },
-        { key: 'sort', label: 'ترتيبه في المنيو (الأصغر الأول)', type: 'number', min: 0, value: c.sort_order ?? '' },
+        { key: 'station', label: 'محطة تحضير الأصناف', type: 'select', options: MA_STATIONS, value: c.station || 'kitchen', required: true },
+        { key: 'sort', label: 'ترتيبه في القائمة (الأصغر الأول)', type: 'number', min: 0, value: c.sort_order ?? '' },
         { key: 'show', label: 'يظهر في منيو الـ QR للعميل', type: 'check', value: c.show_in_menu !== false },
-        ...(id ? [{ type: 'note', label: c.products ? `فيه ${c.products} صنف في القسم ده.` : 'القسم فاضي، تقدر تمسحه من زرار "مسح القسم" اللي جنب "تعديل القسم".' }] : [])],
+        ...(id ? [{ type: 'note', label: c.products ? `فيه ${c.products} صنف في القسم هذا.` : 'القسم فارغ، يمكنك حذفه من زر "حذف القسم" بجوار "تعديل القسم".' }] : [])],
         { ok: 'حفظ' });
     if (!v) return;
     const res = await maCall('save_category', { id: id || null, name: v.name, station: v.station, sort_order: v.sort === null ? '' : String(v.sort), show_in_menu: v.show }, 'تم الحفظ');
@@ -114,8 +114,8 @@ async function maEditCategory(id) {
 }
 
 async function maDeleteCategory(id) {
-    if (!(await uiConfirm('تمسح القسم ده؟', 'مسح', true))) return;
-    if (await maCall('delete_category', { id }, 'اتمسح')) { ma.cat = 'all'; renderMenuAdmin(); }
+    if (!(await uiConfirm('هل تريد حذف هذا القسم؟', 'مسح', true))) return;
+    if (await maCall('delete_category', { id }, 'حذف')) { ma.cat = 'all'; renderMenuAdmin(); }
 }
 
 // ---------------------------------------------------------------- محرر الصنف
@@ -189,9 +189,9 @@ function maRenderEditor() {
         const alt = unitAlt(ing, 'use');
         return `<tr class="border-b text-xs font-bold">
             <td class="p-1.5"><select onchange="maRowIng(${i}, this.value)" class="${uiInputClass()} w-full max-w-[170px]">${(d.ingredients || []).map(x => `<option value="${uiEsc(x.id)}" ${x.id === r.ingredient_id ? 'selected' : ''}>${uiEsc(x.name)}</option>`).join('')}</select></td>
-            <td class="p-1.5 whitespace-nowrap"><input id="ma-rq-${i}" type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="uiPairFrom(this); maRowQty(${i}, this.value, this)" class="${uiInputClass()} w-20 ${Number(r.qty) > 0 ? '' : 'ring-2 ring-amber-400'}" title="${Number(r.qty) > 0 ? '' : 'لسه من غير كمية'}"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
+            <td class="p-1.5 whitespace-nowrap"><input id="ma-rq-${i}" type="number" min="0" step="any" value="${uiEsc(r.qty)}" oninput="uiPairFrom(this); maRowQty(${i}, this.value, this)" class="${uiInputClass()} w-20 ${Number(r.qty) > 0 ? '' : 'ring-2 ring-amber-400'}" title="${Number(r.qty) > 0 ? '' : 'بدون كمية حتى الآن'}"> <span class="text-slate-500">${uiEsc(ing.unit || '')}</span>
                 ${alt ? `<br><span class="text-amber-700">⇄</span> <input id="ma-rq-${i}-alt" data-mult="${alt.mult}" type="number" min="0" step="any" value="${Number(r.qty) ? unitNum(Number(r.qty) * alt.mult) : ''}" oninput="uiPairFrom(this)" class="${uiInputClass()} w-20 bg-amber-50 mt-1"> <span class="text-amber-700">${uiEsc(alt.label)}</span>` : ''}</td>
-            <td class="p-1.5 whitespace-nowrap"><span id="ma-rc-${i}">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}</span>${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة لسه من غير سعر</span>'}</td>
+            <td class="p-1.5 whitespace-nowrap"><span id="ma-rc-${i}">${formatCurrency((Number(r.qty) || 0) * (Number(ing.cost_per_unit) || 0))}</span>${Number(ing.cost_per_unit) ? '' : '<br><span class="text-[10px] text-amber-700">الخامة بدون سعر حتى الآن</span>'}</td>
             <td class="p-1.5"><button onclick="maRowDel(${i})" class="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1">🗑️ حذف</button></td></tr>`;
     }).join('');
     ov.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl my-4 p-5 text-right" dir="rtl">
@@ -205,7 +205,7 @@ function maRenderEditor() {
                     <label class="block">القسم *<select id="ma-cat" onchange="if(this.value==='__new__'){maReadFields(); maNewCatInline();}" class="${uiInputClass()} w-full mt-1 text-sm">
                         ${(d.categories || []).map(c => `<option value="${uiEsc(c.id)}" ${c.id === e.category_id ? 'selected' : ''}>${uiEsc(c.name)}</option>`).join('')}<option value="__new__">➕ قسم جديد</option></select></label>
                 </div>
-                <label class="block">وصف قصير (بيظهر للعميل في منيو الـ QR)<textarea id="ma-desc" rows="2" maxlength="500" class="${uiInputClass()} w-full mt-1" placeholder="مثلاً: دبل شوت اسبريسو مع لبن مبخّر">${uiEsc(e.description || '')}</textarea></label>
+                <label class="block">وصف قصير (يظهر للعميل في قائمة الـ QR)<textarea id="ma-desc" rows="2" maxlength="500" class="${uiInputClass()} w-full mt-1" placeholder="مثلاً: دبل شوت اسبريسو مع لبن مبخّر">${uiEsc(e.description || '')}</textarea></label>
                 <div class="flex flex-wrap gap-4">
                     <label class="flex items-center gap-1.5"><input id="ma-avail" type="checkbox" class="w-4 h-4" ${e.is_available ? 'checked' : ''}> متاح للبيع</label>
                     <label class="flex items-center gap-1.5"><input id="ma-show" type="checkbox" class="w-4 h-4" ${e.show_in_menu ? 'checked' : ''}> يظهر في منيو الـ QR</label>
@@ -214,16 +214,16 @@ function maRenderEditor() {
                 <div class="border rounded-2xl p-3"><p class="mb-2">صورة الصنف (اختياري، بتخلّي منيو الـ QR أشيك)</p>
                     <div class="flex items-center gap-3"><img id="ma-img" class="${e.image ? '' : 'hidden'} w-20 h-20 object-cover rounded-xl border" src="${e.image ? uiEsc(e.image) : ''}">
                         <div class="space-y-1"><input type="file" accept="image/*" onchange="maPickImage(this)" class="text-[11px]">
-                        ${(e.has_image || e.image) ? `<button onclick="maRemoveImage()" class="text-red-600 text-[11px] underline block">شيل الصورة</button>` : ''}</div></div></div>
+                        ${(e.has_image || e.image) ? `<button onclick="maRemoveImage()" class="text-red-600 text-[11px] underline block">احذف الصورة</button>` : ''}</div></div></div>
                 <div class="border rounded-2xl p-3"><p class="mb-2">الإضافات المسموحة للصنف</p>
                     ${(d.groups || []).length ? `<div class="flex flex-wrap gap-3">${d.groups.map(g => `<label class="flex items-center gap-1.5 font-bold"><input type="checkbox" data-ma-group value="${uiEsc(g.id)}" ${e.group_ids.includes(g.id) ? 'checked' : ''}> ${uiEsc(g.name)} <span class="text-slate-400">(${g.modifiers})</span></label>`).join('')}</div>`
-                        : '<p class="text-[11px] font-bold text-slate-400">مفيش مجموعات إضافات. بتتعمل من: الإعدادات ← الإضافات.</p>'}</div>
+                        : '<p class="text-[11px] font-bold text-slate-400">لا توجد مجموعات إضافات. تُنشأ من: الإعدادات ← الإضافات.</p>'}</div>
             </div>
             <div class="lg:col-span-3">
                 <div class="flex flex-wrap justify-between items-center gap-2 mb-2"><p class="text-sm font-black">🥣 الوصفة (المقادير لصنف واحد)</p>
                     ${sug ? `<button onclick="maApplySuggest()" class="text-xs font-black bg-amber-100 text-amber-800 border border-amber-200 rounded-xl px-3 py-1.5">💡 وصفة مقترحة لـ "${uiEsc(e.name)}"</button>` : ''}</div>
                 <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th class="p-1.5">الخامة</th><th class="p-1.5">الكمية</th><th class="p-1.5">التكلفة</th><th></th></tr></thead>
-                    <tbody>${rows || '<tr><td colspan="4" class="text-center text-xs font-bold text-slate-400 py-4">لسه مفيش مقادير. ضيف أول خامة تحت 👇</td></tr>'}</tbody></table></div>
+                    <tbody>${rows || '<tr><td colspan="4" class="text-center text-xs font-bold text-slate-400 py-4">لا توجد مقادير حتى الآن. أضف أول خامة بالأسفل 👇</td></tr>'}</tbody></table></div>
                 <div class="bg-slate-50 border rounded-2xl p-3 mt-3 space-y-2">
                     <p class="text-xs font-black">إضافة خامة للوصفة</p>
                     <div class="flex flex-wrap gap-2 items-center">
@@ -237,7 +237,7 @@ function maRenderEditor() {
                         <span class="text-[11px] font-black text-amber-800">خامة جديدة! وحدتها:</span>
                         <select id="ma-new-unit" onchange="maAddHint()" class="${uiInputClass()}">${['كيلو', 'جرام', 'لتر', 'مللي', 'قطعة', 'علبة', 'رغيف', 'كيس', 'زجاجة', 'باكيت'].map(u => `<option>${u}</option>`).join('')}</select>
                         <span class="text-[11px] font-black">سعر الوحدة (لو تعرفه)</span><input id="ma-new-cost" type="number" min="0" step="any" class="${uiInputClass()} w-24" placeholder="0">
-                        <span class="text-[10px] font-bold text-slate-500">بعد كده بيتحسب لوحده من المشتريات</span>
+                        <span class="text-[10px] font-bold text-slate-500">يُحسب تلقائيًا لاحقًا من المشتريات</span>
                     </div>
                 </div>
                 <div class="grid grid-cols-3 gap-2 mt-3 text-center">
@@ -294,7 +294,7 @@ async function maAddLine() {
     if (!ing) {
         const unit = document.getElementById('ma-new-unit').value;
         const costV = document.getElementById('ma-new-cost').value;
-        const res = await maCall('add_ingredient', { name, unit, cost_per_unit: String(Number(costV) || 0) }, 'اتعملت الخامة');
+        const res = await maCall('add_ingredient', { name, unit, cost_per_unit: String(Number(costV) || 0) }, 'إنشاء خامة');
         if (!res) return;
         ing = (ma.data.ingredients || []).find(x => x.id === res.id);
     }
@@ -329,8 +329,8 @@ async function maApplySuggest() {
     if (!lines) return;
     const ings = ma.data.ingredients || [];
     const missing = lines.filter(([n]) => !ings.some(x => x.name.trim() === n));
-    const msg = `هتتضاف المقادير دي (تقدر تعدّلها بعدها):\n${lines.map(([n, u, q]) => `• ${n}: ${q} ${u}`).join('\n')}`
-        + (missing.length ? `\n\nخامات جديدة هتتعمل (من غير سعر لحد ما تشتريها): ${missing.map(x => x[0]).join('، ')}` : '');
+    const msg = `ستُضاف المقادير التالية (يمكنك تعديلها لاحقًا):\n${lines.map(([n, u, q]) => `• ${n}: ${q} ${u}`).join('\n')}`
+        + (missing.length ? `\n\nخامات جديدة ستنشأ (بدون سعر حتى يتم شراؤها): ${missing.map(x => x[0]).join('، ')}` : '');
     if (!(await uiConfirm(msg, 'ضيفهم'))) return;
     for (const [n, u] of missing) { if (!(await maCall('add_ingredient', { name: n, unit: u, cost_per_unit: '0' }))) return; }
     const all = ma.data.ingredients || [];
@@ -345,9 +345,9 @@ async function maApplySuggest() {
 
 async function maNewCatInline() {
     const v = await uiForm('قسم جديد', [{ key: 'name', label: 'اسم القسم', required: true },
-        { key: 'station', label: 'بيتحضّر فين', type: 'select', options: MA_STATIONS, value: 'kitchen' }], { ok: 'إضافة' });
+        { key: 'station', label: 'محطة التحضير', type: 'select', options: MA_STATIONS, value: 'kitchen' }], { ok: 'إضافة' });
     if (v) {
-        const res = await maCall('save_category', { name: v.name, station: v.station }, 'اتعمل القسم');
+        const res = await maCall('save_category', { name: v.name, station: v.station }, 'تم إنشاؤه القسم');
         if (res) ma.ed.category_id = res.id;
     }
     maRenderEditor();
@@ -368,11 +368,11 @@ function maPickImage(input) {
             canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
             let url = canvas.toDataURL('image/jpeg', 0.78);
             if (url.length > 340000) url = canvas.toDataURL('image/jpeg', 0.55);
-            if (url.length > 340000) return showToast('الصورة كبيرة جداً، اختار صورة أصغر', 'error');
+            if (url.length > 340000) return showToast('الصورة كبيرة جدًا، اختر صورة أصغر', 'error');
             ma.ed.image = url; ma.ed.imageChanged = true;
             maRenderEditor();
         };
-        img.onerror = () => showToast('الملف ده مش صورة', 'error');
+        img.onerror = () => showToast('هذا الملف ليس صورة', 'error');
         img.src = reader.result;
     };
     reader.readAsDataURL(file);
@@ -385,13 +385,13 @@ async function maSave() {
     const e = ma.ed;
     if (!e.name.trim()) return showToast('اكتب اسم الصنف', 'error');
     if (e.price === '' || !(Number(e.price) >= 0)) return showToast('اكتب سعر البيع', 'error');
-    if (!e.category_id || e.category_id === '__new__') return showToast('اختار القسم', 'error');
+    if (!e.category_id || e.category_id === '__new__') return showToast('اختر القسم', 'error');
     const res = await maCall('save_product', {
         id: e.id, name: e.name.trim(), price: String(Number(e.price)), category_id: e.category_id, description: e.description || '',
         is_available: e.is_available, show_in_menu: e.show_in_menu, sort_order: String(Number(e.sort_order) || 0),
         // خامة كميتها صفر = معروفة بس الكمية لسه، بتتحفظ ومش بتخصم حاجة من المخزن
         recipe: e.recipe.filter(r => r.ingredient_id && Number(r.qty) >= 0).map(r => ({ ingredient_id: r.ingredient_id, qty: String(Math.round((Number(r.qty) || 0) * 10000) / 10000) })),
-        group_ids: e.group_ids }, 'اتحفظ الصنف ✅');
+        group_ids: e.group_ids }, 'تم حفظ الصنف ✅');
     if (!res) return;
     if (e.imageChanged) {
         await maCall('set_image', { id: res.id, image: e.image || '' });
@@ -403,18 +403,18 @@ async function maSave() {
 
 async function maDelete() {
     const e = ma.ed;
-    const msg = e.sold ? `الصنف "${e.name}" اتباع قبل كده، فمش هيتمسح عشان الفواتير القديمة. هيتوقف ويستخبى من المنيو. موافق؟` : `تمسح "${e.name}" نهائي؟`;
+    const msg = e.sold ? `الصنف "${e.name}" سبق بيعه، لذا لا يمكن حذفه حفاظًا على الفواتير القديمة. سيتم إيقافه وإخفاؤه من القائمة. هل توافق؟` : `تمسح "${e.name}" نهائي؟`;
     if (!(await uiConfirm(msg, e.sold ? 'إيقاف' : 'مسح', true))) return;
-    if (await maCall('delete_product', { id: e.id }, e.sold ? 'اتوقف الصنف' : 'اتمسح الصنف')) { maClose(); renderMenuAdmin(); }
+    if (await maCall('delete_product', { id: e.id }, e.sold ? 'إيقاف الصنف' : 'حذف الصنف')) { maClose(); renderMenuAdmin(); }
 }
 
 // ---------------------------------------------------------------- إدخال المنيو كله مرة واحدة (لصق)
 async function maImport() {
-    const v = await uiForm('📥 إدخال المنيو مرة واحدة', [
-        { type: 'note', html: `<p class="text-sm">كل سطر صنف بالشكل ده: <b>القسم - الصنف - السعر</b> (وممكن وصف في الآخر)<br>مثال:<br>مشروبات ساخنة - كابتشينو - 65<br>مشروبات ساخنة - شاي - 25 - شاي فتلة بالنعناع<br>
-            الصنف اللي اسمه موجود قبل كده سعره بيتعدّل بس. والأقسام الجديدة بتتعمل لوحدها.</p>` },
+    const v = await uiForm('📥 إدخال القائمة مرة واحدة', [
+        { type: 'note', html: `<p class="text-sm">كل سطر بالصيغة: <b>القسم - الصنف - السعر</b> (ويمكن إضافة وصف في النهاية)<br>مثال:<br>مشروبات ساخنة - كابتشينو - 65<br>مشروبات ساخنة - شاي - 25 - شاي فتلة بالنعناع<br>
+            الصنف الموجود اسمه مسبقًا يتغيّر سعره فقط. والأقسام الجديدة تُنشأ تلقائيًا.</p>` },
         { key: 'text', label: 'الأصناف', type: 'textarea', rows: 12, full: true, required: true },
-        { key: 'station', label: 'الأقسام الجديدة بتتحضّر فين (تقدر تغيّرها بعدين لكل قسم)', type: 'select', options: MA_STATIONS, value: 'kitchen' }], { ok: 'معاينة' });
+        { key: 'station', label: 'محطة تحضير الأقسام الجديدة (يمكن تغييرها لاحقًا لكل قسم)', type: 'select', options: MA_STATIONS, value: 'kitchen' }], { ok: 'معاينة' });
     if (!v) return;
     const rows = [], bad = [];
     String(v.text).split('\n').map(x => x.trim()).filter(Boolean).forEach((line, i) => {
@@ -423,11 +423,11 @@ async function maImport() {
         if (parts.length < 3 || !(toNum(parts[2]) >= 0) || !/[0-9٠-٩]/.test(parts[2])) { bad.push(`سطر ${i + 1}: ${line}`); return; }
         rows.push({ category: parts[0], name: parts[1], price: String(toNum(parts[2])), description: parts.slice(3).join(' - '), station: v.station });
     });
-    if (!rows.length) return showToast('مفيش ولا سطر مظبوط', 'error');
-    const ok = await uiConfirm(`هيتسجل ${rows.length} صنف.${bad.length ? `\n\nالسطور دي فيها غلط ومش هتتسجل:\n${bad.slice(0, 10).join('\n')}` : ''}\n\nأول ٣:\n${rows.slice(0, 3).map(r => `• ${r.category} / ${r.name} / ${r.price}`).join('\n')}`, 'سجّل');
+    if (!rows.length) return showToast('لم يصحّ أي سطر', 'error');
+    const ok = await uiConfirm(`سيُسجَّل ${rows.length} صنف.${bad.length ? `\n\nالسطور التالية بها خطأ ولن تُسجَّل:\n${bad.slice(0, 10).join('\n')}` : ''}\n\nأول ٣:\n${rows.slice(0, 3).map(r => `• ${r.category} / ${r.name} / ${r.price}`).join('\n')}`, 'سجّل');
     if (!ok) return;
     const res = await maCall('import', { rows });
-    if (res) { showToast(`اتسجل ${res.created} صنف جديد، واتعدل ${res.updated}`); ma.cat = 'all'; renderMenuAdmin(); }
+    if (res) { showToast(`تم تسجيل ${res.created} صنف جديد، وتعديل ${res.updated}`); ma.cat = 'all'; renderMenuAdmin(); }
 }
 
 // ---------------------------------------------------------------- الوصفات لأصناف كتير مرة واحدة (لصق)
@@ -437,9 +437,9 @@ async function maImportRecipes() {
     try { const r = await fetch('recipes_suggested.txt', { cache: 'no-store' }); if (r.ok) suggested = await r.text(); } catch (e) { /* empty box */ }
     const v = await uiForm('🧪 إدخال الوصفات مرة واحدة', [
         { type: 'note', html: `<p class="text-sm">كل سطر خامة واحدة في صنف: <b>الصنف - الخامة - الكمية - الوحدة</b> (الكمية للكوباية أو الطبق الواحد)<br>مثال:<br>كابتشينو - بن اسبريسو - 0.018 - كيلو<br>كابتشينو - لبن - 0.15 - لتر<br>
-            ${suggested ? '<b class="text-emerald-700">الصندوق فيه وصفات مقترحة لأصناف المنيو، راجعها وعدّل اللي محتاجه.</b><br>' : ''}الكمية 0 يعني الخامة معروفة والكمية لسه (مش بتخصم من المخزن). الخامة اللي مش موجودة بتتعمل لوحدها بتكلفة صفر (التكلفة بتتحدّث من المشتريات). والسطور اللي بتبدأ بـ # مش بتتحسب.</p>` },
+            ${suggested ? '<b class="text-emerald-700">الصندوق يحتوي على وصفات مقترحة لأصناف القائمة، راجعها وعدّل ما يلزم.</b><br>' : ''}الكمية 0 تعني أن الخامة معروفة ولم تُخصم من المخزن. الخامة غير الموجودة تُنشأ تلقائيًا بتكلفة صفر (التكلفة تُحدَّث من المشتريات). السطور التي تبدأ بـ # لا تُحسب.</p>` },
         { key: 'text', label: 'الوصفات', type: 'textarea', rows: 14, full: true, required: true, value: suggested },
-        { key: 'overwrite', label: 'الأصناف اللي ليها وصفة قبل كده', type: 'select', options: [['keep', 'سيبها زي ما هي'], ['replace', 'استبدلها بالجديدة']], value: 'keep' }], { ok: 'معاينة' });
+        { key: 'overwrite', label: 'الأصناف التي لها وصفة سابقة', type: 'select', options: [['keep', 'اتركها كما هي'], ['replace', 'استبدلها بالجديدة']], value: 'keep' }], { ok: 'معاينة' });
     if (!v) return;
     const toNum = s => Number(String(s).replace(/[٠-٩]/g, ch => '٠١٢٣٤٥٦٧٨٩'.indexOf(ch)).replace('٫', '.').replace(/[^0-9.]/g, ''));
     const rows = [], bad = [];
@@ -451,7 +451,7 @@ async function maImportRecipes() {
         if (!(qty >= 0) || !/[0-9٠-٩]/.test(parts[parts.length - 2])) { bad.push(line); return; }
         rows.push({ product, ingredient, qty: String(qty), unit });
     });
-    if (!rows.length) return showToast('مفيش ولا سطر مظبوط', 'error');
+    if (!rows.length) return showToast('لم يصحّ أي سطر', 'error');
     const d = ma.data || {};
     const prodByName = new Map((d.products || []).map(p => [String(p.name).trim(), p]));
     const ingByName = new Map((d.ingredients || []).map(i => [String(i.name).trim(), i]));
@@ -462,15 +462,15 @@ async function maImportRecipes() {
     const unitClash = [...new Set(rows.filter(r => ingByName.has(r.ingredient) && String(ingByName.get(r.ingredient).unit || '').trim() !== r.unit)
         .map(r => `${r.ingredient}: موجودة بـ"${ingByName.get(r.ingredient).unit}" والوصفة مكتوبة بـ"${r.unit}"`))];
     const replace = v.overwrite === 'replace';
-    const msg = [`${products.length - missing.length} صنف هتتسجل وصفته${!replace && hasRecipe.length ? ` (منهم ${hasRecipe.length} ليهم وصفة قبل كده وهيفضلوا زي ما هما)` : ''}.`,
-        replace && hasRecipe.length ? `⚠️ ${hasRecipe.length} صنف وصفتهم القديمة هتتمسح وتتحط الجديدة.` : '',
-        newIngs.length ? `خامات جديدة هتتعمل (${newIngs.length}): ${newIngs.slice(0, 15).join('، ')}${newIngs.length > 15 ? '...' : ''}` : '',
-        unitClash.length ? `⚠️ انتبه للوحدة (الكمية بتتحسب بوحدة الخامة الموجودة):\n${unitClash.slice(0, 8).join('\n')}` : '',
-        missing.length ? `أصناف مش موجودة في المنيو ومش هتتسجل (${missing.length}): ${missing.slice(0, 10).join('، ')}` : '',
+    const msg = [`${products.length - missing.length} صنف ستُسجَّل وصفته${!replace && hasRecipe.length ? ` (منها ${hasRecipe.length} لديها وصفة سابقة ولن تتغيّر)` : ''}.`,
+        replace && hasRecipe.length ? `⚠️ ${hasRecipe.length} صنف ستُحذف وصفاتها القديمة وتُستبدل بالجديدة.` : '',
+        newIngs.length ? `خامات جديدة ستنشأ (${newIngs.length}): ${newIngs.slice(0, 15).join('، ')}${newIngs.length > 15 ? '...' : ''}` : '',
+        unitClash.length ? `⚠️ انتبه للوحدة (تُحسب الكمية بوحدة الخامة الموجودة):\n${unitClash.slice(0, 8).join('\n')}` : '',
+        missing.length ? `أصناف غير موجودة في القائمة ولن تُسجَّل (${missing.length}): ${missing.slice(0, 10).join('، ')}` : '',
         bad.length ? `سطور فيها غلط (${bad.length}):\n${bad.slice(0, 6).join('\n')}` : ''].filter(Boolean).join('\n\n');
     if (!(await uiConfirm(msg, 'سجّل الوصفات'))) return;
     const res = await maCall('import_recipes', { rows: rows.filter(r => prodByName.has(r.product)), overwrite: replace });
-    if (res) { showToast(`اتسجلت وصفات ${res.imported} صنف، و${res.new_ingredients} خامة جديدة${res.skipped ? `، و${res.skipped} صنف فضل زي ما هو` : ''}`); renderMenuAdmin(); }
+    if (res) { showToast(`تم تسجيل وصفات ${res.imported} صنف، و${res.new_ingredients} خامة جديدة${res.skipped ? `، و${res.skipped} صنف بقي كما هو` : ''}`); renderMenuAdmin(); }
 }
 
 // شاشة الإعدادات: قسم "المنيو والوصفات" بيترسم أول ما الإعدادات تفتح

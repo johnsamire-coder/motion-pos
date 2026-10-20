@@ -37,7 +37,7 @@ async function loadDashboardScreen() {
     const root = document.getElementById('dashboard-root');
     if (!root) return;
     if (!dashState.from) [dashState.from, dashState.to] = dashRangeDates(dashState.range);
-    if (!root.innerHTML) root.innerHTML = '<p class="text-center text-slate-400 font-bold py-20">جاري تحميل لوحة التحكم...</p>';
+    if (!root.innerHTML) root.innerHTML = '<p class="text-center text-slate-500 font-bold py-20">جارٍ تحميل لوحة التحكم...</p>';
     try { await loadScriptOnce('vendor/chart.umd.js'); } catch (e) { /* the numbers still show without charts */ }
     await dashLoad();
     if (!dashState.timer) {
@@ -65,7 +65,7 @@ function dashSetRange(range) {
 
 function dashSetCustom() {
     const f = document.getElementById('dash-from').value, t = document.getElementById('dash-to').value;
-    if (!f || !t || f > t) return showToast('اختار من وإلى صح', 'error');
+    if (!f || !t || f > t) return showToast('اختر جهة الإرسال والاستلام بشكل صحيح', 'error');
     dashState.range = 'custom'; dashState.from = f; dashState.to = t;
     dashLoad();
 }
@@ -86,9 +86,9 @@ function dashDelta(cur, prev, higherIsBetter = true) {
 
 function dashTile(label, value, sub = '', accent = 'border-slate-200') {
     return `<div class="bg-white rounded-2xl border ${accent} p-4 shadow-sm min-w-0">
-        <p class="text-[11px] font-black text-slate-500 mb-1 truncate">${label}</p>
+        <p class="text-xs font-semibold text-slate-600 mb-1 truncate">${label}</p>
         <p class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums truncate">${value}</p>
-        <p class="text-[11px] font-bold text-slate-500 mt-1 truncate">${sub}</p></div>`;
+        <p class="text-[11px] font-medium text-slate-500 mt-1 truncate">${sub}</p></div>`;
 }
 
 function dashCard(title, inner, extra = '', span = '') {
@@ -98,19 +98,19 @@ function dashCard(title, inner, extra = '', span = '') {
 
 function dashHeader() {
     const d = dashState.data || {};
-    const ranges = [['today', 'النهارده'], ['yesterday', 'امبارح'], ['week', 'آخر ٧ أيام'], ['month', 'الشهر ده'], ['last_month', 'الشهر اللي فات']];
+    const ranges = [['today', 'اليوم'], ['yesterday', 'الأمس'], ['week', 'آخر ٧ أيام'], ['month', 'هذا الشهر'], ['last_month', 'الشهر الماضي']];
     const g = (appSettings && appSettings.general) || {};
     const hour = new Date().getHours();
     const hello = hour < 12 ? 'صباح الخير' : 'مساء الخير';
-    return `<div class="rounded-3xl p-5 text-white shadow-lg" style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2a78d6 100%)">
+    return `<div class="rounded-3xl p-5 text-white shadow-lg bg-slate-900">
         <div class="flex flex-wrap justify-between items-start gap-3">
             <div><p class="text-sm font-bold text-blue-100">${hello} يا ${uiEsc(String(currentUser?.name || '').split(' ')[0] || '')} 👋</p>
                 <h2 class="text-2xl font-black">${uiEsc(g.company_name || 'لوحة التحكم')}</h2>
-                <p class="text-xs font-bold text-blue-100 mt-1">${uiEsc(d.branch || '')} | من ${uiEsc(d.from || dashState.from)} لـ ${uiEsc(d.to || dashState.to)} | بيتحدّث كل دقيقة</p></div>
+                <p class="text-xs font-bold text-blue-100 mt-1">${uiEsc(d.branch || '')} | من ${uiEsc(d.from || dashState.from)} لـ ${uiEsc(d.to || dashState.to)} | يُحدَّث كل دقيقة</p></div>
             <div class="flex flex-wrap gap-2 items-center">
                 ${d.can_pick_branch && (d.branches || []).length > 1 ? `<select onchange="dashSetBranch(this.value)" class="text-slate-800 rounded-xl px-2 py-1.5 text-xs font-black">
                     <option value="">كل الفروع</option>${d.branches.map(b => `<option value="${uiEsc(b.id)}" ${b.id === dashState.branch ? 'selected' : ''}>${uiEsc(b.name)}</option>`).join('')}</select>` : ''}
-                <button onclick="dashLoad()" class="bg-white/15 hover:bg-white/25 rounded-xl px-3 py-1.5 text-xs font-black">تحديث 🔄</button>
+                <button onclick="dashLoad()" class="bg-white/15 hover:bg-white/25 rounded-xl px-3 py-1.5 text-xs font-black">تحديث <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
             </div>
         </div>
         <div class="flex flex-wrap gap-1.5 mt-4">
@@ -121,7 +121,7 @@ function dashHeader() {
                 <button onclick="dashSetCustom()" class="text-xs font-black px-2">عرض</button></span>
         </div>
         <div class="flex gap-1.5 mt-3">
-            ${[['overview', '📊 نظرة عامة'], ['pnl', '💰 كسبان ولا خسران (الشهر)']].map(([k, l]) => `<button onclick="dashSetTab('${k}')" class="px-4 py-2 rounded-xl text-xs font-black ${dashState.tab === k ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}">${l}</button>`).join('')}
+            ${[['overview', '<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> نظرة عامة'], ['pnl', '<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> كسبان ولا خسران (الشهر)']].map(([k, l]) => `<button onclick="dashSetTab('${k}')" class="px-4 py-2 rounded-xl text-xs font-black ${dashState.tab === k ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}">${l}</button>`).join('')}
         </div></div>`;
 }
 
@@ -142,48 +142,48 @@ function dashRender() {
     const fb = d.feedback || {};
 
     const liveStrip = `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
-        ${dashTile('🔴 طلبات مفتوحة دلوقتي', dashInt(live.open_orders), `بقيمة ${dashMoney(live.open_value)} ${cur}`, 'border-blue-200')}
-        ${dashTile('🍽️ الطاولات المشغولة', `${dashInt(live.tables_busy)} <span class="text-sm">من ${dashInt(live.tables_total)}</span>`, live.tables_total ? `${Math.round(100 * live.tables_busy / live.tables_total)}% من الصالة` : '')}
-        ${dashTile('📱 طلبات QR مستنية', dashInt(live.qr_waiting), live.qr_waiting ? 'الويتر لازم يأكدها' : 'مفيش حاجة مستنية', live.qr_waiting ? 'border-amber-300' : 'border-slate-200')}
-        ${dashTile('💵 ورديات مفتوحة', dashInt(live.open_shifts), '')}
-        ${dashTile('📦 خامات قربت تخلص', dashInt(live.low_stock), live.low_stock ? 'تحت الحد الأدنى' : 'المخزن تمام', live.low_stock ? 'border-red-300' : 'border-slate-200')}
-        ${dashTile('💬 شكاوي واقتراحات', dashInt(fb.count), fb.avg_rating ? `التقييم ${fb.avg_rating} ⭐ | ${dashInt(fb.complaints)} شكوى` : 'في الفترة دي', fb.open ? 'border-amber-300' : 'border-slate-200')}
+        ${dashTile('الطلبات المفتوحة', dashInt(live.open_orders), `بقيمة ${dashMoney(live.open_value)} ${cur}`, 'border-blue-200')}
+        ${dashTile('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-3.5 h-3.5 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg> الطاولات المشغولة', `${dashInt(live.tables_busy)} <span class="text-sm">من ${dashInt(live.tables_total)}</span>`, live.tables_total ? `${Math.round(100 * live.tables_busy / live.tables_total)}% من الصالة` : '')}
+        ${dashTile('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-3.5 h-3.5 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg> طلبات QR في الانتظار', dashInt(live.qr_waiting), live.qr_waiting ? 'يجب على الويتر تأكيدها' : 'لا توجد طلبات في الانتظار', live.qr_waiting ? 'border-amber-300' : 'border-slate-200')}
+        ${dashTile('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-3.5 h-3.5 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ورديات مفتوحة', dashInt(live.open_shifts), '')}
+        ${dashTile('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-3.5 h-3.5 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> خامات اقتربت من النفاد', dashInt(live.low_stock), live.low_stock ? 'تحت الحد الأدنى' : 'المخزن تمام', live.low_stock ? 'border-red-300' : 'border-slate-200')}
+        ${dashTile('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-3.5 h-3.5 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg> شكاوي واقتراحات', dashInt(fb.count), fb.avg_rating ? `التقييم ${fb.avg_rating} ⭐ | ${dashInt(fb.complaints)} شكوى` : 'في الفترة هذه', fb.open ? 'border-amber-300' : 'border-slate-200')}
     </div>`;
 
     const kpis = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-        ${dashTile('المبيعات', `${dashMoney(k.sales)} <span class="text-sm">${cur}</span>`, `${dashDelta(k.sales, p.sales)} عن الفترة اللي قبلها`, 'border-blue-300')}
+        ${dashTile('المبيعات', `${dashMoney(k.sales)} <span class="text-sm">${cur}</span>`, `${dashDelta(k.sales, p.sales)} عن الفترة السابقة`, 'border-blue-300')}
         ${dashTile('عدد الطلبات', dashInt(k.orders), `${dashDelta(k.orders, p.orders)} | ${dashInt(k.guests)} ضيف`)}
-        ${dashTile('متوسط الفاتورة', `${dashMoney(k.avg_ticket)} <span class="text-sm">${cur}</span>`, `${dashDelta(k.avg_ticket, p.avg_ticket)} عن الفترة اللي قبلها`)}
+        ${dashTile('متوسط الفاتورة', `${dashMoney(k.avg_ticket)} <span class="text-sm">${cur}</span>`, `${dashDelta(k.avg_ticket, p.avg_ticket)} عن الفترة السابقة`)}
         ${dashTile('مجمل الربح (بعد الخامات والهالك)', `${dashMoney(gross)} <span class="text-sm">${cur}</span>`, `${dashDelta(gross, pgross)} | هامش ${margin}%`, 'border-emerald-300')}
         ${dashTile('تكلفة الخامات', `${dashMoney(k.cogs)}`, Number(k.revenue) ? `${Math.round(1000 * k.cogs / k.revenue) / 10}% من الإيراد` : '')}
-        ${dashTile('الهالك', `${dashMoney(k.waste)}`, `${dashDelta(k.waste, p.waste, false)} عن الفترة اللي قبلها`, Number(k.waste) ? 'border-red-200' : 'border-slate-200')}
-        ${dashTile('الخصومات', `${dashMoney(k.discounts)}`, `إكراميات ${dashMoney(k.tips)} | ملغي ${dashInt(k.cancelled)}`)}
-        ${dashTile('طلبات باسم عميل', dashInt(k.with_customer), `${dashInt(k.new_customers)} عميل جديد | ${dashInt(k.repeat_customers)} رجعوا تاني${Number(k.qr_orders) ? ` | ${dashInt(k.qr_orders)} من الـ QR` : ''}`)}
+        ${dashTile('الهالك', `${dashMoney(k.waste)}`, `${dashDelta(k.waste, p.waste, false)} عن الفترة السابقة`, Number(k.waste) ? 'border-red-200' : 'border-slate-200')}
+        ${dashTile('الخصومات', `${dashMoney(k.discounts)}`, `إكراميات ${dashMoney(k.tips)} | ملغى ${dashInt(k.cancelled)}`)}
+        ${dashTile('طلبات باسم عميل', dashInt(k.with_customer), `${dashInt(k.new_customers)} عميل جديد | ${dashInt(k.repeat_customers)} عميل متكرر${Number(k.qr_orders) ? ` | ${dashInt(k.qr_orders)} من الـ QR` : ''}`)}
     </div>`;
 
     const netGood = mtdNet >= 0;
     const coverage = Number(m.fixed_month) ? Math.min(100, Math.round(100 * Math.max(0, Number((m.mtd || {}).gross_profit) || 0) / Number(m.fixed_month))) : 0;
     const monthCard = `<section class="rounded-2xl border-2 ${netGood ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50'} p-4 shadow-sm mt-4">
         <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
-            <h3 class="font-black text-sm text-slate-800">💰 الشهر ده لحد النهارده (${uiEsc(m.month || '')}): ${netGood ? '✅ كسبان' : '⚠️ خسران'} ${dashMoney(Math.abs(mtdNet))} ${cur} <span class="text-[11px] text-slate-500">(مبدئي)</span></h3>
+            <h3 class="font-black text-sm text-slate-800"><svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> هذا الشهر حتى اليوم (${uiEsc(m.month || '')}): ${netGood ? '✅ كسبان' : '⚠️ خسران'} ${dashMoney(Math.abs(mtdNet))} ${cur} <span class="text-[11px] text-slate-500">(مبدئي)</span></h3>
             <button onclick="dashSetTab('pnl')" class="bg-white border rounded-xl px-3 py-1.5 text-xs font-black">التفاصيل يوم بيوم ←</button></div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-bold">
             <div class="bg-white rounded-xl p-3"><p class="text-slate-500">مجمل الربح من أول الشهر</p><p class="text-lg font-black">${dashMoney((m.mtd || {}).gross_profit)}</p></div>
             <div class="bg-white rounded-xl p-3"><p class="text-slate-500">المصاريف الثابتة للشهر</p><p class="text-lg font-black">${dashMoney(m.fixed_month)}</p>
-                <p class="text-slate-500">${dashMoney(m.fixed_daily)} في اليوم${m.estimate_lines ? ` | ${m.estimate_lines} بند لسه تقديري` : ''}</p></div>
+                <p class="text-slate-500">${dashMoney(m.fixed_daily)} في اليوم${m.estimate_lines ? ` | ${m.estimate_lines} بند تقديري بعد` : ''}</p></div>
             <div class="bg-white rounded-xl p-3"><p class="text-slate-500">لو كمّلنا بنفس المعدل، آخر الشهر</p>
                 <p class="text-lg font-black ${fc && fc.net >= 0 ? 'text-emerald-700' : 'text-red-600'}">${fc ? (fc.net >= 0 ? '✅ كسبان ' : '⚠️ خسران ') + dashMoney(Math.abs(fc.net)) : '—'}</p></div>
-            <div class="bg-white rounded-xl p-3"><p class="text-slate-500">عشان متخسرش، المبيعات في اليوم لازم تبقى</p>
+            <div class="bg-white rounded-xl p-3"><p class="text-slate-500">لتفادي الخسارة، يجب أن تكون المبيعات في اليوم</p>
                 <p class="text-lg font-black">${fc && fc.break_even_daily_sales ? dashMoney(fc.break_even_daily_sales) : '—'}</p></div>
         </div>
         ${Number(m.fixed_month) ? `<div class="mt-3"><div class="flex justify-between text-[11px] font-black text-slate-600 mb-1"><span>مجمل الربح غطّى ${coverage}% من المصاريف الثابتة</span><span>${m.days_passed} من ${m.days_in_month} يوم</span></div>
             <div class="h-3 bg-white rounded-full overflow-hidden border"><div class="h-full ${coverage >= Math.round(100 * m.days_passed / m.days_in_month) ? 'bg-emerald-600' : 'bg-amber-500'}" style="width:${coverage}%"></div></div></div>`
-            : '<p class="text-[11px] font-bold text-amber-700 mt-2">⚠️ لسه مفيش مصاريف ثابتة متسجلة. سجّل المرتبات والإيجار والكهرباء والغاز من: المصروفات ← المصروفات المتكررة، عشان الحساب يبقى حقيقي.</p>'}
+            : '<p class="text-[11px] font-bold text-amber-700 mt-2">⚠️ لا توجد مصاريف ثابتة مسجّلة بعد. سجّل المرتبات والإيجار والكهرباء والغاز من: المصروفات ← المصروفات المتكررة، ليصبح الحساب دقيقًا.</p>'}
     </section>`;
 
     const single = d.from === d.to;
     const charts = `<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        ${dashCard(single ? 'المبيعات بالساعة' : 'المبيعات يوم بيوم', '<div class="h-64"><canvas id="dash-c-main"></canvas></div>', `المجموع ${dashMoney(k.sales)} ${cur}`, 'lg:col-span-2')}
+        ${dashCard(single ? 'المبيعات بالساعة' : 'المبيعات يوم بيوم', '<div class="h-64"><canvas id="dash-c-main"></canvas></div>', `الإجمالي ${dashMoney(k.sales)} ${cur}`, 'lg:col-span-2')}
         ${dashCard('المبيعات بالقسم', '<div class="h-48"><canvas id="dash-c-cat"></canvas></div><div id="dash-l-cat" class="mt-2"></div>')}
         ${dashCard(single ? 'أيام الأسبوع' : 'أوقات الذروة (بالساعة)', '<div class="h-56"><canvas id="dash-c-peak"></canvas></div>', '', 'lg:col-span-2')}
         ${dashCard('طرق الدفع', '<div class="h-48"><canvas id="dash-c-pay"></canvas></div><div id="dash-l-pay" class="mt-2"></div>')}
@@ -196,24 +196,24 @@ function dashRender() {
         const pm = Number(x.amount) ? Math.round(1000 * profit / x.amount) / 10 : 0;
         return `<div><div class="flex justify-between text-xs font-black gap-2"><span class="truncate">${i + 1}. ${uiEsc(x.name)} <span class="text-slate-500">× ${dashInt(x.qty)}</span>
             ${x.has_recipe ? '' : '<span class="text-[10px] bg-amber-100 text-amber-800 rounded px-1">ناقص وصفة</span>'}</span>
-            <span class="tabular-nums whitespace-nowrap">${dashMoney(x.amount)} <span class="text-slate-500 text-[10px]">| ربح ${x.has_recipe ? pm + '%' : '؟'}</span></span></div>
+            <span class="tabular-nums whitespace-nowrap">${dashMoney(x.amount)} <span class="text-slate-500 text-[11px]">| ربح ${x.has_recipe ? pm + '%' : '؟'}</span></span></div>
             <div class="h-2 bg-slate-100 rounded-full mt-1"><div class="h-2 rounded-full" style="width:${Math.max(2, 100 * x.amount / maxAmt)}%; background:${DASH_COLORS[0]}"></div></div></div>`;
-    }).join('')}</div>` : '<p class="text-xs text-slate-400 font-bold py-6 text-center">مفيش مبيعات في الفترة دي</p>';
+    }).join('')}</div>` : '<p class="text-xs text-slate-500 font-bold py-6 text-center">لا توجد مبيعات خلال هذه الفترة</p>';
 
-    const listRows = (rows, fmt) => rows && rows.length ? `<div class="divide-y">${rows.map(fmt).join('')}</div>` : '<p class="text-xs text-slate-400 font-bold py-4 text-center">مفيش</p>';
+    const listRows = (rows, fmt) => rows && rows.length ? `<div class="divide-y">${rows.map(fmt).join('')}</div>` : '<p class="text-xs text-slate-500 font-bold py-4 text-center">لا توجد بيانات</p>';
     const waiters = listRows(d.waiters, (w, i) => `<div class="flex justify-between py-1.5 text-xs font-bold"><span>${['🥇', '🥈', '🥉'][i] || '•'} ${uiEsc(w.name)}</span><span class="tabular-nums">${dashMoney(w.amount)} <span class="text-slate-500">(${dashInt(w.orders)} طلب)</span></span></div>`);
     const custs = listRows(d.top_customers, c => `<div class="flex justify-between py-1.5 text-xs font-bold"><span>👤 ${uiEsc(c.name)}</span><span class="tabular-nums">${dashMoney(c.amount)} <span class="text-slate-500">(${dashInt(c.orders)})</span></span></div>`);
-    const slow = listRows(d.slow_products, s => `<div class="flex justify-between py-1.5 text-xs font-bold"><span>🐢 ${uiEsc(s.name)}</span><span class="text-slate-500">${dashInt(s.qty)} اتباع</span></div>`);
+    const slow = listRows(d.slow_products, s => `<div class="flex justify-between py-1.5 text-xs font-bold"><span>🐢 ${uiEsc(s.name)}</span><span class="text-slate-500">${dashInt(s.qty)} وحدة مباعة</span></div>`);
     const prep = listRows(d.prep, s => `<div class="py-1.5 text-xs font-bold"><div class="flex justify-between"><span>${uiEsc(DASH_STATIONS[s.station] || s.station)}</span>
         <span>${s.avg_minutes ?? '-'} دقيقة في المتوسط | <span class="${Number(s.late_pct) > 20 ? 'text-red-600' : 'text-emerald-700'}">${Number(s.late_pct) > 20 ? '⚠️' : '✅'} ${s.late_pct ?? 0}% متأخر</span></span></div></div>`);
     const types = listRows(d.order_types, t => `<div class="flex justify-between py-1.5 text-xs font-bold"><span>${uiEsc(DASH_TYPES[t.type] || t.type)}</span><span class="tabular-nums">${dashMoney(t.amount)} <span class="text-slate-500">(${dashInt(t.orders)} طلب)</span></span></div>`);
 
     const lower = `<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-        ${dashCard('🏆 أكتر ١٠ أصناف بيعاً', topHtml, '', 'lg:col-span-2')}
-        <div class="space-y-4">${dashCard('👨‍🍳 سرعة التحضير', prep)}${dashCard('🧾 بنوع الطلب', types)}</div>
-        ${dashCard('🙋 الويترز', waiters)}${dashCard('⭐ أحسن العملاء', custs)}${dashCard('🐢 أقل أصناف بيعاً', slow)}
+        ${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg> أكثر ١٠ أصناف مبيعًا', topHtml, '', 'lg:col-span-2')}
+        <div class="space-y-4">${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg> سرعة التحضير', prep)}${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg> بنوع الطلب', types)}</div>
+        ${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> الويترز', waiters)}${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> أفضل العملاء', custs)}${dashCard('<svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 inline-block align-middle" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg> أقل أصناف مبيعًا', slow)}
     </div>
-    ${d.no_recipe ? `<p class="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ فيه ${dashInt(d.no_recipe)} صنف من غير وصفة (مقادير)، فتكلفتهم بتتحسب صفر والربح بيبان أكبر من الحقيقي. كمّلهم من: الإعدادات ← المنيو والوصفات.</p>` : ''}`;
+    ${d.no_recipe ? `<p class="mt-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ يوجد ${dashInt(d.no_recipe)} صنف بدون وصفة (مقادير)، لذا تُحسب تكلفتهم صفر ويظهر الربح أكبر من الحقيقي. أكملها من: الإعدادات ← القائمة والوصفات.</p>` : ''}`;
 
     root.innerHTML = dashHeader() + liveStrip + kpis + monthCard + charts + lower;
     dashDrawCharts(single);
@@ -244,7 +244,7 @@ function dashDonut(id, legendId, rows) {
     if (rows.length > 7) list.push({ label: 'باقي', value: rows.slice(7).reduce((s, r) => s + (Number(r.value) || 0), 0) });
     const lg = document.getElementById(legendId);
     if (lg) lg.innerHTML = list.length ? list.map((r, i) => `<div class="flex justify-between text-[11px] font-bold py-0.5"><span><span class="inline-block w-2.5 h-2.5 rounded-sm align-middle ml-1" style="background:${DASH_COLORS[i]}"></span>${uiEsc(r.label)}</span>
-        <span class="tabular-nums">${dashMoney(r.value)} <span class="text-slate-500">(${total ? Math.round(1000 * r.value / total) / 10 : 0}%)</span></span></div>`).join('') : '<p class="text-xs text-slate-400 font-bold text-center">مفيش</p>';
+        <span class="tabular-nums">${dashMoney(r.value)} <span class="text-slate-500">(${total ? Math.round(1000 * r.value / total) / 10 : 0}%)</span></span></div>`).join('') : '<p class="text-xs text-slate-500 font-bold text-center">لا توجد بيانات</p>';
     if (!el || typeof Chart === 'undefined' || !list.length) return;
     dashState.charts.push(new Chart(el, {
         type: 'doughnut',
@@ -273,7 +273,7 @@ async function dashLoadPnl() {
     if (!dashState.month) dashState.month = dashLocal(0).slice(0, 7);
     const root = document.getElementById('dashboard-root');
     dashDestroyCharts();
-    if (root) root.innerHTML = dashHeader() + '<div id="dash-pnl" class="mt-4"><p class="text-center text-slate-400 font-bold py-10">جاري الحساب...</p></div>';
+    if (root) root.innerHTML = dashHeader() + '<div id="dash-pnl" class="mt-4"><p class="text-center text-slate-500 font-bold py-10">جارٍ الحساب...</p></div>';
     const res = await uiCall('pnl_daily_secure', { p_month: dashState.month + '-01', p_branch_id: dashState.branch });
     if (!res) return;
     dashState.pnl = res;
@@ -293,13 +293,13 @@ function dashRenderPnl() {
     box.innerHTML = `
         <div class="flex flex-wrap items-center gap-2 mb-3"><span class="text-xs font-black">الشهر:</span>
             <input type="month" value="${uiEsc(dashState.month)}" onchange="dashState.month=this.value; dashLoadPnl()" class="${uiInputClass()}">
-            <span class="text-[11px] font-bold text-slate-500">الأرقام مبدئية لحد ما الفواتير الفعلية تتسجل، وبعدها بتتعدل لوحدها.</span></div>
+            <span class="text-[11px] font-bold text-slate-500">الأرقام مبدئية حتى تسجيل الفواتير الفعلية، وبعدها تُعدَّل تلقائيًا.</span></div>
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            ${dashTile('الإيراد (من غير ضريبة)', dashMoney(mtd.revenue), `${r.days_passed} يوم من ${r.days_in_month}`)}
+            ${dashTile('الإيراد (بدون ضريبة)', dashMoney(mtd.revenue), `${r.days_passed} يوم من ${r.days_in_month}`)}
             ${dashTile('الخامات + الهالك', dashMoney((Number(mtd.cogs) || 0) + (Number(mtd.waste) || 0)), '')}
-            ${dashTile('المصاريف الثابتة (نصيب الأيام دي)', dashMoney(mtd.fixed), `${dashMoney(r.fixed_daily)} في اليوم`)}
-            ${dashTile('مصاريف تانية', dashMoney(mtd.other_expenses), 'اللي اتسجلت فعلاً')}
-            ${dashTile(good ? '✅ كسبان لحد النهارده' : '⚠️ خسران لحد النهارده', `<span class="${good ? 'text-emerald-700' : 'text-red-600'}">${dashMoney(Math.abs(mtd.net))}</span>`, fc ? `توقّع آخر الشهر: ${fc.net >= 0 ? 'كسبان' : 'خسران'} ${dashMoney(Math.abs(fc.net))}` : '', good ? 'border-emerald-300' : 'border-red-300')}
+            ${dashTile('المصاريف الثابتة (نصيب الأيام هذه)', dashMoney(mtd.fixed), `${dashMoney(r.fixed_daily)} في اليوم`)}
+            ${dashTile('مصاريف أخرى', dashMoney(mtd.other_expenses), 'المسجَّلة فعليًا')}
+            ${dashTile(good ? '✅ ربح حتى اليوم' : '⚠️ خسارة حتى اليوم', `<span class="${good ? 'text-emerald-700' : 'text-red-600'}">${dashMoney(Math.abs(mtd.net))}</span>`, fc ? `توقّع آخر الشهر: ${fc.net >= 0 ? 'كسبان' : 'خسران'} ${dashMoney(Math.abs(fc.net))}` : '', good ? 'border-emerald-300' : 'border-red-300')}
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
             ${dashCard('صافي كل يوم (بعد نصيبه من المصاريف الثابتة)', '<div class="h-64"><canvas id="dash-c-pnl"></canvas></div>', `<span style="color:${DASH_GOOD}">■ كسبان</span> <span style="color:${DASH_BAD}">■ خسران</span>`, 'lg:col-span-2')}
@@ -308,7 +308,7 @@ function dashRenderPnl() {
                 { label: 'المتوقع', render: x => dashMoney(x.budget) },
                 { label: 'الفعلي', render: x => Number(x.actual) ? dashMoney(x.actual) : '—' },
                 { label: '', render: x => x.kind === 'actual' ? '<span class="text-emerald-700">✅ فعلي</span>' : '<span class="text-amber-700">⏳ تقديري</span>' }],
-                'مفيش مصاريف متكررة متسجلة') + `<p class="text-[11px] font-bold text-slate-500 mt-2">المجموع ${dashMoney(r.fixed_month)} ${cur}. البنود دي بتتسجل من: المصروفات ← المصروفات المتكررة (مرتبات، إيجار، كهربا، غاز...).</p>`)}
+                'لا توجد مصاريف متكررة مسجّلة') + `<p class="text-[11px] font-bold text-slate-500 mt-2">الإجمالي ${dashMoney(r.fixed_month)} ${cur}. تُسجَّل هذه البنود من: المصروفات ← المصروفات المتكررة (مرتبات، إيجار، كهرباء، غاز...).</p>`)}
         </div>
         ${dashCard('يوم بيوم', uiTable(days.slice().reverse(), [
             { label: 'اليوم', render: x => uiEsc(x.day) },
@@ -317,10 +317,10 @@ function dashRenderPnl() {
             { label: 'الخامات', render: x => dashMoney(x.cogs) },
             { label: 'الهالك', render: x => dashMoney(x.waste) },
             { label: 'مجمل الربح', render: x => dashMoney(x.gross_profit) },
-            { label: 'مصاريف تانية', render: x => dashMoney(x.other_expenses) },
+            { label: 'مصاريف أخرى', render: x => dashMoney(x.other_expenses) },
             { label: 'نصيبه من الثابت', render: x => dashMoney(x.fixed_share) },
             { label: 'الصافي', render: x => `<span class="${x.net >= 0 ? 'text-emerald-700' : 'text-red-600'} font-black">${x.net >= 0 ? '▲' : '▼'} ${dashMoney(Math.abs(x.net))}</span>` },
-            { label: 'من أول الشهر', render: x => `<span class="${x.cum >= 0 ? 'text-emerald-700' : 'text-red-600'}">${dashMoney(x.cum)}</span>` }], 'لسه مفيش أيام'), '', 'mt-4')}`;
+            { label: 'من أول الشهر', render: x => `<span class="${x.cum >= 0 ? 'text-emerald-700' : 'text-red-600'}">${dashMoney(x.cum)}</span>` }], 'لا توجد بيانات بعد'), '', 'mt-4')}`;
     const el = document.getElementById('dash-c-pnl');
     if (el && typeof Chart !== 'undefined' && days.length) {
         dashState.charts.push(new Chart(el, {

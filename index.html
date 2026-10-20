@@ -39,7 +39,7 @@
     </div>
 
     <!-- نافذة طلب PIN الحماية -->
-    <div id="pin-auth-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="pin-auth-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-slate-100">
             <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 font-bold text-xl">🔒</div>
             <h3 class="font-extrabold text-base text-slate-800 mb-1">منطقة محمية</h3>
@@ -53,7 +53,7 @@
     </div>
 
     <!-- نافذة المدفوعات المتعددة و الـ Tips -->
-    <div id="payments-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="payments-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
                 <h3 class="font-black text-base text-slate-800">إغلاق الفاتورة (مدفوعات + Tips)</h3>
@@ -71,7 +71,7 @@
                     <span class="text-xs font-bold text-amber-800">إكرامية (Tip) - غير ملزمة:</span>
                 <input type="number" id="input-tip-amount" value="0" min="0" step="0.01" onchange="renderPaymentLines()" class="w-20 bg-white border p-1 rounded-md text-xs font-bold text-center">
                 </div>
-                <div class="text-[10px] font-bold text-amber-700">الإكرامية بتروح لصندوق الإكراميات وبتتوزع على الموظفين بالتساوي.</div>
+                <div class="text-[10px] font-bold text-amber-700">تُضاف الإكرامية إلى صندوق الإكراميات وتُوزَّع على الموظفين بالتساوي.</div>
             </div>
 
             <div id="payment-lines-list" class="space-y-2 mb-4"></div>
@@ -84,7 +84,7 @@
     </div>
 
     <!-- معاينة تقسيم الفاتورة -->
-    <div id="split-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="split-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-3xl shadow-2xl max-w-xl w-full border border-slate-100">
             <div class="flex justify-between items-center border-b pb-3 mb-4">
                 <div>
@@ -103,7 +103,7 @@
 
             <div id="split-workspace-content" class="mb-4 min-h-[220px]"></div>
             <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                التقسيم هنا للمعاينة فقط؛ الدفع المنفصل غير مربوط بسجل المدفوعات. استخدم الدفع العادي لتسجيل الفاتورة كاملة.
+                التقسيم هنا للمعاينة فقط؛ الدفع المنفصل غير مرتبط بسجل المدفوعات. استخدم الدفع العادي لتسجيل الفاتورة كاملة.
             </p>
 
             <div class="flex gap-2 pt-2 border-t">
@@ -124,25 +124,25 @@
                 </div>
             </div>
             <nav class="flex flex-wrap gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 w-full lg:w-auto lg:max-w-[60%] order-3 lg:order-none">
-                <button onclick="switchMainTab('dashboard')" id="tab-btn-dashboard" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">لوحة التحكم 📈</button>
-                <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير</button>
-                <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ 👨‍🍳</button>
-                <button onclick="switchMainTab('shift')" id="tab-btn-shift" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الوردية 💵</button>
-                <button onclick="switchMainTab('inventory')" id="tab-btn-inventory" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المخازن 📦</button>
-                <button onclick="switchMainTab('purchase')" id="tab-btn-purchase" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المشتريات 🛒</button>
-                <button onclick="switchMainTab('treasury')" id="tab-btn-treasury" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الخزينة 🏦</button>
-                <button onclick="switchMainTab('expenses')" id="tab-btn-expenses" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المصروفات 🧾</button>
-                <button onclick="switchMainTab('staff')" id="tab-btn-staff" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الموظفين 👥</button>
-                <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول</button>
-                <button onclick="switchMainTab('sales')" id="tab-btn-sales" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المبيعات 🧾</button>
-                <button onclick="switchMainTab('customers')" id="tab-btn-customers" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">العملاء 👤</button>
-                <button onclick="switchMainTab('feedback')" id="tab-btn-feedback" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الشكاوي والاقتراحات 💬 <span id="feedback-badge" class="hidden bg-red-600 text-white rounded-full px-1.5 text-[10px]"></span></button>
-                <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير 📊</button>
-                <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات</button>
-                <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات ⚙️</button>
+                <button onclick="switchMainTab('dashboard')" id="tab-btn-dashboard" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">لوحة التحكم <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></button>
+                <button onclick="switchMainTab('pos')" id="tab-btn-pos" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black bg-blue-600 text-white shadow">الكاشير <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></button>
+                <button onclick="switchMainTab('kds')" id="tab-btn-kds" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المطبخ <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg></button>
+                <button onclick="switchMainTab('shift')" id="tab-btn-shift" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الوردية <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></button>
+                <button onclick="switchMainTab('inventory')" id="tab-btn-inventory" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المخازن <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></button>
+                <button onclick="switchMainTab('purchase')" id="tab-btn-purchase" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المشتريات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></button>
+                <button onclick="switchMainTab('treasury')" id="tab-btn-treasury" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الخزينة <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></button>
+                <button onclick="switchMainTab('expenses')" id="tab-btn-expenses" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المصروفات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg></button>
+                <button onclick="switchMainTab('staff')" id="tab-btn-staff" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الموظفين <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
+                <button onclick="switchMainTab('cost')" id="tab-btn-cost" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الكوست كنترول <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg></button>
+                <button onclick="switchMainTab('sales')" id="tab-btn-sales" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">المبيعات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></button>
+                <button onclick="switchMainTab('customers')" id="tab-btn-customers" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">العملاء <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+                <button onclick="switchMainTab('feedback')" id="tab-btn-feedback" class="main-tab-btn hidden px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الشكاوى والاقتراحات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg> <span id="feedback-badge" class="hidden bg-red-600 text-white rounded-full px-1.5 text-[10px]"></span></button>
+                <button onclick="switchMainTab('reports')" id="tab-btn-reports" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">التقارير <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></button>
+                <button onclick="switchMainTab('accounting')" id="tab-btn-accounting" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الحسابات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></button>
+                <button onclick="switchMainTab('settings')" id="tab-btn-settings" class="main-tab-btn px-3 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-200">الإعدادات <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
             </nav>
             <div class="flex items-center gap-2">
-                <button id="waiter-bell" onclick="openWaiterFeed()" class="hidden fixed bottom-4 left-4 z-40 shadow-lg px-5 py-3 text-base lg:static lg:shadow-none lg:px-3 lg:py-1.5 lg:text-xs rounded-xl font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">🔔 <span id="waiter-bell-count">0</span></button>
+                <button id="waiter-bell" onclick="openWaiterFeed()" class="hidden fixed bottom-4 left-4 z-40 shadow-lg px-5 py-3 text-base lg:static lg:shadow-none lg:px-3 lg:py-1.5 lg:text-xs rounded-xl font-black bg-amber-100 text-amber-800 border border-amber-300">🔔 <span id="waiter-bell-count">0</span></button>
                 <span class="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl font-bold text-xs border border-blue-200" id="branch-badge">الفرع</span>
                 <button onclick="logout()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">خروج 🚪</button>
             </div>
@@ -211,9 +211,9 @@
                         </div>
                     </div>
                     <div class="flex gap-1 mb-1">
-                        <input id="pos-cust-phone" type="tel" placeholder="📱 موبايل العميل (دوّر أو ضيف)" onkeydown="if(event.key==='Enter')posFindCustomer()" class="flex-1 bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]">
+                        <input id="pos-cust-phone" type="tel" placeholder="📱 رقم هاتف العميل (ابحث أو أضف)" onkeydown="if(event.key==='Enter')posFindCustomer()" class="flex-1 bg-slate-50 border rounded-xl p-1.5 font-bold text-[11px]">
                         <button onclick="posFindCustomer()" class="bg-blue-600 text-white px-2.5 rounded-xl text-[11px] font-black">بحث</button>
-                        <button onclick="posClearCustomer()" class="bg-slate-100 text-slate-600 px-2 rounded-xl text-[11px] font-black" title="شيل العميل">✖</button>
+                        <button onclick="posClearCustomer()" class="bg-slate-100 text-slate-600 px-2 rounded-xl text-[11px] font-black" title="إزالة العميل">✖</button>
                     </div>
                     <div id="pos-cust-info" class="text-[10px] font-bold text-slate-500 mb-1"></div>
                     <div id="cart-items-list" class="space-y-2 overflow-y-auto max-h-[240px] border-t border-b py-3 my-2"></div>
@@ -245,7 +245,7 @@
                     </div>
 
                     <div class="grid grid-cols-3 gap-2 pt-1">
-                        <button onclick="sendOrderToKitchen()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-amber-600">إرسال للمطبخ 👨🍳</button>
+                        <button onclick="sendOrderToKitchen()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-amber-600">إرسال للمطبخ 👨‍🍳</button>
                         <button onclick="printCurrentBill()" class="w-full bg-slate-700 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-slate-800">الحساب 🧾</button>
                         <button id="pos-pay-btn" onclick="openMultiplePaymentsModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700">دفع وإغلاق 💳</button>
                     </div>
@@ -319,7 +319,7 @@
                     <h3 class="font-black text-sm text-slate-800 mb-4 border-b pb-2">⚙️ أقسام الإعدادات</h3>
                     <button onclick="switchSettingsSection('pos')" id="btn-set-pos" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 mb-2">الضرائب والطاولات</button>
                     <button onclick="switchSettingsSection('inventory')" id="btn-set-inventory" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">الفروع والمخازن</button>
-                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">المنيو والوصفات 🍽️</button>
+                    <button onclick="switchSettingsSection('menu')" id="btn-set-menu" class="set-nav-btn w-full text-right px-4 py-3 rounded-xl text-xs font-black bg-slate-50 text-slate-600 border border-slate-100 mb-2">القائمة والوصفات 🍽️</button>
                 </aside>
                 <div class="lg:col-span-3 space-y-4">
                     <div id="set-section-pos" class="set-section space-y-4">
@@ -408,10 +408,10 @@
         }
 
         function switchMainTab(targetTab) {
-            if (typeof uiHasUnsaved === 'function' && uiHasUnsaved() && !confirm('فيه تعديلات مش محفوظة. تخرج من غير حفظ؟')) return;
+            if (typeof uiHasUnsaved === 'function' && uiHasUnsaved() && !confirm('توجد تعديلات غير محفوظة. هل تريد الخروج بدون حفظ؟')) return;
             document.querySelectorAll('[data-save-btn][data-dirty="1"]').forEach(b => { if (typeof uiSaveBtnStyle === 'function') uiSaveBtnStyle(b, false); });
             if (!canOpenTab(targetTab)) {
-                showToast('القسم ده مش مسموح لدورك', 'error');
+                showToast('هذا القسم غير مسموح لدورك', 'error');
                 return;
             }
             Object.keys(TAB_PERMS).forEach(tab => {
