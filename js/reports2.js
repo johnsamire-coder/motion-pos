@@ -84,7 +84,7 @@ async function runReport(key) {
         <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
             <div><h3 class="font-black text-sm text-blue-800">${uiEsc(res.title)}</h3>
             <p class="text-[11px] font-bold text-slate-500">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | ${res.rows.length} سطر</p></div>
-            <div class="flex gap-2">${uiBtn('تصدير Excel 📗', 'exportReportExcel(rptState.last)', 'green')}${uiBtn('PDF / طباعة 📄', 'printReportPdf(rptState.last)', 'red')}</div>
+            <div class="flex gap-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(rptState.last)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(rptState.last)', 'red')}</div>
         </div>
         ${res.rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${head}</tr></thead><tbody>${body}${foot}</tbody></table></div>`
             : '<p class="text-center text-slate-400 font-bold text-xs py-6">لا توجد بيانات خلال هذه الفترة</p>'}`;

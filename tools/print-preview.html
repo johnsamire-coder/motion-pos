@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>معاينة طباعة المشتريات - موشن بوس</title>
+    <script src="../vendor/tailwind.js"></script>
+    <script src="../vendor/supabase.js"></script>
+    <link rel="stylesheet" href="../vendor/fonts/cairo.css">
+    <style>
+        body { font-family: 'Cairo', Tahoma, sans-serif; background: #eef2f7; margin: 0; padding: 18px; color: #0f172a; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 16px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+        h1 { font-size: 20px; margin: 0 0 6px; color: #1e3a8a; }
+        p.hint { font-size: 12px; font-weight: bold; color: #475569; margin: 4px 0 14px; line-height: 1.9; }
+        .frame { width: 100%; height: 560px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+        .slot { margin-bottom: 24px; } .slot .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+        .real { padding: 6px 12px; border-radius: 10px; background: #0f172a; color: #fff; font-size: 11px; font-weight: 900; border: 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>معاينة المشتريات: الطباعة والتصدير</h1>
+        <p class="hint">
+            دي صفحة تجربة مستقلة بتشغّل <b>نفس شاشات البرنامج ونفس كود الطباعة</b>، بس ببيانات وهمية (فيها لوجو تجريبية باسم «مكاني»).
+            مفيش تسجيل دخول، ومفيش وصلة بقاعدة البيانات، ومفيش أي بيانات حقيقية اتلمست.
+            جرّب التبويبات زي ما بتعمل جوه المحل: دوس 🖨️ تتفرج على الورقة تحت، ودوس «فتح شاشة الطباعة الحقيقية» توريك شاشة طباعة متصفحك (ومنها تختار «حفظ كـ PDF»)، ودوس 📗 ينزّل ملف إكسل حقيقي.
+        </p>
+        <div id="purchase-root"></div>
+    </div>
+    <div class="card">
+        <h1 style="font-size:16px">الورق اللي طلع من التجارب</h1>
+        <p class="hint">كل ما تدوس زرار طباعة بتظهر ورقة جديدة هنا.</p>
+        <div id="docs"></div>
+    </div>
+
+    <script src="../vendor/exceljs.min.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/purchasing.js"></script>
+    <script src="../js/print.js"></script>
+    <script src="../js/purchase_print.js"></script>
+    <script>
+    // ----------------------------------------- سيرفر وهمي: نفس شكل ردود قاعدة البيانات
+    const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString();
+    const pvIngredients = [{ id: 'i1', name: 'لبن طازج', unit: 'لتر', pack_unit: 'جالون', pack_size: 20, cost_per_unit: 8.5 },
+        { id: 'i2', name: 'زبادي', unit: 'كوب', pack_unit: '', pack_size: null, cost_per_unit: 6 },
+        { id: 'i3', name: 'بن تركي', unit: 'كيلو', pack_unit: 'شيكارة', pack_size: 25, cost_per_unit: 100 },
+        { id: 'i4', name: 'بن برازيلي', unit: 'كيلو', pack_unit: '', pack_size: null, cost_per_unit: 100 }];
+    const pvSuppliers = [
+        { id: 's1', name: 'شركة الألبان', phone: '0122222222', company_name: 'شركة الألبان المصرية', tax_number: '111222333', payment_terms: 'cash', is_active: true, balance: 4350 },
+        { id: 's2', name: 'مورد البن', phone: '0111111111', company_name: '', tax_number: '987654321', payment_terms: 'cash', is_active: true, balance: -500 },
+        { id: 's3', name: 'محل الحلويات', phone: '0133333333', company_name: '', tax_number: '', payment_terms: 'cash', is_active: false, balance: 0 }];
+    const pvOrders = [
+        { id: '1', po_number: 'PO-260', status: 'approved', created_at: daysAgo(2), supplier_id: 's1', supplier: 'شركة الألبان', warehouse: 'مخزن فرع المهندسين',
+            total: 3270, received_value: 0, invoiced_value: 0, notes: 'التوصية قبل ١٢ ظهراً',
+            lines: [{ id: 'l1', ingredient: 'لبن طازج', unit: 'لتر', quantity: 300, qty_received: 0, unit_price: 8.5 },
+                { id: 'l2', ingredient: 'زبادي', unit: 'كوب', quantity: 120, qty_received: 0, unit_price: 6 }] },
+        { id: '2', po_number: 'PO-259', status: 'partially_received', created_at: daysAgo(6), supplier_id: 's2', supplier: 'مورد البن', warehouse: 'مخزن فرع المهندسين',
+            total: 6200, received_value: 4000, invoiced_value: 4000, notes: '',
+            lines: [{ id: 'l3', ingredient: 'بن تركي', unit: 'كيلو', quantity: 40, qty_received: 25, unit_price: 100 },
+                { id: 'l4', ingredient: 'بن برازيلي', unit: 'كيلو', quantity: 22, qty_received: 15, unit_price: 100 }] }];
+    const pvGrns = [{ id: 'g1', grn_number: 'GRN-88', po_number: 'PO-259', supplier: 'مورد البن', warehouse: 'مخزن فرع المهندسين', received_at: daysAgo(3),
+        posted_at: daysAgo(2), received_by: 'أحمد أمين', posted_by: 'محمد مدير', status: 'posted', files: 2, value: 4000, notes: 'الوصول ناقص ٧ كيلو بن برازيلي',
+        lines: [{ ingredient: 'بن تركي', unit: 'كيلو', ordered: 40, qty: 25, unit_cost: 100, total: 2500 },
+            { ingredient: 'بن برازيلي', unit: 'كيلو', ordered: 22, qty: 15, unit_cost: 100, total: 1500 }] }];
+    const pvLedger = [{ at: daysAgo(20), type: 'adjustment', amount: 1000, balance_after: 1000, reference: 'رصيد أول المدة' },
+        { at: daysAgo(10), type: 'invoice', amount: 3350, balance_after: 4350, reference: 'فاتورة PO-260' },
+        { at: daysAgo(4), type: 'payment', amount: -1000, balance_after: 3350, reference: 'تحويل بنكي ٥٥٤' }];
+    const pvPrices = { current: [{ supplier: 'شركة البن الأخضر', unit_price: 96 }, { supplier: 'مورد البن', unit_price: 100 }],
+        history: [{ at: daysAgo(3), supplier: 'مورد البن', unit_cost: 100, qty: 25, grn: 'GRN-88' }, { at: daysAgo(33), supplier: 'شركة البن الأخضر', unit_cost: 96, qty: 20, grn: 'GRN-71' }] };
+
+    const pvAnswers = {
+        suppliers_secure: () => ({ ok: true, suppliers: pvSuppliers }),
+        po_list_secure: () => ({ ok: true, orders: pvOrders }),
+        inv_warehouses_secure: () => ({ ok: true, warehouses: [{ id: 'w1', name: 'مخزن فرع المهندسين', mine: true }] }),
+        gr_list_secure: () => ({ ok: true, receipts: pvGrns, can_post: true, can_receive: true }),
+        supplier_statement_secure: () => ({ ok: true, entries: pvLedger }),
+        price_history_secure: () => ({ ok: true, current: pvPrices.current, history: pvPrices.history }) };
+
+    serverRpc = async name => ({ ...pvAnswers[name]() });
+    _supabase.from = () => ({ select: () => ({ order: () => Promise.resolve({ data: pvIngredients }) }) });
+    loadScriptOnce = () => Promise.resolve(); // مكتبة الإكسل محمّلة قبله
+
+    // ----------------------------------------- شكل الشركة: لوجو تجريبية من كانفاس
+    const pvLogo = (() => { const c = document.createElement('canvas'); c.width = 220; c.height = 70;
+        const x = c.getContext('2d'); x.fillStyle = '#1e3a8a'; x.fillRect(0, 0, 220, 70);
+        x.fillStyle = '#fff'; x.font = 'bold 28px Tahoma'; x.fillText('مكاني', 62, 46); return c.toDataURL('image/png'); })();
+    appSettings = { general: { company_name: 'مكاني كافيه ورستورانت', address: '39 شارع العراق متفرع من شهاب، المهندسين', phone: '01000000000',
+        tax_number: '5123456789', commercial_register: '١٢٣٤٥', currency: 'ج.م', logo: pvLogo, day_start_hour: 8 }, receipt: { paper_mm: 80 } };
+    currentUser = { id: 'u1', name: 'محمد سمير', roles: { name: 'owner' },
+        perms: ['po_create', 'po_approve', 'po_receive', 'po_post', 'po_invoice', 'supplier_pay', 'suppliers_manage', 'purchasing'] };
+    currentBranch = { name: 'فرع المهندسين', has_tables: true };
+
+    // ----------------------------------------- الطباعة تتحوّلم لإطار جوه الصفحة بدل شاشة الطباعة
+    const pvRealPrint = printHtml;
+    printHtml = function (html, pageCss) {
+        const title = ((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || 'ورقة').replace(/<[^>]+>/g, '').trim();
+        const box = document.createElement('div'); box.className = 'slot';
+        box.innerHTML = `<div class="row"><b style="font-size:13px">${title}</b><button class="real" type="button">🖨️ فتح شاشة الطباعة الحقيقية</button></div><iframe class="frame" title="${title}"></iframe>`;
+        document.getElementById('docs').appendChild(box);
+        const frame = box.querySelector('iframe');
+        frame.srcdoc = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;color:#000}table{width:100%;border-collapse:collapse}${pageCss || ''}</style></head><body>${html}</body></html>`;
+        box.querySelector('.real').onclick = () => pvRealPrint(html, pageCss);
+        frame.onload = () => { try { frame.style.height = Math.min(1400, frame.contentWindow.document.body.scrollHeight + 40) + 'px'; } catch (e) { /*فضل على مقاسه*/ } };
+    };
+
+    // ----------------------------------------- افتح الشاشة الحقيقية على تبويب أوامر الشراء
+    loadPurchasingScreen();
+    </script>
+</body>
+</html>

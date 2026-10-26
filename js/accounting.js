@@ -56,7 +56,7 @@ async function accJournalLoad() {
         columns: [{ key: 'entry_number', label: 'الرقم', type: 't' }, { key: 'entry_date', label: 'التاريخ', type: 't' }, { key: 'type', label: 'النوع', type: 't' },
             { key: 'description', label: 'الوصف', type: 't' }, { key: 'total', label: 'المبلغ', type: 'm' }, { key: 'status', label: 'الحالة', type: 't' }],
         rows: (res.entries || []).map(e => ({ ...e, type: JE_TYPE_NAMES[e.journal_type] || e.journal_type, status: e.status === 'reversed' ? 'معكوس' : 'مرحّل' })) };
-    document.getElementById('accj-table').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastJournal)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastJournal)', 'red')}</div>`
+    document.getElementById('accj-table').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastJournal)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastJournal)', 'red')}</div>`
         + uiTable(res.entries, [{ label: 'الرقم', key: 'entry_number' }, { label: 'التاريخ', key: 'entry_date' },
             { label: 'النوع', render: e => uiEsc(JE_TYPE_NAMES[e.journal_type] || e.journal_type) }, { label: 'الوصف', key: 'description' },
             { label: 'الفرع', key: 'branch' }, { label: 'المبلغ', render: e => formatCurrency(e.total) },
@@ -143,7 +143,7 @@ async function accPnlLoad() {
         ...sec('expense').map(r => ({ ...r, g: 'المصروفات' })), { name: 'إجمالي المصروفات', amount: res.expenses, bold: true },
         { name: 'صافي الربح', amount: res.net_profit, bold: true }];
     accState.lastPnl = { title: 'الأرباح والخسائر', from: res.from, to: res.to, branch: res.branch, columns: [{ key: 'code', label: 'الكود', type: 't' }, { key: 'name', label: 'البند', type: 't' }, { key: 'amount', label: 'المبلغ', type: 'm' }], rows, key: 'sales_compare' };
-    document.getElementById('accp-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastPnl)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastPnl)', 'red')}</div>`
+    document.getElementById('accp-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastPnl)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastPnl)', 'red')}</div>`
         + uiTable(rows, [{ label: 'الكود', render: r => uiEsc(r.code || '') }, { label: 'البند', render: r => r.bold ? `<b>${uiEsc(r.name)}</b>` : uiEsc(r.name) },
             { label: 'المبلغ', render: r => r.bold ? `<b class="${Number(r.amount) < 0 ? 'text-red-600' : ''}">${formatCurrency(r.amount)}</b>` : formatCurrency(r.amount) }]);
 }
@@ -163,7 +163,7 @@ async function accBsLoad() {
         { name: 'إجمالي الخصوم وحقوق الملكية', amount: res.liabilities_and_equity, bold: true }];
     accState.lastBs = { title: 'الميزانية', from: res.as_of, to: res.as_of, branch: 'كل الفروع', columns: [{ key: 'code', label: 'الكود', type: 't' }, { key: 'name', label: 'البند', type: 't' }, { key: 'amount', label: 'المبلغ', type: 'm' }], rows, key: 'sales_compare' };
     document.getElementById('accb-body').innerHTML = `<p class="text-xs font-black mb-2 ${res.balanced ? 'text-emerald-600' : 'text-red-600'}">${res.balanced ? '✅ الميزانية متوازنة' : '❌ الميزانية غير متوازنة، راجع القيود'}</p>
-        <div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastBs)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastBs)', 'red')}</div>`
+        <div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastBs)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastBs)', 'red')}</div>`
         + uiTable(rows, [{ label: 'الكود', render: r => uiEsc(r.code || '') }, { label: 'البند', render: r => r.bold ? `<b>${uiEsc(r.name)}</b>` : uiEsc(r.name) },
             { label: 'المبلغ', render: r => r.bold ? `<b>${formatCurrency(r.amount)}</b>` : formatCurrency(r.amount) }]);
 }
@@ -183,7 +183,7 @@ async function accGlLoad() {
     accState.lastGl = { title: 'دفتر الأستاذ: ' + res.account, from: document.getElementById('accg-from').value, to: document.getElementById('accg-to').value, branch: '',
         columns: [{ key: 'date', label: 'التاريخ', type: 't' }, { key: 'entry_number', label: 'القيد', type: 't' }, { key: 'description', label: 'البيان', type: 't' },
             { key: 'debit', label: 'مدين', type: 'm' }, { key: 'credit', label: 'دائن', type: 'm' }, { key: 'balance', label: 'الرصيد', type: 'm' }], rows, key: 'sales_compare' };
-    document.getElementById('accg-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastGl)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastGl)', 'red')}</div>`
+    document.getElementById('accg-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastGl)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastGl)', 'red')}</div>`
         + uiTable(rows, [{ label: 'التاريخ', key: 'date' }, { label: 'القيد', key: 'entry_number' }, { label: 'البيان', key: 'description' },
             { label: 'مدين', render: r => Number(r.debit) ? formatCurrency(r.debit) : '' }, { label: 'دائن', render: r => Number(r.credit) ? formatCurrency(r.credit) : '' },
             { label: 'الرصيد', render: r => `<b>${formatCurrency(r.balance)}</b>` }]);
@@ -204,7 +204,7 @@ async function accTbLoad() {
             { key: 'ending_debit', label: 'مدين', type: 'm' }, { key: 'ending_credit', label: 'دائن', type: 'm' }], rows };
     const d = rows.reduce((s, r) => s + (Number(r.ending_debit) || 0), 0);
     const c = rows.reduce((s, r) => s + (Number(r.ending_credit) || 0), 0);
-    document.getElementById('acct-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('Excel', 'exportReportExcel(accState.lastTb)', 'green')}${uiBtn('PDF', 'printReportPdf(accState.lastTb)', 'red')}</div>`
+    document.getElementById('acct-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastTb)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastTb)', 'red')}</div>`
         + uiTable(rows, [{ label: 'الكود', key: 'account_code' }, { label: 'الحساب', key: 'account_name_ar' },
             { label: 'مدين', render: r => Number(r.ending_debit) ? formatCurrency(r.ending_debit) : '' }, { label: 'دائن', render: r => Number(r.ending_credit) ? formatCurrency(r.ending_credit) : '' }])
         + `<p class="text-xs font-black mt-2 ${Math.abs(d - c) < 0.01 ? 'text-emerald-600' : 'text-red-600'}">مدين ${formatCurrency(d)} | دائن ${formatCurrency(c)}</p>`;

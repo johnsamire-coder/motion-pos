@@ -114,7 +114,7 @@ async function salesRun() {
         </div>
         <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
             <p class="text-[11px] font-bold text-slate-500">${uiEsc(res.from)} إلى ${uiEsc(res.to)} | ${uiEsc(res.branch)} | ${rows.length} طلب${rows.length >= 1000 ? ' (أول ١٠٠٠ سجل، ضيّق الفترة)' : ''} | اضغط على أي طلب لعرض تفاصيله</p>
-            <div class="flex gap-2">${uiBtn('تصدير Excel 📗', 'exportReportExcel(salesExportRep())', 'green')}${uiBtn('PDF / طباعة 📄', 'printReportPdf(salesExportRep())', 'red')}</div>
+            <div class="flex gap-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(salesExportRep())', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(salesExportRep())', 'red')}</div>
         </div>
         ${rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr>${['رقم الطلب', 'الوقت', 'النوع', 'الطاولة', 'العميل', 'الويتر', 'الكاشير', 'الأصناف', 'الإجمالي', 'وقت التحضير', 'الدفع', 'الحالة']
             .map(h => `<th class="p-2 text-[11px] text-white bg-blue-700 font-black">${h}</th>`).join('')}</tr></thead><tbody>
