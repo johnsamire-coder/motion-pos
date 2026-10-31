@@ -67,8 +67,9 @@ $Files = [ordered]@{
   'supabase\migrations\032_menu_branch_address.sql'           = '60fa8b054fc0ef6b'
   'supabase\migrations\033_one_shift_per_branch_own_attendance.sql' = 'd2070cf7b5cbc16e'
   'supabase\migrations\034_business_day_cancel_charge_small_po.sql' = '13fa7dc597d7579b'
+  'supabase\migrations\035_qr_presence_auto_open.sql'        = 'f3fe790ba3fba3d1'
 }
-$LastVersion = '034'
+$LastVersion = '035'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }

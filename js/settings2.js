@@ -92,7 +92,8 @@ function set2RenderAll() {
         ['qr_welcome', 'جملة الترحيب أول القائمة', 'text'],
         ['qr_privacy_note', 'الجملة التي تطمئن العميل عند طلب اسمه ورقمه وتاريخ ميلاده', 'text']],
         `<div class="mt-4 border-t pt-3">${uiBtn('طباعة أكواد الطاولات (QR)', 'set2PrintQr()', 'blue')}
-         <p class="text-[11px] text-slate-500 font-bold mt-2">لكل طاولة كود مختلف. اطبع اللوحات وضع كل كود على طاولته.</p></div>`, '', 'qr');
+         <p class="text-[11px] text-slate-500 font-bold mt-2">لكل طاولة كود مختلف. اطبع اللوحات وضع كل كود على طاولته.</p></div>
+         <div id="set2-presence" class="mt-4 border-t pt-3"></div>`, '', 'qr');
     set2Form('loyalty', '⭐ خصم الولاء (للعميل الدائم)', [['enabled', 'تفعيل', 'bool'], ['min_spent', 'إذا اشترى بمبلغ (جنيه) أو أكثر', 'number'],
         ['period_days', 'عدد الأيام السابقة (365 = سنة)', 'number'], ['percent', 'نسبة الخصم %', 'number'], ['label', 'اسم الخصم على الفاتورة', 'text']],
         '<p class="text-[11px] text-slate-500 font-bold mt-2">يُطبَّق تلقائيًا عند اختيار الكاشير للعميل بالهاتف (أو طلب العميل من QR)، ويظهر في الفاتورة كسطر مستقل. يُحسب من الطلبات المدفوعة فقط.</p>', '', 'loyalty');
@@ -109,6 +110,7 @@ function set2RenderAll() {
         set2Form('inventory', 'المخازن', [['default_min_stock', 'الحد الأدنى الافتراضي للخامة الجديدة', 'number']], '', '', 'work', true);
         set2Form('staff', 'الموظفين (التأخير)', [['work_start_time', 'موعد بداية العمل (مثلاً 09:00)', 'text'], ['late_grace_minutes', 'مدة سماح التأخير بالدقائق', 'number']], '', '', 'work', true);
     }
+    set2RenderPresence();
     set2RenderSync();
     set2RenderRecipes();
     if (typeof set2RenderModifiers === 'function') set2RenderModifiers();
@@ -303,6 +305,64 @@ function set2PickLogo(input) {
 async function set2Station(categoryId, station) {
     await uiCall('settings2_secure', { p_action: 'set_category_station', p_data: { category_id: categoryId, station } }, 'تم');
 }
+
+// ---------------------------------------------------------------- الطلب من الـ QR من جوه المحل بس
+// الموبايل على واي فاي المحل أو جوه دايرة حوالين المحل = الطاولة بتتفتح لوحدها. بعيد عن المحل = الطلب بيترفض.
+async function set2RenderPresence(data) {
+    const box = document.getElementById('set2-presence');
+    if (!box) return;
+    const r = data || await uiCall('qr_presence_admin_secure', { p_action: 'get', p_data: null });
+    if (!r) { box.innerHTML = ''; return; }
+    const httpsNote = window.isSecureContext && location.protocol === 'https:' ? ''
+        : '<p class="text-[11px] font-black text-amber-700 mt-1">⚠️ لتسجيل الموقع أو الواي فاي، افتح البرنامج من رابط الإنترنت (https) على موبايل متصل بواي فاي المحل. من لابتوب المحل (http) الموبايل مايقدرش يدّي الموقع.</p>';
+    const autoWifi = r.has_store_server
+        ? `<p class="text-[11px] font-bold ${r.store_ip_seen ? 'text-emerald-700' : 'text-slate-500'}">${r.store_ip_seen ? '✅ واي فاي المحل بيتعرف لوحده من لابتوب المحل.' : 'واي فاي المحل بيتعرف لوحده من لابتوب المحل لما المزامنة تشتغل.'} لو المحل فيه أكتر من خط نت، ضيف كل واحد بالزرار تحت.</p>` : '';
+    const ips = (r.ips || []).map(ip => `<span class="inline-flex items-center gap-1 bg-slate-100 rounded-lg px-2 py-1 text-[11px] font-bold" dir="ltr">${uiEsc(ip)}
+        <button onclick="set2PresRemoveIp('${uiEsc(ip)}')" class="text-red-600 font-black">✕</button></span>`).join(' ');
+    box.innerHTML = `<p class="text-xs font-black mb-1">📍 الطلب من الـ QR من جوه المحل بس</p>
+        <p class="text-[11px] text-slate-500 font-bold mb-2 leading-5">الزبون اللي على واي فاي المحل، أو موبايله جوه المحل (بالموقع)، الطاولة بتتفتح لوحدها وطلبه بيروح المطبخ.
+        اللي فاتح الرابط من بيته طلبه بيترفض. واللي رفض يدّي الموقع طلبه بيستنى تأكيد الويتر.</p>
+        <div class="space-y-2 text-xs font-bold">
+          <label class="flex items-center gap-2"><input type="checkbox" id="set2-pres-auto" ${r.auto ? 'checked' : ''} class="w-4 h-4"> الطاولة تتفتح والطلب يروح المطبخ لوحده (من غير تأكيد الويتر)</label>
+          <label class="flex items-center gap-2">المسافة المسموحة حوالين المحل بالمتر <input type="number" id="set2-pres-radius" value="${uiEsc(r.radius_m)}" min="30" max="2000" class="${uiInputClass()} w-24"></label>
+          <div>${uiBtn('حفظ الإعداد', 'set2PresSave()', 'green')}</div>
+          <div class="border-t pt-2"><p>موقع الفرع (${uiEsc(r.branch || '')}): ${r.lat != null ? `<span class="text-emerald-700">✅ متسجل</span> <a class="text-blue-700" target="_blank" rel="noopener" href="https://maps.google.com/?q=${encodeURIComponent(r.lat + ',' + r.lng)}">شوفه على الخريطة</a>` : '<span class="text-red-600">❌ لسه ماتسجلش، فالطلب من نت الموبايل بيستنى الويتر</span>'}</p>
+            <div class="flex flex-wrap gap-2 mt-1">${uiBtn('📍 سجّل موقع المحل (وانت جوه المحل)', 'set2PresSetLocation()', 'blue')}${r.lat != null ? uiBtn('امسح الموقع', 'set2PresClearLocation()', 'gray') : ''}</div></div>
+          <div class="border-t pt-2"><p>واي فاي المحل: ${r.on_shop_wifi ? '<span class="text-emerald-700">✅ الجهاز ده دلوقتي على واي فاي المحل</span>' : '<span class="text-slate-500">الجهاز ده مش متعرف إنه على واي فاي المحل</span>'}</p>
+            ${autoWifi}
+            <div class="flex flex-wrap gap-2 mt-1">${ips || '<span class="text-[11px] text-slate-400">مفيش عناوين متضافة بالإيد</span>'}</div>
+            <div class="mt-1">${uiBtn('📶 ضيف الواي فاي اللي الجهاز ده متصل بيه', 'set2PresAddIp()', 'blue')}</div></div>
+          ${httpsNote}
+        </div>`;
+}
+
+async function set2PresAct(action, data, okMsg) {
+    const r = await uiCall('qr_presence_admin_secure', { p_action: action, p_data: data || null }, okMsg);
+    if (r) set2RenderPresence(r);
+}
+
+function set2PresSave() {
+    set2PresAct('save', { auto: !!document.getElementById('set2-pres-auto')?.checked,
+        radius_m: Number(document.getElementById('set2-pres-radius')?.value || 150) }, 'تم الحفظ');
+}
+
+function set2PresSetLocation() {
+    if (!navigator.geolocation || !window.isSecureContext) { showToast('الجهاز ده مايقدرش يدّي الموقع. افتح البرنامج من رابط https على موبايل', 'error'); return; }
+    showToast('📍 بنجيب الموقع... اسمح للمتصفح لو سألك');
+    navigator.geolocation.getCurrentPosition(async g => {
+        if (g.coords.accuracy > 300) { showToast(`الموقع مش دقيق (±${Math.round(g.coords.accuracy)} متر). شغّل الـ GPS وجرّب تاني جوه المحل`, 'error'); return; }
+        set2PresAct('set_location', { lat: g.coords.latitude, lng: g.coords.longitude }, `✅ اتسجل موقع المحل (دقة ±${Math.round(g.coords.accuracy)} متر)`);
+    }, () => showToast('مقدرناش نجيب الموقع. اسمح للمتصفح بالموقع وجرّب تاني', 'error'), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+
+async function set2PresClearLocation() {
+    if (!confirm('تمسح موقع المحل؟ الطلب من نت الموبايل هيستنى تأكيد الويتر.')) return;
+    set2PresAct('clear_location', null, 'اتمسح الموقع');
+}
+
+function set2PresAddIp() { set2PresAct('add_my_ip', null, '✅ اتضاف واي فاي المحل'); }
+
+function set2PresRemoveIp(ip) { set2PresAct('remove_ip', { ip }, 'اتشال العنوان'); }
 
 async function set2PrintQr() {
     const res = await uiCall('tables_qr_secure', {});

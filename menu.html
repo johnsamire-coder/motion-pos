@@ -163,6 +163,30 @@
             return data;
         }
 
+        // هل الموبايل في المحل؟ لو على واي فاي المحل بيبعت على طول. غير كده بنسأل الموبايل عن مكانه (بيطلب الإذن مرة واحدة).
+        // لو الزبون رفض الموقع، الطلب بيستنى الويتر يأكده زي الأول. ولو الموبايل بعيد عن المحل، السيرفر بيرفض.
+        let posCache = null;
+        function phonePosition() {
+            return new Promise(resolve => {
+                if (posCache && Date.now() - posCache.at < 120000) return resolve(posCache.p);
+                if (!navigator.geolocation) return resolve({});
+                navigator.geolocation.getCurrentPosition(
+                    g => { const p = { p_lat: g.coords.latitude, p_lng: g.coords.longitude, p_accuracy: Math.round(g.coords.accuracy || 0) }; posCache = { at: Date.now(), p }; resolve(p); },
+                    () => resolve({}),
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+            });
+        }
+        async function presenceArgs() {
+            const none = { p_lat: null, p_lng: null, p_accuracy: null };
+            try {
+                const pr = await rpc('qr_presence_public', { p_qr: qrToken });
+                if (!pr || !pr.ok || pr.wifi || !pr.location) return none;
+            } catch (e) { return none; }
+            const p = await phonePosition();
+            return p.p_lat == null ? none : p;
+        }
+        const NOT_IN_SHOP_MSG = '📍 الطلب من الموبايل متاح وانت في المحل بس. لو انت في المحل: اتصل بواي فاي المحل، أو اسمح للموبايل يعرف مكانك وجرّب تاني.';
+
         async function load() {
             const app = document.getElementById('app');
             try {
@@ -178,7 +202,7 @@
                 mode = M.ordering ? (sessionStorage.getItem(KEY + '_mode') || null) : 'browse';
                 render();
                 const last = store(KEY + '_last');
-                if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) pollStatus(last.ref, false);
+                if (last && last.ref && Date.now() - last.at < 3 * 3600 * 1000) pollStatus(last.ref, false, last.auto);
                 if (!mode) chooseMode();
             } catch (err) {
                 app.innerHTML = '<p class="center-msg">حدثت مشكلة في الاتصال بالإنترنت. حاول مرة أخرى 🙏</p>';
@@ -475,6 +499,7 @@
             const me = store('motion_menu_me') || {};
             openSheet(`<h3>آخر خطوة 🙌</h3>
                 <div class="note"><span style="font-size:20px">🔒</span><span>${esc(M.privacy_note || '')}</span></div>
+                <p class="muted" style="font-size:12px;margin:4px 0">📍 لو مش متصل بواي فاي المحل، الموبايل هيسألك عن الموقع مرة واحدة علشان نتأكد إنك في المحل.</p>
                 <label class="l">اسمك *</label><input class="field" id="c-name" maxlength="80" value="${esc(me.name || '')}" autocomplete="name">
                 <label class="l">رقم هاتفك *</label><input class="field" id="c-phone" type="tel" inputmode="tel" maxlength="16" dir="ltr" style="text-align:right" value="${esc(me.phone || '')}" autocomplete="tel" placeholder="01xxxxxxxxx">
                 <label class="l">تاريخ ميلادك (اختياري) 🎂</label><input class="field" id="c-bd" type="date" value="${esc(me.birthday || '')}">
@@ -493,29 +518,32 @@
             if (!name) { err.textContent = 'من فضلك اكتب اسمك'; err.style.display = 'block'; return; }
             if (digits.length < 8) { err.textContent = 'رقم الهاتف غير صحيح'; err.style.display = 'block'; return; }
             if (document.getElementById('c-remember').checked) store('motion_menu_me', { name, phone, birthday: bd }); else store('motion_menu_me', {});
-            const btn = document.getElementById('send-btn'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال...';
+            const btn = document.getElementById('send-btn'); btn.disabled = true; btn.textContent = '📍 بنتأكد إنك في المحل...';
             try {
+                const where = await presenceArgs();
+                btn.textContent = 'جارٍ الإرسال...';
                 const res = await rpc('qr_order_public', { p_qr: qrToken, p_items: cart.map(l => ({ product_id: l.product_id, quantity: l.qty, modifier_ids: l.mods, item_notes: l.note || null })),
-                    p_name: name, p_phone: phone, p_birthday: bd || null, p_note: (store(KEY + '_note') || '').trim() || null });
+                    p_name: name, p_phone: phone, p_birthday: bd || null, p_note: (store(KEY + '_note') || '').trim() || null, ...where });
                 if (!res || !res.ok) {
                     const m = { too_many: 'لديك طلب ما زال في انتظار تأكيد الويتر. انتظر لحظة 🙏', store_offline: 'الإنترنت في المحل متوقف الآن 🙏 من فضلك اطلب من الويتر.',
                         product_not_available: 'أحد الأصناف المختارة غير متوفر الآن. احذفه وحاول مرة أخرى.', invalid_phone: 'رقم الهاتف غير صحيح', invalid_name: 'من فضلك اكتب اسمك',
-                        invalid_date: 'تاريخ الميلاد غير صحيح', required_modifier_missing: 'يوجد صنف يحتاج اختيار إضافة له', qr_disabled: 'الطلب من الهاتف متوقف الآن' }[res && res.reason];
+                        invalid_date: 'تاريخ الميلاد غير صحيح', required_modifier_missing: 'يوجد صنف يحتاج اختيار إضافة له', qr_disabled: 'الطلب من الهاتف متوقف الآن',
+                        not_in_shop: NOT_IN_SHOP_MSG }[res && res.reason];
                     err.textContent = m || 'تعذّر الإرسال. حاول مرة أخرى.'; err.style.display = 'block';
                     btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
                     return;
                 }
-                store(KEY + '_last', { ref: res.ref, at: Date.now() });
+                store(KEY + '_last', { ref: res.ref, at: Date.now(), auto: !!res.auto });
                 cart = []; saveCart(); store(KEY + '_note', '');
                 render();
-                pollStatus(res.ref, true);
+                pollStatus(res.ref, true, !!res.auto);
             } catch (e) {
                 err.textContent = 'حدثت مشكلة في الإنترنت. حاول مرة أخرى.'; err.style.display = 'block';
                 btn.disabled = false; btn.textContent = 'تأكيد وإرسال للويتر ✅';
             }
         }
 
-        async function pollStatus(ref, show) {
+        async function pollStatus(ref, show, auto) {
             clearInterval(statusTimer);
             const draw = (st) => {
                 if (!show && st.status === 'pending') { show = true; }
@@ -524,7 +552,9 @@
                     ? `<div class="status"><div class="ic">🎉</div><h3>تم تأكيد طلبك!</h3><p class="muted" style="font-size:15px">رقم طلبك <b>${esc(st.order_number || '')}</b> والمطبخ يجهّزه الآن. بالهنا والشفا ❤️</p></div>`
                     : st.status === 'rejected'
                         ? `<div class="status"><div class="ic">🙏</div><h3>لم يتم تأكيد الطلب</h3><p class="muted" style="font-size:15px">${esc(st.reject_reason || '')}</p></div>`
-                        : `<div class="status"><div class="spinner"></div><h3>وصل طلبك إلى الويتر ✅</h3><p class="muted" style="font-size:15px">في انتظار تأكيد الويتر (ثوانٍ). اترك هذه الصفحة مفتوحة.</p></div>`;
+                        : auto
+                            ? `<div class="status"><div class="spinner"></div><h3>طلبك اتسجل ✅</h3><p class="muted" style="font-size:15px">بيتبعت للمطبخ خلال ثوانٍ. اترك هذه الصفحة مفتوحة.</p></div>`
+                            : `<div class="status"><div class="spinner"></div><h3>وصل طلبك إلى الويتر ✅</h3><p class="muted" style="font-size:15px">في انتظار تأكيد الويتر (ثوانٍ). اترك هذه الصفحة مفتوحة.</p></div>`;
                 openSheet(body + `<button class="ghost" onclick="closeSheet()">تمام</button>`);
             };
             const tick = async () => {
@@ -541,8 +571,10 @@
 
         async function svc(type) {
             try {
-                const data = await rpc('qr_request_public', { p_qr: qrToken, p_type: type });
+                const where = await presenceArgs();
+                const data = await rpc('qr_request_public', { p_qr: qrToken, p_type: type, ...where });
                 if (!data || !data.ok) {
+                    if (data && data.reason === 'not_in_shop') { toast(NOT_IN_SHOP_MSG, 6000); return; }
                     toast(data && data.reason === 'too_many' ? 'طلبات كثيرة. الويتر قادم فورًا 🙏'
                         : data && data.reason === 'store_offline' ? 'الإنترنت في المحل متوقف الآن 🙏 من فضلك استدعِ الويتر مباشرة.' : 'تعذّر الإرسال. حاول مرة أخرى.', 3500);
                     return;
