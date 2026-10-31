@@ -38,12 +38,30 @@ const PRINT_TYPE_NAMES = { dine_in: 'صالة', takeaway: 'تيك أواي', del
 const PRINT_METHOD_NAMES = { cash: 'كاش', card: 'كارت', instapay: 'إنستاباي', wallet: 'محفظة', on_account: 'آجل' };
 const PRINT_STATION_NAMES = { kitchen: 'المطبخ', bar: 'البار', shisha: 'الشيشة' };
 
+// دمج الأصناف المتكررة في سطر واحد (شاي 1 + شاي 2 + شاي 15 = شاي 18)
+// بيتدمج بس الصنف اللي ليه نفس السعر ونفس الإضافات ونفس الملاحظة
+function mergePrintItems(items) {
+    const map = new Map();
+    (items || []).forEach(i => {
+        const mods = (i.modifiers || []).slice().sort();
+        const key = [i.name, Number(i.unit_price) || 0, mods.join('|'), i.notes || '', i.station || ''].join('\u0001');
+        const cur = map.get(key);
+        if (cur) {
+            cur.quantity = (Number(cur.quantity) || 0) + (Number(i.quantity) || 0);
+            cur.total_price = (Number(cur.total_price) || 0) + (Number(i.total_price) || 0);
+        } else {
+            map.set(key, { ...i, modifiers: i.modifiers || [], quantity: Number(i.quantity) || 0, total_price: Number(i.total_price) || 0 });
+        }
+    });
+    return [...map.values()];
+}
+
 function buildReceiptHtml(o, s) {
     const g = s.general || {};
     const r = s.receipt || {};
     const money = v => (Number(v) || 0).toFixed(2);
     const paid = o.status === 'closed';
-    const items = (o.items || []).map(i => `<tr><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}${i.notes ? `<br><small>📝 ${uiEsc(i.notes)}</small>` : ''}</td>
+    const items = mergePrintItems(o.items).map(i => `<tr><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}${i.notes ? `<br><small>📝 ${uiEsc(i.notes)}</small>` : ''}</td>
         <td class="num">${uiEsc(i.quantity)}×${money(i.unit_price)}</td><td class="num">${money(i.total_price)}</td></tr>`).join('');
     const pays = (o.payments || []).filter(p => Number(p.amount) > 0).map(p => `<tr><td>${uiEsc(PRINT_METHOD_NAMES[p.method] || p.method)}</td><td class="num">${money(p.amount)}</td></tr>`).join('');
     return `
@@ -281,7 +299,7 @@ const HOSP_CAT_NAMES = { owner_guest: 'ضيف المالك', family: 'أهل', s
 function buildHospitalityHtml(o, s) {
     const g = (s && s.general) || {};
     const h = o.hospitality || {};
-    const items = (o.items || []).map(i => `<tr><td class="b">${uiEsc(i.quantity)} ×</td><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}</td></tr>`).join('');
+    const items = mergePrintItems(o.items).map(i => `<tr><td class="b">${uiEsc(i.quantity)} ×</td><td>${uiEsc(i.name)}${(i.modifiers || []).length ? `<br><small>+ ${uiEsc(i.modifiers.join('، '))}</small>` : ''}</td></tr>`).join('');
     return `
         <div class="c b big">${uiEsc(g.company_name || '')}</div>
         ${o.branch ? `<div class="c">${uiEsc(o.branch)}</div>` : ''}
