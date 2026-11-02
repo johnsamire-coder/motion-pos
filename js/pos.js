@@ -630,14 +630,17 @@ function renderOrderCartTicket() {
     if (posState.cart.items.length === 0) {
         itemsContainer.innerHTML = `<p class="text-slate-400 text-center py-8 text-xs font-bold">الفاتورة فارغة</p>`;
     } else {
-        itemsContainer.innerHTML = posState.cart.items.map((item, idx) => {
+        // الأصناف اللي اتبعتت للمطبخ في أكتر من طلبية بتتعرض في سطر واحد (شاي 1 + شاي 3 = شاي 4)
+        itemsContainer.innerHTML = posTicketGroups(posState.cart.items).map(g => {
+            const item = g.item;
             const modsText = (item.modifiers || []).map(m => `+ ${m.name || m.modifier_name}`).join(', ');
             const sentBadge = item.db_item_id ? '' : '<span class="text-[9px] text-amber-600 font-bold">(لم يُرسَل بعد)</span>';
+            const timesBadge = g.idxs.length > 1 ? `<span class="text-[9px] text-slate-400 font-bold">(اتطلب ${g.idxs.length === 2 ? 'مرتين' : g.idxs.length + ' مرات'})</span>` : '';
             return `<div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold space-y-1">
-                <div class="flex justify-between items-center"><span class="text-slate-800">${item.name} ${sentBadge}</span><span class="text-blue-600 font-extrabold">${formatCurrency(item.price * item.qty)}</span></div>
+                <div class="flex justify-between items-center"><span class="text-slate-800">${item.name} ${sentBadge}${timesBadge}</span><span class="text-blue-600 font-extrabold">${formatCurrency(item.price * g.qty)}</span></div>
                 ${modsText ? `<p class="text-[10px] text-amber-600 font-bold">${uiEsc(modsText)}</p>` : ''}
                 ${item.notes ? `<p class="text-[10px] text-red-600 font-bold">📝 ${uiEsc(item.notes)}</p>` : ''}
-                <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1"><span>${item.price} × ${item.qty}</span><span class="flex gap-1">${item.db_item_id ? '' : `<button onclick="editCartItemNote(${idx})" class="text-amber-700 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-bold">📝 ملاحظة</button>`}<button onclick="voidCartItem(${idx})" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-bold">مسح / Void</button></span></div>
+                <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1"><span>${item.price} × ${g.qty}</span><span class="flex gap-1">${item.db_item_id ? '' : `<button onclick="editCartItemNote(${g.idxs[0]})" class="text-amber-700 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-bold">📝 ملاحظة</button>`}<button onclick="voidCartGroup('${g.idxs.join(',')}')" class="text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-bold">مسح / Void</button></span></div>
             </div>`;
         }).join('');
     }
@@ -702,6 +705,36 @@ async function pickCancelReason(title, type, pinLabel, extraFields = []) {
     }
     const reason = list.find(r => String(r.id) === String(v.reason));
     return reason ? { ...reason, pin: v.pin, charge: v.charge || null } : null;
+}
+
+// تجميع سطور التذكرة للعرض بس: الصنف اللي اتبعت أكتر من مرة بنفس السعر والإضافات والملاحظة = سطر واحد.
+// السطور الحقيقية زي ما هي (الحسابات والإلغاء والتقسيم شغالين عليها). اللي لسه ما اتبعتش بيفضل لوحده علشان الملاحظة.
+function posTicketGroups(items) {
+    const groups = [];
+    const byKey = new Map();
+    (items || []).forEach((item, idx) => {
+        if (!item.db_item_id) { groups.push({ item, idxs: [idx], qty: Number(item.qty) || 0 }); return; }
+        const mods = (item.modifiers || []).map(m => m.modifier_id || m.id).sort().join('|');
+        const key = [item.product_id, Number(item.price) || 0, mods, item.notes || ''].join('\u0001');
+        const g = byKey.get(key);
+        if (g) { g.idxs.push(idx); g.qty += Number(item.qty) || 0; return; }
+        const n = { item, idxs: [idx], qty: Number(item.qty) || 0 };
+        byKey.set(key, n);
+        groups.push(n);
+    });
+    return groups;
+}
+
+// مسح من سطر متجمع: لو الصنف اتطلب أكتر من مرة، الكاشير يختار أنهي طلبية تتمسح
+async function voidCartGroup(list) {
+    const idxs = String(list).split(',').map(Number).filter(i => posState.cart.items[i]);
+    if (!idxs.length) return;
+    if (idxs.length === 1) return voidCartItem(idxs[0]);
+    const name = posState.cart.items[idxs[0]].name;
+    const v = await uiForm(`مسح "${name}"`, [{ key: 'line', label: `الصنف ده اتطلب ${idxs.length === 2 ? 'مرتين' : idxs.length + ' مرات'}. اختار اللي هيتمسح`, type: 'select', required: true,
+        options: idxs.map((i, n) => [String(i), `المرة ${n + 1}: ${posState.cart.items[i].qty} ${name}`]) }], { ok: 'التالي', danger: true });
+    if (!v) return;
+    voidCartItem(Number(v.line));
 }
 
 async function voidCartItem(idx) {
