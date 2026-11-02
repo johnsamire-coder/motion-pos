@@ -72,7 +72,9 @@ async function shiftClose() {
     if (!res) return;
     await loadShiftScreen();
     const box = document.getElementById('shift-last-report');
-    if (box) box.innerHTML = renderShiftReport(res.report);
+    if (box) { box.innerHTML = renderShiftReport(res.report); box.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    // الإيصال بتقسيمة المبالغ بيتطبع لوحده أول ما الوردية تتقفل (وزرار الطباعة موجود لو محتاج نسخة تانية)
+    printShiftStatement();
 }
 
 const SHIFT_METHODS = [['cash', 'نقدي'], ['card', 'فيزا / كارت'], ['instapay', 'إنستاباي'], ['wallet', 'محفظة'], ['on_account', 'آجل (على الحساب)']];
@@ -133,19 +135,28 @@ function printShiftStatement() {
     const m = v => (Number(v) || 0).toFixed(2);
     const pm = r.payments_by_method || {}, tm = r.tips_by_method || {};
     const diff = Number(r.difference) || 0;
-    const rows = SHIFT_METHODS.map(([k, l]) => `<tr><td>${uiEsc(l)}</td><td class="num">${m(pm[k])}</td><td class="num">${m(tm[k])}</td></tr>`).join('');
+    const known = SHIFT_METHODS.map(([k]) => k);
+    const methods = SHIFT_METHODS.concat(Object.keys(pm).concat(Object.keys(tm)).filter((k, i, a) => !known.includes(k) && a.indexOf(k) === i).map(k => [k, k]));
+    const rows = methods.filter(([k]) => k === 'cash' || Number(pm[k]) || Number(tm[k])).map(([k, l]) => `<tr><td>${uiEsc(l)}</td><td class="num">${m(pm[k])}</td><td class="num">${m(tm[k])}</td><td class="num b">${m((Number(pm[k]) || 0) + (Number(tm[k]) || 0))}</td></tr>`).join('');
     const tips = Object.values(tm).reduce((s, v) => s + (Number(v) || 0), 0);
+    // العهدة والزيادة والعجز والتسليم مكتوبين تحت في حساب الدرج، فمش بيتكرروا هنا
+    const moves = (r.cash_moves || []).filter(x => !['float', 'overage', 'shortage', 'close_handover'].includes(x.type));
+    const movesHtml = moves.length ? `<div class="line"></div><div class="b">حركات الدرج</div>
+        <table>${moves.map(x => `<tr><td>${uiEsc(SHIFT_MOVE_NAMES[x.type] || x.type)}${x.reason ? `<br><small>${uiEsc(x.reason)}</small>` : ''}</td><td class="num">${m(x.amount)}</td></tr>`).join('')}</table>` : '';
     printHtml(`
         ${g.logo ? `<div class="c"><img class="logo" src="${uiEsc(g.logo)}"></div>` : ''}
         <div class="c b big">${uiEsc(g.company_name || '')}</div>
         <div class="c b">بيان إغلاق الوردية</div>
         <div>الكاشير: ${uiEsc(r.staff || '')}</div>
         <div>من: ${uiEsc(uiDate(r.opened_at))}</div><div>حتى: ${uiEsc(uiDate(r.closed_at))}</div>
+        <div>عدد الطلبات المدفوعة: ${uiEsc(r.orders_paid ?? 0)}</div>
         <div class="line"></div>
-        <table><tr class="b"><td>الطريقة</td><td class="num">مبيعات</td><td class="num">إكرامية</td></tr>${rows}</table>
+        <table><tr class="b"><td>الطريقة</td><td class="num">مبيعات</td><td class="num">إكرامية</td><td class="num">الإجمالي</td></tr>${rows}</table>
         <div class="line"></div>
         <table><tr class="b"><td>إجمالي المبيعات</td><td class="num">${m(r.sales_total)}</td></tr>
-            <tr class="b"><td>إجمالي الإكراميات</td><td class="num">${m(tips)}</td></tr></table>
+            <tr class="b"><td>إجمالي الإكراميات</td><td class="num">${m(tips)}</td></tr>
+            <tr class="b"><td>الإجمالي كله</td><td class="num">${m((Number(r.sales_total) || 0) + tips)}</td></tr></table>
+        ${movesHtml}
         <div class="line"></div>
         <table><tr><td>العهدة</td><td class="num">${m(r.opening_float)}</td></tr>
             <tr><td>المفروض في الدرج</td><td class="num">${m(r.expected_cash)}</td></tr>
