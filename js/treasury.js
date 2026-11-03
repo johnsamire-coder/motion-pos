@@ -289,7 +289,7 @@ async function tipsRender(body) {
             <label class="text-xs font-bold">المبلغ الذي سيُوزَّع
                 <input id="tips-amount" type="number" min="0" step="0.01" value="${uiEsc(Number(res.pool) || 0)}" oninput="tipsPreview()" class="${uiInputClass()} w-32 block mt-1"></label>
             <label class="text-xs font-bold">الصرف من
-                <select id="tips-source" class="${uiInputClass()} block mt-1"><option value="main_cash">الخزينة الرئيسية</option><option value="drawer">درج ورديتي</option></select></label>
+                <select id="tips-source" class="${uiInputClass()} block mt-1"><option value="main_cash">الخزينة الرئيسية</option><option value="drawer">درج الكاشير (الوردية المفتوحة)</option></select></label>
             ${uiBtn('توزيع 💰', 'tipsDistribute()', 'green')}
         </div>
         <p id="tips-preview" class="text-xs font-black text-emerald-700"></p>

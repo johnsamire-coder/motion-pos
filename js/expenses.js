@@ -28,7 +28,7 @@ function expCategoryOptions() {
 }
 
 function expSourceSelect(id) {
-    return `<select id="${id}" class="${uiInputClass()}"><option value="main_cash">الخزينة الرئيسية</option><option value="drawer">درج الكاشير (ورديتي)</option><option value="bank">البنك</option></select>`;
+    return `<select id="${id}" class="${uiInputClass()}"><option value="main_cash">الخزينة الرئيسية</option><option value="drawer">درج الكاشير (الوردية المفتوحة)</option><option value="bank">البنك</option></select>`;
 }
 
 function expRenderNew() {
