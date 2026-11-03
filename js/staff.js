@@ -205,9 +205,12 @@ async function stfRenderPerformance() {
 }
 
 async function stfRenderPerms() {
-    const res = await uiCall('role_permissions_secure', { p_role: null, p_perms: null });
+    const isOwnerNow = String(currentUser?.roles?.name || '') === 'owner';
+    const [res, vd] = await Promise.all([uiCall('role_permissions_secure', { p_role: null, p_perms: null }),
+        isOwnerNow ? uiCall('view_days_secure', { p_role: null, p_days: null }) : Promise.resolve(null)]);
     if (!res) return;
     stfState.permData = res;
+    stfState.viewDays = vd;
     const roles = Object.keys(res.roles || {});
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
     const builtin = ['owner', 'branch_manager', 'cashier', 'waiter', 'storekeeper'];
@@ -217,7 +220,34 @@ async function stfRenderPerms() {
         + '</tr>').join('');
     document.getElementById('stf-body').innerHTML = uiCard('الصلاحيات (المالك لديه كل الصلاحيات دائمًا)',
         `<p class="text-[11px] font-bold text-slate-500 mb-2">📂 = إمكانية فتح الشاشة. ↳ = الإجراءات المتاحة داخل الشاشة. مثال: مدير الفرع يفتح المشتريات وينشئ أمر شراء ويستلم، والاعتماد والترحيل للمالك فقط.</p><div class="overflow-x-auto"><table class="w-full text-right"><thead>${head}</thead><tbody>${body}</tbody></table></div>`,
-        (isOwner ? uiBtn('➕ دور جديد', 'stfAddRole()', 'blue') : '') + uiBtn('حفظ', 'stfSavePerms()', 'green'));
+        (isOwner ? uiBtn('➕ دور جديد', 'stfAddRole()', 'blue') : '') + uiBtn('حفظ', 'stfSavePerms()', 'green'))
+        + (vd ? stfViewDaysHtml(roles, vd) : '');
+}
+
+// المالك بيحدد كل دور يشوف آخر كام يوم في كل شاشة (فاضي = كل حاجة)
+function stfViewDaysHtml(roles, vd) {
+    const head = '<tr><th class="p-2 text-[11px] border-b">الشاشة</th>' + roles.map(r => `<th class="p-2 text-[11px] border-b">${uiEsc(STAFF_ROLE_NAMES[r] || r)}</th>`).join('') + '</tr>';
+    const body = (vd.areas || []).map(a => `<tr class="border-b text-xs font-black"><td class="p-2">${uiEsc(VIEW_AREA_NAMES[a] || a)}</td>`
+        + roles.map(r => `<td class="p-2 text-center"><input type="number" min="0" max="3650" step="1" data-view-role="${uiEsc(r)}" data-view-area="${uiEsc(a)}"
+            value="${uiEsc((vd.roles[r] || {})[a] || '')}" placeholder="الكل" class="${uiInputClass()} w-20 text-center"></td>`).join('') + '</tr>').join('');
+    return uiCard('📅 الفترة المسموح بالاطلاع عليها',
+        `<p class="text-[11px] font-bold text-slate-500 mb-2">اكتب عدد الأيام لكل دور في كل شاشة: مثلاً 3 = يشوف آخر 3 أيام لحد النهارده (يوم الشغل من 8 لـ 8). فاضي أو 0 = يشوف كل حاجة. المالك بيشوف كل حاجة دايمًا. بيتطبّق على طول، والموظف بيشوف شريط بالفترة من أول دخول جاي.</p>
+         <div class="overflow-x-auto"><table class="w-full text-right"><thead>${head}</thead><tbody>${body}</tbody></table></div>`,
+        uiBtn('حفظ', 'stfSaveViewDays()', 'green'));
+}
+
+async function stfSaveViewDays() {
+    const roles = Object.keys(stfState.viewDays?.roles || {});
+    for (const r of roles) {
+        const days = {};
+        document.querySelectorAll(`[data-view-role="${CSS.escape(r)}"]`).forEach(el => {
+            const n = parseInt(el.value, 10);
+            if (n > 0) days[el.dataset.viewArea] = n;
+        });
+        if (!(await uiCall('view_days_secure', { p_role: r, p_days: days }))) return;
+    }
+    showToast('تم حفظ الفترات، وبتتطبّق على طول.');
+    stfRenderPerms();
 }
 
 async function stfAddRole() {

@@ -384,6 +384,7 @@
                 if (res && res.ok && currentUser) {
                     currentUser.perms = res.perms || [];
                     currentUser.settings = { working_days_per_month: res.working_days_per_month, expense_manager_limit: res.expense_manager_limit };
+                    currentUser.view_days = res.view_days || {};
                 }
             } catch (err) {
                 console.error('Permissions load error:', err);
@@ -421,6 +422,7 @@
             });
             const activeEl = document.getElementById('view-' + targetTab + '-workspace');
             if (activeEl) activeEl.classList.remove('hidden');
+            if (typeof uiViewLimitNote === 'function') uiViewLimitNote(targetTab, activeEl);
             try { sessionStorage.setItem('motionpos_tab', targetTab); } catch (e) { /* private mode */ }
             document.querySelectorAll('.main-tab-btn').forEach(btn => {
                 const hidden = btn.classList.contains('hidden');

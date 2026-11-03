@@ -300,6 +300,7 @@ function canDo(perm) {
 
 function serverReasonMessage(res, fallback) {
     const reason = res && res.reason;
+    if (reason === 'view_limit') return `مسموح لك تشوف آخر ${res.days} ${Number(res.days) === 1 ? 'يوم' : 'أيام'} بس (من ${res.min_date}). اختار فترة أحدث`;
     if (reason === 'branch_shift_open' && res.staff) return `توجد وردية مفتوحة في هذا الفرع باسم ${res.staff}. يجب إغلاقها قبل فتح وردية جديدة`;
     return SERVER_REASON_MESSAGES[reason] || fallback || ('تعذر تنفيذ العملية' + (reason ? ` (${reason})` : ''));
 }
@@ -350,6 +351,23 @@ function uiDate(ts) {
     if (!ts) return '-';
     const d = new Date(ts);
     return d.toLocaleDateString('ar-EG') + ' ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+}
+
+// الفترة اللي الدور ده يقدر يشوفها في كل شاشة (المالك بيحددها من الموظفين ← الصلاحيات). السيرفر هو اللي بيطبّقها،
+// والشريط ده بس بيعرّف الموظف إن البيانات اللي قدامه محدودة.
+const VIEW_AREA_NAMES = { dashboard: 'لوحة التحكم', sales: 'المبيعات', reports: 'التقارير', purchase: 'المشتريات', expenses: 'المصروفات',
+    treasury: 'الخزينة', accounting: 'الحسابات', inventory: 'المخازن', staff: 'الموظفين', cost: 'الكوست كنترول' };
+function uiViewLimitNote(tab, el) {
+    if (!el) return;
+    let note = el.querySelector(':scope > .view-limit-note');
+    const days = Number(currentUser && currentUser.view_days ? currentUser.view_days[tab] : 0);
+    if (!days) { if (note) note.remove(); return; }
+    if (!note) {
+        note = document.createElement('div');
+        note.className = 'view-limit-note bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 text-xs font-black mb-3';
+        el.prepend(note);
+    }
+    note.textContent = `📅 مسموح لك تشوف آخر ${days} ${days === 1 ? 'يوم' : 'أيام'} بس (من ${uiToday(-(days - 1))} لحد النهارده). أي فترة أقدم مش هتظهر.`;
 }
 
 // "today" = the shop's business day: before the day start hour (settings > الشركة) it is still yesterday
