@@ -7,6 +7,7 @@ let kdsStation = 'kitchen';
 let kdsKnownIds = new Set();
 let kdsWarnMinutes = null;
 let kdsRush = null;
+let kdsLoadedStation = null;   // المكان اللي اتحمّل مرة: بعدها أي طلب جديد يعمل تنبيه (حتى لو المكان كان فاضي)
 const KDS_STATION_NAMES = { kitchen: 'المطبخ 👨‍🍳', bar: 'البار 🍹', shisha: 'الشيشة 💨' };
 
 function subscribeToKDSRealtime() {
@@ -19,7 +20,7 @@ function subscribeToKDSRealtime() {
     }, seconds * 1000);
 }
 
-function setKDSStation(st) { kdsStation = st; kdsKnownIds = new Set(); loadKDSOrders(); }
+function setKDSStation(st) { kdsStation = st; kdsKnownIds = new Set(); kdsLoadedStation = null; loadKDSOrders(); }
 
 function renderKDSStationTabs() {
     const box = document.getElementById('kds-station-tabs');
@@ -39,6 +40,36 @@ function kdsBeep() {
     } catch (e) { /* no sound */ }
 }
 
+// تنبيه طلب جديد: 3 صفارات + شريط كبير فوق الشاشة لحد ما حد يدوس عليه + اسم التبويب بينوّر
+let kdsTitleTimer = null;
+function kdsNewOrderAlert(fresh) {
+    [0, 450, 900].forEach(ms => setTimeout(kdsBeep, ms));
+    let bar = document.getElementById('kds-new-alert');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'kds-new-alert';
+        bar.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl bg-emerald-600 text-white rounded-2xl shadow-2xl p-4 cursor-pointer animate-pulse';
+        bar.setAttribute('dir', 'rtl');
+        bar.onclick = kdsDismissAlert;
+        document.body.appendChild(bar);
+    }
+    const lines = fresh.map(o => `<div class="text-sm font-black">${uiEsc(o.order_number || '')}${o.table_number ? ' - طاولة ' + uiEsc(o.table_number) : ' - ' + uiEsc(o.order_type === 'takeaway' ? 'تيك أواي' : o.order_type === 'delivery' ? 'توصيل' : 'استلام')}${o.waiter ? ' (' + uiEsc(o.waiter) + ')' : ''}</div>`).join('');
+    bar.innerHTML = `<div class="flex justify-between items-start gap-3"><div><div class="text-lg font-black">🔔 طلب جديد في ${uiEsc(KDS_STATION_NAMES[kdsStation] || kdsStation)}</div>${lines}</div>
+        <span class="text-xs font-black bg-white/20 rounded-lg px-2 py-1 whitespace-nowrap">تمام ✓</span></div>`;
+    bar.classList.remove('hidden');
+    const base = document.title.replace(/^🔔 .*? \| /, '');
+    let on = false;
+    clearInterval(kdsTitleTimer);
+    kdsTitleTimer = setInterval(() => { on = !on; document.title = on ? `🔔 طلب جديد | ${base}` : base; }, 1000);
+}
+
+function kdsDismissAlert() {
+    document.getElementById('kds-new-alert')?.classList.add('hidden');
+    clearInterval(kdsTitleTimer);
+    kdsTitleTimer = null;
+    document.title = document.title.replace(/^🔔 .*? \| /, '');
+}
+
 async function loadKDSOrders() {
     renderKDSStationTabs();
     if (!currentUser?.branch_id || !staffSessionToken) { kdsOrders = []; renderKDSCards(); return; }
@@ -46,11 +77,12 @@ async function loadKDSOrders() {
         const res = await serverRpc('kds_station_list_secure', { p_station: kdsStation });
         if (!res || !res.ok) return;
         const fresh = (res.orders || []).filter(o => !kdsKnownIds.has(o.id));
-        if (kdsKnownIds.size && fresh.length) kdsBeep();
+        if (kdsLoadedStation === kdsStation && fresh.length) kdsNewOrderAlert(fresh);
         kdsOrders = res.orders || [];
         kdsWarnMinutes = Number(res.warn_minutes) || null;
         kdsRush = res.rush || null;
         kdsKnownIds = new Set(kdsOrders.map(o => o.id));
+        kdsLoadedStation = kdsStation;
         renderKDSCards();
     } catch (err) {
         console.error('KDS Exception:', err);
