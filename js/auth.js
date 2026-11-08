@@ -16,6 +16,51 @@ function clearPin() {
     if (input) input.value = '';
 }
 
+// بصمة الحضور والانصراف لأي موظف برقمه السري، من أي جهاز (شاشة الدخول، أو زرار ⏱️ فوق وحد تاني داخل):
+// دخول مؤقت برقمه (تذكرة لوحدها) ← الحضور بيتسجل على حسابه هو ← التذكرة المؤقتة بتتقفل. اللي داخل على الجهاز مايتأثرش.
+async function attendanceByPin(pin) {
+    pin = String(pin || '').trim();
+    if (!/^[0-9]{4}$/.test(pin)) { showToast('الرقم السري 4 أرقام', 'error'); return false; }
+    let tok = null;
+    try {
+        const { data: lg, error } = await _supabase.rpc('staff_login', { p_pin: pin });
+        if (error || !lg) throw error || new Error('no_reply');
+        if (!lg.ok) {
+            showToast(lg.reason === 'locked' ? 'متوقف مؤقتًا بسبب محاولات خاطئة كثيرة. انتظر 10 دقائق'
+                : lg.reason === 'pin_duplicate' ? 'الرقم السري مكرر لأكثر من موظف. اتصل بالمالك لتغييره.' : 'الرقم السري غلط', 'error');
+            return false;
+        }
+        tok = lg.session_token;
+        const { data: res, error: e2 } = await _supabase.rpc('attendance_punch_secure', { p_token: tok, p_pin: pin });
+        if (e2 || !res) throw e2 || new Error('no_reply');
+        if (!res.ok) { showToast(serverReasonMessage(res, 'تعذر تسجيل الحضور'), 'error'); return false; }
+        showToast(`${res.name}: ${res.action === 'in' ? 'تم تسجيل الحضور ✅' : 'تم تسجيل الانصراف 👋'} ${uiDate(res.at)}`);
+        return true;
+    } catch (err) {
+        console.error('Attendance error:', err);
+        showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error');
+        return false;
+    } finally {
+        if (tok) { try { await _supabase.rpc('staff_logout', { p_token: tok }); } catch (e) { /* ignore */ } }
+    }
+}
+
+// من شاشة الدخول: يكتب رقمه ويدوس "حضور / انصراف" من غير ما يدخل البرنامج
+async function punchFromLogin() {
+    const input = document.getElementById('login-pin');
+    const pin = input ? input.value : '';
+    clearPin();
+    await attendanceByPin(pin);
+}
+
+// من الشريط اللي فوق: أي موظف يبصم على جهاز حد تاني داخل عليه (المطبخ، البار، الكاشير...)
+async function openAttendancePunch() {
+    const v = await uiForm('⏱️ تسجيل حضور / انصراف', [
+        { type: 'note', label: 'أي موظف يكتب رقمه السري هو: أول مرة في اليوم = حضور، والمرة اللي بعدها = انصراف. اللي داخل على الجهاز مش هيخرج.' },
+        { key: 'pin', label: 'الرقم السري', type: 'pin', required: true }], { ok: 'تسجيل' });
+    if (v) await attendanceByPin(v.pin);
+}
+
 async function loginWithPin() {
     const pinInput = document.getElementById('login-pin');
     if (!pinInput) return;

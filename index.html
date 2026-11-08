@@ -34,6 +34,7 @@
                 <button onclick="appendPin('0')" class="py-3.5 bg-slate-100 rounded-2xl font-black text-lg hover:bg-slate-200">0</button>
                 <button onclick="loginWithPin()" class="py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-xs hover:bg-blue-700 shadow-md">دخول</button>
             </div>
+            <button onclick="punchFromLogin()" class="w-full py-3 mb-4 bg-emerald-600 text-white rounded-2xl font-black text-sm hover:bg-emerald-700 shadow-md">⏱️ تسجيل حضور / انصراف</button>
             <div class="text-[10px] text-slate-400 font-bold bg-slate-50 p-2 rounded-xl border border-slate-100">أدخل رمز PIN الخاص بحساب الموظف المسجل في النظام</div>
         </div>
     </div>
@@ -144,6 +145,7 @@
             <div class="flex items-center gap-2">
                 <button id="waiter-bell" onclick="openWaiterFeed()" class="hidden fixed bottom-4 left-4 z-40 shadow-lg px-5 py-3 text-base lg:static lg:shadow-none lg:px-3 lg:py-1.5 lg:text-xs rounded-xl font-black bg-amber-100 text-amber-800 border border-amber-300">🔔 <span id="waiter-bell-count">0</span></button>
                 <span class="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl font-bold text-xs border border-blue-200" id="branch-badge">الفرع</span>
+                <button onclick="openAttendancePunch()" title="أي موظف يسجّل حضوره أو انصرافه برقمه" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200">⏱️ حضور</button>
                 <button onclick="logout()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">خروج 🚪</button>
             </div>
         </header>

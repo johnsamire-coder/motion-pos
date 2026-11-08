@@ -30,7 +30,7 @@ async function loadShiftScreen() {
     }
 
     const attendanceHtml = uiCard('الحضور والانصراف', `
-        <p class="text-xs font-bold text-slate-500 mb-2">الحضور يُسجَّل لـ <b class="text-slate-800">${uiEsc((currentUser && currentUser.name) || '')}</b> فقط (من فتح البرنامج الآن). اكتب رقمك السري: مرة للحضور ومرة للانصراف. يسجّل أي موظف آخر حضوره من حسابه.</p>
+        <p class="text-xs font-bold text-slate-500 mb-2">أي موظف يكتب رقمه السري هو: مرة للحضور ومرة للانصراف. الحضور بيتسجل على صاحب الرقم. (وممكن كمان من زرار ⏱️ حضور فوق، أو من شاشة الدخول)</p>
         <div class="flex gap-2 max-w-sm">
             <input id="attendance-pin" type="password" inputmode="numeric" maxlength="4" placeholder="الرقم السري" class="${uiInputClass()} flex-1 text-center">
             ${uiBtn('تسجيل', 'attendancePunch()', 'blue')}
@@ -173,9 +173,7 @@ async function attendancePunch() {
     const input = document.getElementById('attendance-pin');
     const pin = input ? input.value.trim() : '';
     if (input) input.value = '';
-    if (!/^[0-9]{4}$/.test(pin)) return showToast('الرقم السري 4 أرقام', 'error');
-    const res = await uiCall('attendance_punch_secure', { p_pin: pin });
-    if (res) showToast(`${res.name}: ${res.action === 'in' ? 'تم تسجيل الحضور ✅' : 'تم تسجيل الانصراف 👋'} ${uiDate(res.at)}`);
+    await attendanceByPin(pin);
 }
 
 // -----------------------------------------
