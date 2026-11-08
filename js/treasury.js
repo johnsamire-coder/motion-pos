@@ -173,7 +173,7 @@ async function attendancePunch() {
     const input = document.getElementById('attendance-pin');
     const pin = input ? input.value.trim() : '';
     if (input) input.value = '';
-    await attendanceByPin(pin);
+    attendanceScreen(pin);
 }
 
 // -----------------------------------------

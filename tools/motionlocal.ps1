@@ -71,8 +71,9 @@ $Files = [ordered]@{
   'supabase\migrations\036_branch_drawer_for_manager.sql'    = 'b7e4030fc9bd62d4'
   'supabase\migrations\037_business_day_everywhere.sql'      = 'dfd700b3740265fe'
   'supabase\migrations\038_view_period_per_role.sql'         = 'da9b8288a4afe62c'
+  'supabase\migrations\039_attendance_in_out_buttons.sql'     = 'c4a142e6fe2af900'
 }
-$LastVersion = '038'
+$LastVersion = '039'
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }

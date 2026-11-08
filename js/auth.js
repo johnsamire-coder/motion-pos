@@ -16,50 +16,118 @@ function clearPin() {
     if (input) input.value = '';
 }
 
-// بصمة الحضور والانصراف لأي موظف برقمه السري، من أي جهاز (شاشة الدخول، أو زرار ⏱️ فوق وحد تاني داخل):
-// دخول مؤقت برقمه (تذكرة لوحدها) ← الحضور بيتسجل على حسابه هو ← التذكرة المؤقتة بتتقفل. اللي داخل على الجهاز مايتأثرش.
-async function attendanceByPin(pin) {
+// شاشة الحضور والانصراف: أي موظف يكتب رقمه السري من أي جهاز (شاشة الدخول، أو زرار ⏱️ فوق وحد تاني داخل)،
+// تظهر باسمه وفيها زرارين: حضور وانصراف. المفتوح بس اللي ينفع: بعد الحضور، الحضور يتقفل والانصراف يتفتح.
+// بيتعمل دخول مؤقت برقمه (تذكرة لوحدها) وبيتقفل لما الشاشة تتقفل. اللي داخل على الجهاز مايتأثرش.
+let attState = { tok: null, pin: null, timer: null };
+
+function attModal() {
+    let m = document.getElementById('att-modal');
+    if (!m) {
+        m = document.createElement('div');
+        m.id = 'att-modal';
+        m.className = 'fixed inset-0 bg-slate-900/70 z-[60] flex items-center justify-center p-4';
+        m.setAttribute('dir', 'rtl');
+        document.body.appendChild(m);
+    }
+    m.classList.remove('hidden');
+    return m;
+}
+
+async function attClose() {
+    clearTimeout(attState.timer);
+    document.getElementById('att-modal')?.classList.add('hidden');
+    const tok = attState.tok;
+    attState = { tok: null, pin: null, timer: null };
+    if (tok) { try { await _supabase.rpc('staff_logout', { p_token: tok }); } catch (e) { /* ignore */ } }
+}
+
+// الخطوة 1: الرقم السري
+function attendanceScreen(pin) {
+    attClose();
+    if (pin && /^[0-9]{4}$/.test(String(pin))) return attOpenWithPin(String(pin));
+    const m = attModal();
+    m.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm text-center space-y-4">
+        <div class="text-3xl">⏱️</div><h3 class="font-black text-lg text-slate-800">الحضور والانصراف</h3>
+        <p class="text-xs font-bold text-slate-500">اكتب رقمك السري</p>
+        <input id="att-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="****"
+            class="w-full text-center text-3xl font-black tracking-widest bg-slate-50 border-2 border-slate-200 p-3 rounded-2xl focus:outline-none"
+            onkeydown="if (event.key === 'Enter') attOpenWithPin(this.value)">
+        <div class="flex gap-2"><button onclick="attOpenWithPin(document.getElementById('att-pin').value)" class="flex-1 bg-blue-600 text-white py-3 rounded-2xl font-black text-sm">متابعة</button>
+        <button onclick="attClose()" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold text-sm">إلغاء</button></div></div>`;
+    setTimeout(() => document.getElementById('att-pin')?.focus(), 50);
+}
+
+// الخطوة 2: دخول مؤقت برقمه، ونعرف هو حاضر ولا لأ
+async function attOpenWithPin(pin) {
     pin = String(pin || '').trim();
-    if (!/^[0-9]{4}$/.test(pin)) { showToast('الرقم السري 4 أرقام', 'error'); return false; }
-    let tok = null;
+    if (!/^[0-9]{4}$/.test(pin)) { showToast('الرقم السري 4 أرقام', 'error'); return; }
     try {
         const { data: lg, error } = await _supabase.rpc('staff_login', { p_pin: pin });
         if (error || !lg) throw error || new Error('no_reply');
         if (!lg.ok) {
             showToast(lg.reason === 'locked' ? 'متوقف مؤقتًا بسبب محاولات خاطئة كثيرة. انتظر 10 دقائق'
                 : lg.reason === 'pin_duplicate' ? 'الرقم السري مكرر لأكثر من موظف. اتصل بالمالك لتغييره.' : 'الرقم السري غلط', 'error');
-            return false;
+            const inp = document.getElementById('att-pin'); if (inp) { inp.value = ''; inp.focus(); }
+            return;
         }
-        tok = lg.session_token;
-        const { data: res, error: e2 } = await _supabase.rpc('attendance_punch_secure', { p_token: tok, p_pin: pin });
-        if (e2 || !res) throw e2 || new Error('no_reply');
-        if (!res.ok) { showToast(serverReasonMessage(res, 'تعذر تسجيل الحضور'), 'error'); return false; }
-        showToast(`${res.name}: ${res.action === 'in' ? 'تم تسجيل الحضور ✅' : 'تم تسجيل الانصراف 👋'} ${uiDate(res.at)}`);
-        return true;
+        attState.tok = lg.session_token;
+        attState.pin = pin;
+        const st = await attCall('status');
+        if (st) attRender(st);
     } catch (err) {
         console.error('Attendance error:', err);
         showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error');
-        return false;
-    } finally {
-        if (tok) { try { await _supabase.rpc('staff_logout', { p_token: tok }); } catch (e) { /* ignore */ } }
     }
 }
 
-// من شاشة الدخول: يكتب رقمه ويدوس "حضور / انصراف" من غير ما يدخل البرنامج
-async function punchFromLogin() {
+async function attCall(action) {
+    const { data: res, error } = await _supabase.rpc('attendance_action_secure', { p_token: attState.tok, p_pin: attState.pin, p_action: action });
+    if (error || !res) { showToast('حدث خطأ أثناء الاتصال بالسيرفر', 'error'); return null; }
+    if (!res.ok) {
+        const msg = { already_in: 'انت مسجل حضور بالفعل', not_in: 'انت مش مسجل حضور، سجّل حضور الأول' }[res.reason];
+        showToast(msg || serverReasonMessage(res, 'تعذر التسجيل'), 'error');
+        return null;
+    }
+    return res;
+}
+
+function attTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : ''; }
+
+// الشاشة: الاسم + الحالة + زرار حضور وزرار انصراف (اللي مايتنفعش بيبقى مقفول)
+function attRender(st, done) {
+    const m = attModal();
+    const open = !!st.open;
+    const btn = (label, action, on, color) => `<button ${on ? `onclick="attDo('${action}')"` : 'disabled'}
+        class="flex-1 py-6 rounded-2xl font-black text-xl ${on ? color + ' text-white shadow-lg' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}">${label}</button>`;
+    const status = open ? `<p class="text-sm font-black text-emerald-700 bg-emerald-50 rounded-xl py-2">🟢 حاضر من الساعة ${uiEsc(attTime(st.clock_in))}</p>`
+        : `<p class="text-sm font-black text-slate-500 bg-slate-50 rounded-xl py-2">⚪ مش مسجل حضور دلوقتي</p>`;
+    m.innerHTML = `<div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm text-center space-y-4">
+        <div class="text-3xl">⏱️</div><h3 class="font-black text-lg text-slate-800">أهلاً ${uiEsc(st.name || '')}</h3>
+        ${done ? `<p class="text-base font-black ${done.action === 'in' ? 'text-emerald-700' : 'text-red-700'}">${done.action === 'in' ? '✅ تم تسجيل الحضور' : '👋 تم تسجيل الانصراف'} الساعة ${uiEsc(attTime(done.at))}${done.minutes ? ` (${Math.floor(done.minutes / 60)} ساعة و ${done.minutes % 60} دقيقة)` : ''}</p>` : status}
+        <div class="flex gap-3">${btn('حضور', 'in', !open, 'bg-emerald-600 hover:bg-emerald-700')}${btn('انصراف', 'out', open, 'bg-red-600 hover:bg-red-700')}</div>
+        <button onclick="attClose()" class="w-full bg-slate-100 text-slate-600 py-2.5 rounded-2xl font-bold text-sm">${done ? 'تمام' : 'إغلاق'}</button></div>`;
+}
+
+async function attDo(action) {
+    const res = await attCall(action);
+    if (!res) { const st = await attCall('status'); if (st) attRender(st); return; }
+    showToast(`${res.name}: ${action === 'in' ? 'تم تسجيل الحضور ✅' : 'تم تسجيل الانصراف 👋'} ${attTime(res.at)}`);
+    attRender({ name: res.name, open: action === 'in', clock_in: action === 'in' ? res.at : null }, res);
+    clearTimeout(attState.timer);
+    attState.timer = setTimeout(attClose, 6000);
+}
+
+// من شاشة الدخول: لو كتب رقمه في الخانة بيفتح على اسمه على طول
+function punchFromLogin() {
     const input = document.getElementById('login-pin');
     const pin = input ? input.value : '';
     clearPin();
-    await attendanceByPin(pin);
+    attendanceScreen(pin);
 }
 
-// من الشريط اللي فوق: أي موظف يبصم على جهاز حد تاني داخل عليه (المطبخ، البار، الكاشير...)
-async function openAttendancePunch() {
-    const v = await uiForm('⏱️ تسجيل حضور / انصراف', [
-        { type: 'note', label: 'أي موظف يكتب رقمه السري هو: أول مرة في اليوم = حضور، والمرة اللي بعدها = انصراف. اللي داخل على الجهاز مش هيخرج.' },
-        { key: 'pin', label: 'الرقم السري', type: 'pin', required: true }], { ok: 'تسجيل' });
-    if (v) await attendanceByPin(v.pin);
-}
+// من الشريط اللي فوق: أي موظف على جهاز حد تاني داخل عليه
+function openAttendancePunch() { attendanceScreen(''); }
 
 async function loginWithPin() {
     const pinInput = document.getElementById('login-pin');
