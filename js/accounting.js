@@ -37,29 +37,79 @@ function renderAccounting() {
         customers: accCustomers, expense: accExpense }[accState.tab] || accJournal)();
 }
 
+// أزرار سريعة فوق دفتر القيود: نوع قيد، أو حساب بكوده (الحساب اللي مش في الدليل زرّاره مش بيظهر)
+const ACC_QUICK = [['type', 'sales', '🧾 المبيعات'], ['type', 'expense', '📤 المصروفات'], ['type', 'purchase', '🛒 المشتريات'],
+    ['acc', '1130', '👥 ذمم الموظفين'], ['acc', '1140', '🧰 عهد الموظفين'], ['acc', '1120', '🧑‍💼 العملاء (الآجل)'], ['acc', '2100', '🏭 الموردين'],
+    ['acc', '1100', '💰 الخزينة'], ['acc', '1101', '🗄️ درج الكاشير'], ['acc', '1110', '🏦 البنك']];
+
 async function accJournal() {
+    const f = accState.journalFilter || {};
+    accState.journalFilter = null;
     const body = document.getElementById('acc-body');
+    const quick = ACC_QUICK.filter(([k, v]) => k === 'type' || accState.accounts.some(a => String(a.code) === v))
+        .map(([k, v, l]) => `<button data-accq="${k}:${v}" onclick="accJournalQuick('${k}','${v}')" class="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-100 text-slate-700 hover:bg-slate-200">${uiEsc(l)}</button>`).join('');
     body.innerHTML = uiCard('دفتر القيود اليومية', `
-        <div class="flex flex-wrap gap-2 mb-3">${accRange('accj', uiToday(-30))}${accBranchSelect('accj-branch')}
+        <div class="flex flex-wrap gap-1.5 mb-3">${quick}<button onclick="accJournalQuick('', '')" class="px-3 py-1.5 rounded-xl text-xs font-black bg-white border text-slate-500">✕ الكل</button></div>
+        <div class="flex flex-wrap gap-2 mb-3">${accRange('accj', f.from || uiToday(-30))}${accBranchSelect('accj-branch')}
             <select id="accj-type" class="${uiInputClass()}"><option value="">كل الأنواع</option>${Object.entries(JE_TYPE_NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+            <input id="accj-code" type="text" inputmode="numeric" placeholder="كود الحساب" class="${uiInputClass()} w-24 text-center">
+            <select id="accj-account" class="${uiInputClass()} max-w-[220px]">${uiOptions(accState.accounts, 'id', a => `${a.code} - ${a.name}`, 'كل الحسابات')}</select>
             <input id="accj-search" type="text" placeholder="بحث بالوصف أو الرقم" class="${uiInputClass()}">${uiBtn('عرض', 'accJournalLoad()', 'gray')}</div>
         <div id="accj-table"></div><div id="accj-entry"></div>`);
+    if (f.from) document.getElementById('accj-from').value = f.from;
+    if (f.to) document.getElementById('accj-to').value = f.to;
+    const code = document.getElementById('accj-code'), sel = document.getElementById('accj-account');
+    code.oninput = () => { const a = accState.accounts.find(x => String(x.code) === code.value.trim()); sel.value = a ? a.id : ''; code.classList.toggle('border-red-400', !!code.value.trim() && !a); };
+    code.onkeydown = e => { if (e.key === 'Enter') accJournalLoad(); };
+    sel.onchange = () => { code.value = (accState.accounts.find(x => x.id === sel.value) || {}).code || ''; code.classList.remove('border-red-400'); };
+    if (f.code) { code.value = f.code; code.oninput(); }
     accJournalLoad();
 }
 
+function accJournalQuick(kind, val) {
+    const type = document.getElementById('accj-type'), code = document.getElementById('accj-code');
+    type.value = kind === 'type' ? val : '';
+    code.value = kind === 'acc' ? val : '';
+    code.oninput();
+    accJournalLoad();
+}
+
+// من الميزانية أو ميزان المراجعة: الضغط على حساب بيفتح قيوده
+function accOpenAccount(code, from, to) {
+    accState.journalFilter = { code: String(code), from, to };
+    setAccTab('journal');
+}
+
 async function accJournalLoad() {
+    const accId = document.getElementById('accj-account')?.value || null;
+    const acc = accState.accounts.find(a => a.id === accId);
+    const type = document.getElementById('accj-type').value || '';
+    document.querySelectorAll('[data-accq]').forEach(b => {
+        const on = b.dataset.accq === (acc ? 'acc:' + acc.code : type ? 'type:' + type : '');
+        b.className = 'px-3 py-1.5 rounded-xl text-xs font-black ' + (on ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200');
+    });
     const res = await uiCall('journal_list_secure', { p_from: document.getElementById('accj-from').value, p_to: document.getElementById('accj-to').value,
-        p_branch_id: document.getElementById('accj-branch')?.value || null, p_type: document.getElementById('accj-type').value || null,
-        p_search: document.getElementById('accj-search').value || null });
+        p_branch_id: document.getElementById('accj-branch')?.value || null, p_type: type || null,
+        p_search: document.getElementById('accj-search').value || null, p_account_id: accId });
     if (!res) return;
-    accState.lastJournal = { title: 'دفتر القيود اليومية', from: document.getElementById('accj-from').value, to: document.getElementById('accj-to').value, branch: '',
+    const entries = res.entries || [];
+    const title = 'دفتر القيود اليومية' + (acc ? ` - ${acc.code} ${acc.name}` : type ? ` - ${JE_TYPE_NAMES[type] || type}` : '');
+    const accCols = acc ? [{ key: 'account_debit', label: 'مدين الحساب', type: 'm' }, { key: 'account_credit', label: 'دائن الحساب', type: 'm' }] : [];
+    accState.lastJournal = { title, from: document.getElementById('accj-from').value, to: document.getElementById('accj-to').value, branch: '',
         columns: [{ key: 'entry_number', label: 'الرقم', type: 't' }, { key: 'entry_date', label: 'التاريخ', type: 't' }, { key: 'type', label: 'النوع', type: 't' },
-            { key: 'description', label: 'الوصف', type: 't' }, { key: 'total', label: 'المبلغ', type: 'm' }, { key: 'status', label: 'الحالة', type: 't' }],
-        rows: (res.entries || []).map(e => ({ ...e, type: JE_TYPE_NAMES[e.journal_type] || e.journal_type, status: e.status === 'reversed' ? 'معكوس' : 'مرحّل' })) };
+            { key: 'description', label: 'الوصف', type: 't' }, { key: 'total', label: 'المبلغ', type: 'm' }, ...accCols, { key: 'status', label: 'الحالة', type: 't' }],
+        rows: entries.map(e => ({ ...e, type: JE_TYPE_NAMES[e.journal_type] || e.journal_type, status: e.status === 'reversed' ? 'معكوس' : 'مرحّل' })) };
+    let sumHtml = '';
+    if (acc) {
+        const d = entries.reduce((s, e) => s + (Number(e.account_debit) || 0), 0), c = entries.reduce((s, e) => s + (Number(e.account_credit) || 0), 0);
+        sumHtml = `<p class="text-xs font-black mb-2 bg-blue-50 border border-blue-100 rounded-xl p-2">${uiEsc(acc.code + ' - ' + acc.name)} في الفترة دي: مدين ${formatCurrency(d)} | دائن ${formatCurrency(c)} | الصافي ${formatCurrency(d - c)}</p>`;
+    }
     document.getElementById('accj-table').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastJournal)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastJournal)', 'red')}</div>`
-        + uiTable(res.entries, [{ label: 'الرقم', key: 'entry_number' }, { label: 'التاريخ', key: 'entry_date' },
+        + sumHtml + uiTable(entries, [{ label: 'الرقم', key: 'entry_number' }, { label: 'التاريخ', key: 'entry_date' },
             { label: 'النوع', render: e => uiEsc(JE_TYPE_NAMES[e.journal_type] || e.journal_type) }, { label: 'الوصف', key: 'description' },
             { label: 'الفرع', key: 'branch' }, { label: 'المبلغ', render: e => formatCurrency(e.total) },
+            ...(acc ? [{ label: 'مدين الحساب', render: e => Number(e.account_debit) ? formatCurrency(e.account_debit) : '' },
+                       { label: 'دائن الحساب', render: e => Number(e.account_credit) ? formatCurrency(e.account_credit) : '' }] : []),
             { label: 'الحالة', render: e => e.status === 'reversed' ? '<span class="text-red-600">معكوس</span>' : 'مرحّل' },
             { label: '', render: e => uiBtn('تفاصيل', `accShowEntry('${e.id}')`, 'gray') }], 'لا توجد قيود');
 }
@@ -183,7 +233,9 @@ async function accBsLoad() {
     accState.lastBs = { title: 'الميزانية', from: res.as_of, to: res.as_of, branch: 'كل الفروع', columns: [{ key: 'code', label: 'الكود', type: 't' }, { key: 'name', label: 'البند', type: 't' }, { key: 'amount', label: 'المبلغ', type: 'm' }], rows, key: 'sales_compare' };
     document.getElementById('accb-body').innerHTML = `<p class="text-xs font-black mb-2 ${res.balanced ? 'text-emerald-600' : 'text-red-600'}">${res.balanced ? '✅ الميزانية متوازنة' : '❌ الميزانية غير متوازنة، راجع القيود'}</p>
         <div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastBs)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastBs)', 'red')}</div>`
-        + uiTable(rows, [{ label: 'الكود', render: r => uiEsc(r.code || '') }, { label: 'البند', render: r => r.bold ? `<b>${uiEsc(r.name)}</b>` : uiEsc(r.name) },
+        + '<p class="text-[11px] font-bold text-slate-500 mb-1">اضغط على أي حساب علشان تشوف قيوده.</p>'
+        + uiTable(rows, [{ label: 'الكود', render: r => uiEsc(r.code || '') },
+            { label: 'البند', render: r => r.bold ? `<b>${uiEsc(r.name)}</b>` : r.code ? `<button onclick="accOpenAccount('${uiEsc(r.code)}','${uiEsc(String(res.as_of).slice(0, 4))}-01-01','${uiEsc(res.as_of)}')" class="text-blue-700 hover:underline font-bold text-right">${uiEsc(r.name)}</button>` : uiEsc(r.name) },
             { label: 'المبلغ', render: r => r.bold ? `<b>${formatCurrency(r.amount)}</b>` : formatCurrency(r.amount) }]);
 }
 
@@ -224,7 +276,9 @@ async function accTbLoad() {
     const d = rows.reduce((s, r) => s + (Number(r.ending_debit) || 0), 0);
     const c = rows.reduce((s, r) => s + (Number(r.ending_credit) || 0), 0);
     document.getElementById('acct-body').innerHTML = `<div class="flex gap-2 mb-2">${uiBtn('📗 تصدير الإكسل', 'exportReportExcel(accState.lastTb)', 'green')}${uiBtn('🖨️ طباعة / حفظ PDF', 'printReportPdf(accState.lastTb)', 'red')}</div>`
-        + uiTable(rows, [{ label: 'الكود', key: 'account_code' }, { label: 'الحساب', key: 'account_name_ar' },
+        + '<p class="text-[11px] font-bold text-slate-500 mb-1">اضغط على أي حساب علشان تشوف قيوده في نفس الفترة.</p>'
+        + uiTable(rows, [{ label: 'الكود', key: 'account_code' },
+            { label: 'الحساب', render: r => `<button onclick="accOpenAccount('${uiEsc(r.account_code)}','${uiEsc(document.getElementById('acct-from').value)}','${uiEsc(document.getElementById('acct-to').value)}')" class="text-blue-700 hover:underline font-bold text-right">${uiEsc(r.account_name_ar)}</button>` },
             { label: 'مدين', render: r => Number(r.ending_debit) ? formatCurrency(r.ending_debit) : '' }, { label: 'دائن', render: r => Number(r.ending_credit) ? formatCurrency(r.ending_credit) : '' }])
         + `<p class="text-xs font-black mt-2 ${Math.abs(d - c) < 0.01 ? 'text-emerald-600' : 'text-red-600'}">مدين ${formatCurrency(d)} | دائن ${formatCurrency(c)}</p>`;
 }
