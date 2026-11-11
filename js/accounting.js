@@ -91,6 +91,7 @@ function accAccountOptions() {
 function accManual() {
     if (!accState.manualLines.length) accState.manualLines = [{ account_id: '', debit: '', credit: '', description: '' }, { account_id: '', debit: '', credit: '', description: '' }];
     const rows = accState.manualLines.map((l, i) => `<tr>
+        <td class="p-1"><input data-mlcode="${i}" type="text" inputmode="numeric" placeholder="الكود" value="${uiEsc((accState.accounts.find(a => a.id === l.account_id) || {}).code || '')}" class="${uiInputClass()} w-20 text-center"></td>
         <td class="p-1"><select data-ml="${i}" data-f="account_id" class="${uiInputClass()} w-full">${accAccountOptions()}</select></td>
         <td class="p-1"><input data-ml="${i}" data-f="debit" type="number" min="0" step="0.01" value="${uiEsc(l.debit)}" class="${uiInputClass()} w-28"></td>
         <td class="p-1"><input data-ml="${i}" data-f="credit" type="number" min="0" step="0.01" value="${uiEsc(l.credit)}" class="${uiInputClass()} w-28"></td>
@@ -99,13 +100,31 @@ function accManual() {
     document.getElementById('acc-body').innerHTML = uiCard('قيد يدوي (للمدير والمالك، ويجب أن يكون متوازنًا)', `
         <div class="flex flex-wrap gap-2 mb-3"><input id="accm-date" type="date" value="${uiToday()}" class="${uiInputClass()}">
             <input id="accm-desc" type="text" placeholder="وصف القيد (إجباري)" class="${uiInputClass()} flex-1">${accBranchSelect('accm-branch')}</div>
-        <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th>الحساب</th><th>مدين</th><th>دائن</th><th>البيان</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th>الكود</th><th>الحساب</th><th>مدين</th><th>دائن</th><th>البيان</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
         <p id="accm-totals" class="text-xs font-black my-2"></p>
         <div class="flex gap-2">${uiBtn('سطر جديد', 'accManualAdd()', 'gray')}${uiBtn('حفظ القيد', 'accManualSave()', 'blue')}</div>`);
     document.querySelectorAll('[data-ml]').forEach(el => {
         const l = accState.manualLines[el.dataset.ml];
         el.value = l[el.dataset.f] ?? '';
-        el.oninput = el.onchange = () => { l[el.dataset.f] = el.value; accManualTotals(); };
+        el.oninput = el.onchange = () => {
+            l[el.dataset.f] = el.value;
+            // اختار الحساب من القايمة: الكود بيتكتب لوحده
+            if (el.dataset.f === 'account_id') { const ci = document.querySelector(`[data-mlcode="${el.dataset.ml}"]`); if (ci) { ci.value = (accState.accounts.find(a => a.id === el.value) || {}).code || ''; ci.classList.remove('border-red-400'); } }
+            accManualTotals();
+        };
+    });
+    // كتب الكود: الحساب بيظهر لوحده (ولو الكود مش موجود الخانة بتحمر)
+    document.querySelectorAll('[data-mlcode]').forEach(ci => {
+        ci.oninput = () => {
+            const i = ci.dataset.mlcode, code = ci.value.trim();
+            const acc = accState.accounts.find(a => String(a.code) === code);
+            const sel = document.querySelector(`[data-ml="${i}"][data-f="account_id"]`);
+            accState.manualLines[i].account_id = acc ? acc.id : '';
+            if (sel) sel.value = acc ? acc.id : '';
+            ci.classList.toggle('border-red-400', !!code && !acc);
+            accManualTotals();
+        };
+        ci.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); document.querySelector(`[data-ml="${ci.dataset.mlcode}"][data-f="debit"]`)?.focus(); } };
     });
     accManualTotals();
 }

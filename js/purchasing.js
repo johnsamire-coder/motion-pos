@@ -54,6 +54,8 @@ function purOrderButtons(o) {
     if (o.status === 'draft' && !canDo('po_approve')) b.push('<span class="text-[11px] font-bold text-amber-700">بانتظار اعتماد المالك</span>');
     if (['partially_received', 'fully_received', 'closed'].includes(o.status) && Number(o.received_value) > Number(o.invoiced_value) && canDo('po_invoice')) b.push(uiBtn('فاتورة المورد', `purInvoice('${o.id}')`, 'amber'));
     if ((o.status === 'partially_received' || o.status === 'fully_received') && canDo('po_create')) b.push(uiBtn('إغلاق', `purAction('${o.id}','close')`, 'gray'));
+    if (['approved', 'partially_received'].includes(o.status) && (canDo('po_create') || canDo('po_approve'))
+        && (o.lines || []).some(l => Number(l.qty_received) < Number(l.quantity))) b.push(uiBtn('✂️ إلغاء أصناف', `purCancelLines('${o.id}')`, 'amber'));
     if ((o.status === 'draft' || o.status === 'approved') && canDo('po_create')) b.push(uiBtn('إلغاء', `purAction('${o.id}','cancel')`, 'gray'));
     return '<div class="flex flex-wrap gap-1">' + b.join('') + '</div>';
 }
@@ -67,15 +69,50 @@ async function purReview(id) {
         { label: 'سعر الوحدة', render: l => formatCurrency(l.unit_price) }, { label: 'الإجمالي', render: l => formatCurrency(l.total) }])
         + `<p class="text-sm font-black mt-2">الإجمالي: ${formatCurrency(o.total)} | المورد: ${uiEsc(o.supplier)} | المخزن: ${uiEsc(o.warehouse || '')}</p>`
         + (o.notes ? `<p class="text-[11px] text-slate-500 mt-1">ملاحظات: ${uiEsc(o.notes)}</p>` : '');
+    // كل صنف ليه علامة "ارفض الصنف ده": الموافقة بتمشي على الباقي بس
+    const dropFields = (o.lines || []).map((l, i) => ({ key: 'drop_' + i, type: 'check', label: `❌ ارفض: ${l.ingredient} (${Number(l.quantity)} ${l.unit || ''})` }));
     const v = await uiForm(`مراجعة أمر الشراء ${o.po_number || ''}`, [
         { type: 'note', html: table },
-        { key: 'decision', label: 'القرار', type: 'select', options: [['approve', 'موافقة ✅'], ['reject', 'رفض ❌']], value: 'approve', required: true },
-        { key: 'reason', label: 'سبب الرفض (لو رفض)', type: 'textarea', full: true },
+        ...(dropFields.length > 1 ? [{ type: 'note', label: 'لو عايز ترفض صنف أو أكتر وتوافق على الباقي: علّم عليه، واختار "موافقة"، واكتب السبب.' }, ...dropFields] : []),
+        { key: 'decision', label: 'القرار', type: 'select', options: [['approve', 'موافقة ✅'], ['reject', 'رفض الأمر كله ❌']], value: 'approve', required: true },
+        { key: 'reason', label: 'السبب (لرفض الأمر أو للأصناف المرفوضة)', type: 'textarea', full: true },
         { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }],
-        { ok: 'تنفيذ', validate: x => (x.decision === 'reject' && !String(x.reason || '').trim()) ? 'اكتب سبب الرفض' : null });
+        { ok: 'تنفيذ', validate: x => {
+            const dropped = dropFields.some(f => x[f.key]);
+            if ((x.decision === 'reject' || dropped) && !String(x.reason || '').trim()) return x.decision === 'reject' ? 'اكتب سبب الرفض' : 'اكتب سبب رفض الأصناف';
+            return null;
+        } });
     if (!v) return;
+    const dropIds = (o.lines || []).filter((l, i) => v['drop_' + i]).map(l => l.id);
+    if (v.decision === 'approve' && dropIds.length) {
+        // الأصناف كلها اترفضت = الأمر كله بيترفض
+        if (dropIds.length === (o.lines || []).length) {
+            if (await uiCall('po_action_secure', { p_po_id: id, p_action: 'reject', p_manager_pin: v.pin, p_reason: v.reason }, 'رفض أمر الشراء')) purRenderOrders();
+            return;
+        }
+        const cut = await uiCall('po_lines_cancel_secure', { p_po_id: id, p_line_ids: dropIds, p_reason: v.reason, p_manager_pin: v.pin });
+        if (!cut) return;
+    }
     if (await uiCall('po_action_secure', { p_po_id: id, p_action: v.decision, p_manager_pin: v.pin, p_reason: v.reason || null },
-        v.decision === 'approve' ? 'تمت الموافقة' : 'رفض أمر الشراء')) purRenderOrders();
+        v.decision === 'approve' ? (dropIds.length ? `تمت الموافقة بعد رفض ${dropIds.length} صنف` : 'تمت الموافقة') : 'رفض أمر الشراء')) purRenderOrders();
+}
+
+// بعد الموافقة: إلغاء صنف أو أكتر من الأمر (اللي اتستلم منه حاجة بيفضل باللي اتستلم بس)، والباقي يكمل عادي
+async function purCancelLines(id) {
+    const o = (purState.orders || []).find(x => x.id === id);
+    if (!o) return;
+    const open = (o.lines || []).filter(l => Number(l.qty_received) < Number(l.quantity));
+    const v = await uiForm(`إلغاء أصناف من أمر الشراء ${o.po_number || ''}`, [
+        { type: 'note', label: 'علّم على الأصناف اللي هتتلغي. اللي اتستلم منه جزء بيفضل بالكمية اللي اتستلمت بس. الباقي من الأمر بيكمل عادي.' },
+        ...open.map((l, i) => ({ key: 'drop_' + i, type: 'check', label: `${l.ingredient}: ${Number(l.quantity) - Number(l.qty_received)} ${l.unit || ''} لسه مااتستلمش` })),
+        { key: 'reason', label: 'السبب', type: 'textarea', full: true, required: true },
+        { key: 'pin', label: 'رقم المدير', type: 'pin', required: true }],
+        { ok: 'إلغاء الأصناف', danger: true, validate: x => open.some((l, i) => x['drop_' + i]) ? null : 'علّم على صنف واحد على الأقل' });
+    if (!v) return;
+    const ids = open.filter((l, i) => v['drop_' + i]).map(l => l.id);
+    const res = await uiCall('po_lines_cancel_secure', { p_po_id: id, p_line_ids: ids, p_reason: v.reason, p_manager_pin: v.pin },
+        `تم إلغاء ${ids.length} صنف`);
+    if (res) purRenderOrders();
 }
 
 async function purAction(id, action) {
