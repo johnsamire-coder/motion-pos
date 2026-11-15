@@ -106,6 +106,12 @@ async function serverRpc(name, params = {}) {
         if (String(error.message || '').includes('table_number_taken')) {
             throw new Error('توجد طاولة بنفس الرقم في هذه المنطقة');
         }
+        if (/demo_limit|demo_expired/.test(String(error.message || ''))) {
+            motionLicenseCheck();
+            throw new Error(String(error.message).includes('demo_expired')
+                ? 'انتهت مدة النسخة التجريبية، ومش هينفع تسجيل طلبات جديدة. للنسخة الكاملة تواصل مع Motion POS.'
+                : 'خلص عدد الطلبات المسموح في النسخة التجريبية. للنسخة الكاملة تواصل مع Motion POS.');
+        }
         if (String(error.message || '').includes('store_server_only')) {
             throw new Error('هذا الفرع يعمل من كمبيوتر المحل. فتح الوردية والطلبات وإغلاق اليوم تتم من المحل فقط.');
         }
@@ -707,3 +713,34 @@ function uiConfirm(message, okLabel = 'موافق', danger = false) {
 }
 
 const UI_BOX_OPTIONS = keys => keys.map(k => [k, UI_BOX_NAMES[k]]);
+
+// -----------------------------------------
+// النسخة التجريبية (043): لو قاعدة البيانات دي نسخة عرض، بتظهر علامة صغيرة تحت على الشمال بالمتبقي من الطلبات والأيام،
+// وكل ورقة بتتطبع بيتكتب عليها إنها نسخة تجريبية (print.js). النسخ العادية مابيظهرش فيها أي حاجة.
+// -----------------------------------------
+let motionLicense = null;
+async function motionLicenseCheck() {
+    try {
+        const { data, error } = await _supabase.rpc('motionpos_license_public');
+        if (error) return;   // قاعدة بيانات قبل 043: نسخة عادية
+        motionLicense = data && data.demo ? data : null;
+    } catch (e) { return; }
+    let el = document.getElementById('motion-demo-badge');
+    if (!motionLicense) { if (el) el.remove(); return; }
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'motion-demo-badge';
+        el.dir = 'rtl';
+        el.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:65;padding:6px 14px;border-radius:999px;font:900 12px Cairo,Tahoma,sans-serif;box-shadow:0 6px 18px rgba(15,23,42,.25);pointer-events:none;';
+        document.body.appendChild(el);
+    }
+    const L = motionLicense;
+    const parts = [];
+    if (L.orders_left !== null && L.orders_left !== undefined) parts.push(`متبقي ${L.orders_left} طلب`);
+    if (L.days_left !== null && L.days_left !== undefined) parts.push(`${L.days_left} يوم`);
+    el.textContent = L.ended ? '⛔ انتهت النسخة التجريبية' : `🧪 ${L.label || 'نسخة عرض تجريبية'}${parts.length ? ' · ' + parts.join(' · ') : ''}`;
+    el.style.background = L.ended ? '#dc2626' : '#f59e0b';
+    el.style.color = L.ended ? '#fff' : '#111827';
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', motionLicenseCheck); else motionLicenseCheck();
+setInterval(motionLicenseCheck, 5 * 60 * 1000);

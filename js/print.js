@@ -7,6 +7,12 @@ function appSet(section, key, fallback) {
     return (s[key] === undefined || s[key] === null) ? fallback : s[key];
 }
 
+// النسخة التجريبية: سطر على كل ورقة (فاتورة، مطبخ، تقرير) إنها مش للاستخدام الحقيقي
+function motionDemoPrintNote() {
+    if (typeof motionLicense === 'undefined' || !motionLicense) return '';
+    return '<div style="margin-top:8px;border:1px dashed #000;padding:4px;text-align:center;font-weight:bold;font-size:11px">*** نسخة تجريبية - غير صالحة كفاتورة ***</div>';
+}
+
 function printHtml(html, pageCss) {
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
@@ -15,7 +21,7 @@ function printHtml(html, pageCss) {
     doc.open();
     doc.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>
         * { box-sizing: border-box; } body { font-family: Tahoma, Arial, sans-serif; margin: 0; color: #000; }
-        table { width: 100%; border-collapse: collapse; } ${pageCss || ''}</style></head><body>${html}</body></html>`);
+        table { width: 100%; border-collapse: collapse; } ${pageCss || ''}</style></head><body>${html}${motionDemoPrintNote()}</body></html>`);
     doc.close();
     const go = () => { try { frame.contentWindow.focus(); frame.contentWindow.print(); } finally { setTimeout(() => frame.remove(), 2000); } };
     const imgs = [...doc.images];

@@ -1,5 +1,5 @@
 # Motion POS - shop server on this PC (database + API + screens), works on any Windows PC
-# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off|pause|resume|wipe|newclient [-Rebuild] [-Site client.vercel.app] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
+# Usage: powershell -ExecutionPolicy Bypass -File motionlocal.ps1 -Step setup|start|stop|status|update|cloud|sync|syncloop|compare|backup|run|autostart|autostart-off|pause|resume|wipe|newclient|newdemo [-Rebuild] [-Site client.vercel.app] [-Repo D:\SmartPOS] [-Root D:\MotionLocal]
 param([string]$Step = 'status', [switch]$Rebuild, [string]$Site = '', [string]$Repo = 'D:\SmartPOS', [string]$Root = 'D:\MotionLocal')
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -75,8 +75,10 @@ $Files = [ordered]@{
   'supabase\migrations\040_po_cancel_lines.sql'              = '28933695428cfcbc'
   'supabase\migrations\041_journal_by_account.sql'           = '19ad575bc23cfd68'
   'supabase\migrations\042_journal_number_fix.sql'           = 'eda2d79b97d941b5'
+  'supabase\migrations\043_demo_license.sql'                 = 'd2caacd15367be98'
 }
-$LastVersion = '042'
+$LastVersion = '043'
+$DemoData = @{ 'supabase\demo\demo_cafe_data.sql' = '93047a21b2c7a117' }
 
 function Ok($m)   { Write-Host "[OK]   $m" -ForegroundColor Green }
 function Info($m) { Write-Host "[..]   $m" -ForegroundColor Cyan }
@@ -560,7 +562,10 @@ server-port = $ApiPort
 }
 
 
-'newclient' {
+{ $_ -eq 'newclient' -or $_ -eq 'newdemo' } {
+  # newdemo = the same, but a DEMO copy for a reseller: no copy from the current cloud; the sample cafe from
+  # supabase\demo\demo_cafe_data.sql instead, a new owner PIN, and a limit (orders + days) that only the database owner can change.
+  $isDemo = ($Step -eq 'newdemo')
   # build a brand-new Supabase project for a client from the files 001..last, copy the starter setup
   # (company, branch, tables, warehouses, chart of accounts, roles, reasons, discounts, settings) from the current cloud,
   # make a new owner, and add the client site to config.js
@@ -572,21 +577,34 @@ server-port = $ApiPort
   git fetch -q origin
   if ((git rev-parse HEAD).Trim() -ne (git rev-parse origin/dev).Trim()) { Fail 'This PC and GitHub dev differ - update first' }
   foreach ($k in $Files.Keys) { if ((Get-Fp (Join-Path $Repo $k)) -ne $Files[$k]) { Fail "Fingerprint mismatch $k" } }
+  if ($isDemo) { foreach ($k in $DemoData.Keys) { if (-not (Test-Path (Join-Path $Repo $k)) -or (Get-Fp (Join-Path $Repo $k)) -ne $DemoData[$k]) { Fail "Fingerprint mismatch $k" } } }
   Ok "Repo clean and up to date, $($Files.Count) database files match"
   $cfg = Join-Path $Repo 'js\config.js'
   $cfgText = [IO.File]::ReadAllText($cfg, [Text.Encoding]::UTF8)
   $marker = '    // clients (added by tools\motionlocal.ps1 -Step newclient)'
   if (-not $cfgText.Contains($marker)) { Fail 'config.js has no clients line (old version)' }
 
+  if ($isDemo) {
+    Write-Host '--- Demo copy details (the sample cafe keeps its Arabic names; English is fine here) ---' -ForegroundColor Yellow
+    $owner = (Read-Host 'Name for the demo owner login (the reseller)').Trim()
+    $maxOrders = (Read-Host 'Order limit (example 300)').Trim()
+    $days = (Read-Host 'Days until the demo ends (example 60)').Trim()
+    if (-not $owner) { Fail 'Name cannot be empty' }
+    if ($maxOrders -notmatch '^\d{1,6}$' -or [int]$maxOrders -lt 1) { Fail 'Order limit must be a number like 300' }
+    if ($days -notmatch '^\d{1,4}$' -or [int]$days -lt 1) { Fail 'Days must be a number like 60' }
+    $company = 'demo'; $branch = 'demo'
+  } else {
   Write-Host '--- Client details (names can be changed later from Settings; English is fine) ---' -ForegroundColor Yellow
   $company = (Read-Host 'Client company name').Trim()
   $branch  = (Read-Host 'First branch name').Trim()
   $owner   = (Read-Host 'Owner name').Trim()
   if (-not $company -or -not $branch -or -not $owner) { Fail 'Names cannot be empty' }
+  }
   $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN, 4 digits (hidden)' -AsSecureString)))
   $p2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'Owner PIN again (hidden)' -AsSecureString)))
   if ($p1 -notmatch '^\d{4}$') { Fail 'PIN must be exactly 4 digits (the login keypad takes 4)' }
   if ($p1 -ne $p2) { Fail 'The two PINs are different' }
+  if ($isDemo -and @('2222','3333','3334','4444','4445','4446','5555') -contains $p1) { Fail 'That PIN belongs to a sample staff member - choose another' }
   $site = (Read-Host 'Client site address on Vercel (example: cafe-nour.vercel.app)').Trim().ToLower() -replace '^https?://', '' -replace '/.*$', ''
   if ($site -notmatch '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$') { Fail "Site address looks wrong: $site" }
   if ($cfgText.Contains("'$site': [")) { Fail "Site $site is already in config.js" }
@@ -643,6 +661,33 @@ server-port = $ApiPort
   if ($ver -ne $LastVersion) { Fail "Client project version is $ver, expected $LastVersion" }
   Ok "Client project built: version $ver"
 
+  if ($isDemo) {
+  # 2) demo: the sample cafe, the reseller's owner login, and the limit
+  $k = @($DemoData.Keys)[0]
+  Info 'Client project: loading the sample cafe (about 1,050 orders, takes a minute)'
+  if (-not (Remote-File $dst (Join-Path $Repo $k) (Join-Path $work 'demo_data.log'))) { Fail 'Loading the sample cafe failed. Reset the client project and run again.' }
+  $q = { param($v) "'" + $v.Replace("'", "''") + "'" }
+  $seed = @"
+begin;
+update public.staff s set name = $(& $q $owner), pin_hash = extensions.crypt('$p1', extensions.gen_salt('bf', 8)), is_active = true
+  from public.roles r where r.id = s.role_id and r.name = 'owner';
+select public.pos_license_set('demo', $([int]$maxOrders), $([int]$days), null);
+commit;
+"@
+  $sf = Join-Path $work 'seed.sql'; [IO.File]::WriteAllText($sf, $seed, $utf8)
+  $ok = Remote-File $dst $sf (Join-Path $work 'seed.log')
+  Remove-Item $sf -Force
+  if (-not $ok) { Fail 'Setting the demo owner and limit failed. Reset the client project and run again.' }
+  $chk = Remote-Val $dst ("select (select count(*) from public.orders) || ' sample orders, ' || (select count(*) from public.staff) || ' staff, owner PIN ' || " +
+         "(select case when count(*) = 1 then 'OK' else 'WRONG' end from public.staff s where s.pin_hash = extensions.crypt('$p1', s.pin_hash)) || ', limit ' || " +
+         "(select public.motionpos_license_public()->>'orders_left') || ' orders / ' || (select public.motionpos_license_public()->>'days_left') || ' days';")
+  Remove-Item (Join-Path $work 'q.sql') -Force -ErrorAction SilentlyContinue
+  if ($chk -notmatch 'owner PIN OK, limit \d+ orders / \d+ days$') { Fail "Demo check failed: $chk" }
+  Ok "Demo copy: $chk"
+  Info 'Sample staff PINs: manager 2222, cashiers 3333 3334, waiters 4444 4445 4446, storekeeper 5555'
+  $p1 = $null; $p2 = $null
+  } else {
+
   # 2) starter setup copied from the current cloud (same ids), owner only
   $tables = 'companies','brands','branches','branch_tax_settings','areas','tables','warehouses','accounts','cost_centers','cash_bank_accounts',
             'payment_method_account_mappings','fiscal_periods','roles','role_permissions','discounts','adjustment_reasons','cancel_reasons',
@@ -697,12 +742,13 @@ commit;
   if ($chk -notmatch 'owner PIN OK$') { Fail "Starter setup check failed: $chk" }
   Ok "Client starter setup: $chk"
   $p1 = $null; $p2 = $null
+  }
 
   # 3) the client site in config.js -> GitHub
   $line = "    '$site': ['https://$ref.supabase.co', '$key'],"
   [IO.File]::WriteAllText($cfg, $cfgText.Replace($marker, $line + "`r`n" + $marker), $utf8)
   git add -- js/config.js
-  git commit -q -m "New client site $site -> Supabase project $ref" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`nClaude-Session: https://claude.ai/code/session_015M3SkwKzgacJqnC6D7qAuH"
+  git commit -q -m "New $(if ($isDemo) { 'DEMO' } else { 'client' }) site $site -> Supabase project $ref" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`nClaude-Session: https://claude.ai/code/session_015M3SkwKzgacJqnC6D7qAuH"
   if ($LASTEXITCODE -ne 0) { Fail 'Commit failed' }
   git push -q origin dev; if ($LASTEXITCODE -ne 0) { Fail 'Push to dev failed' }
   git push -q origin dev:main; if ($LASTEXITCODE -ne 0) { Fail 'Push to main failed' }
@@ -719,7 +765,7 @@ commit;
          -Headers @{ apikey = $key; Authorization = "Bearer $key" } -ErrorAction Stop
   } catch { Fail "Client database does not answer with the anon key: $($_.Exception.Message)" }
   Ok "https://$site is live and its database answers (version $v)"
-  Write-Host 'NEWCLIENT DONE' -ForegroundColor Green
+  if ($isDemo) { Write-Host 'NEWDEMO DONE' -ForegroundColor Green } else { Write-Host 'NEWCLIENT DONE' -ForegroundColor Green }
 }
 
 default { Fail "Unknown step $Step" }
