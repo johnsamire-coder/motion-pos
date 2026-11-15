@@ -263,14 +263,26 @@ function purRenderNew() {
             ${uiSearchBox('pur-new-ing', '🔍 ابحث عن الخامة')}
             <select id="pur-new-ing" onchange="purIngChanged()" class="${uiInputClass()}">${uiOptions(purState.ingredients, 'id', i => `${i.name} (${i.unit})`, 'اختر الخامة')}</select>
             <span class="text-[11px] font-black text-slate-500 self-center">الكمية:</span><span id="pur-new-qty-box">${uiQtyPair('pur-new-qty', null, 'buy', '')}</span>
-            <span class="text-[11px] font-black text-slate-500 self-center">السعر:</span><span id="pur-new-price-box">${uiQtyPair('pur-new-price', null, 'buy', '', '', '', 'price')}</span>
+            <span class="text-[11px] font-black text-slate-500 self-center">سعر الوحدة (مش الإجمالي):</span><span id="pur-new-price-box">${uiQtyPair('pur-new-price', null, 'buy', '', '', '', 'price')}</span>
             ${uiBtn('إضافة', 'purAddLine()', 'gray')}
         </div>
+        <div id="pur-new-line-total" class="text-xs font-black text-blue-700 mb-2"></div>
         <div id="pur-last-price" class="text-[11px] font-bold text-slate-500 mb-2"></div>
         <div id="pur-new-lines"></div>
         <input id="pur-new-notes" type="text" placeholder="ملاحظات" class="${uiInputClass()} w-full mt-2">
         <div class="mt-3 flex flex-wrap gap-2">${uiBtn('حفظ كمسودة', 'purSubmitNew()', 'blue')}${uiBtn('🖨️ طباعة المسودة', 'purPrintDraft()', 'gray')}</div>`);
+    // وانت بتكتب: الكمية × سعر الوحدة = إجمالي السطر، علشان محدش يكتب الإجمالي مكان سعر الوحدة
+    document.getElementById('pur-body').oninput = purNewLineTotal;
     purRenderLines();
+}
+
+function purNewLineTotal() {
+    const box = document.getElementById('pur-new-line-total');
+    if (!box) return;
+    const ing = purIng(document.getElementById('pur-new-ing')?.value);
+    const qty = Number(document.getElementById('pur-new-qty')?.value), price = Number(document.getElementById('pur-new-price')?.value);
+    box.textContent = ing && qty > 0 && document.getElementById('pur-new-price')?.value !== ''
+        ? `إجمالي السطر: ${unitNum(qty)} ${ing.unit} × ${formatCurrency(price)} لل${ing.unit} = ${formatCurrency(qty * price)}` : '';
 }
 
 function purAddLine() {
@@ -286,6 +298,7 @@ function purAddLine() {
     ['pur-new-qty', 'pur-new-qty-alt', 'pur-new-price', 'pur-new-price-alt'].forEach(x => { const el = document.getElementById(x); if (el) el.value = ''; });
     document.getElementById('pur-new-ing-q').focus();
     const lp = document.getElementById('pur-last-price'); if (lp) lp.innerHTML = '';
+    purNewLineTotal();
     purRenderLines();
 }
 
