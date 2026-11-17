@@ -37,7 +37,11 @@ async function purRenderOrders() {
     const res = await uiCall('po_list_secure', {});
     if (!res) return;
     purState.orders = res.orders || [];
-    document.getElementById('pur-body').innerHTML = uiCard('أوامر الشراء (آخر 180 يوم)', uiTable(res.orders, [
+    // المرفوض والملغي مايتمسحش (علشان يفضل معروف مين عمله وليه اترفض)، بس بيستخبى من القايمة إلا لو طلبته
+    const cancelled = purState.orders.filter(o => o.status === 'cancelled').length;
+    const shown = purState.showCancelled ? purState.orders : purState.orders.filter(o => o.status !== 'cancelled');
+    const toggle = cancelled ? `<label class="flex items-center gap-2 text-xs font-black mb-2"><input type="checkbox" ${purState.showCancelled ? 'checked' : ''} onchange="purState.showCancelled = this.checked; purRenderOrders()" class="w-4 h-4"> اعرض المرفوض والملغي (${cancelled})</label>` : '';
+    document.getElementById('pur-body').innerHTML = uiCard('أوامر الشراء (آخر 180 يوم)', toggle + uiTable(shown, [
         { label: 'الرقم', key: 'po_number' }, { label: 'التاريخ', render: o => uiEsc(uiDate(o.created_at)) },
         { label: 'المورد', key: 'supplier' }, { label: 'المخزن', key: 'warehouse' },
         { label: 'الحالة', render: o => uiEsc(PUR_STATUS[o.status] || o.status) },
