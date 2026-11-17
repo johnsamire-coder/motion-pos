@@ -385,15 +385,127 @@ async function set2PrintQr() {
 }
 
 // ---------------------------------------------------------------- recipes and ingredients
+// ---------------------------------------------------------------- الخامات: مراجعة الوحدات والعبوات، تصحيح الوحدة، الدمج
+const SET2_WEIGHT_UNITS = ['كيلو', 'لتر'];
+const SET2_SMALL_UNITS = ['جرام', 'مللي'];
+const SET2_PACK_WORDS = ['كيس', 'علبة', 'كرتون', 'بورش', 'زجاجة', 'ازازة', 'جالون', 'باكيت', 'شوال', 'جركن'];
+
+// اسم من غير الفروق اللي بتعمل تكرار: المسافات، أ/ا، ى/ي، ة/ه، ء
+function set2NormName(s) { return String(s || '').replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[ءؤئ]/g, '').replace(/\s+/g, ''); }
+function set2Lev1(a, b) {   // الفرق بين اسمين حرف واحد أو أقل
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0, j = 0, diff = 0;
+    while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) { i++; j++; continue; }
+        if (++diff > 1) return false;
+        if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+    return diff + (a.length - i) + (b.length - j) <= 1;
+}
+
+// ملاحظات على تعريف الخامة: الحاجات اللي شكلها غلط
+function set2IngFlags(i, all) {
+    const f = [];
+    const ps = Number(i.pack_size) || 0, cost = Number(i.cost_per_unit) || 0;
+    if (i.pack_unit && SET2_WEIGHT_UNITS.includes(i.unit) && ps >= 50) f.push(`ال${i.pack_unit} = ${unitNum(ps)} ${i.unit}؟ رقم كبير أوي. لو ده بال${i.unit === 'كيلو' ? 'جرام' : 'مللي'} يبقى المفروض ${unitNum(ps / 1000)}`);
+    if (i.pack_unit && SET2_SMALL_UNITS.includes(i.unit) && ps > 0 && ps < 5) f.push(`ال${i.pack_unit} فيه ${unitNum(ps)} ${i.unit} بس؟`);
+    if (SET2_SMALL_UNITS.includes(i.unit) && cost > 20) f.push(`تكلفة ال${i.unit} ${formatCurrency(cost)} كتير. يمكن الوحدة ${i.unit === 'جرام' ? 'كيلو' : 'لتر'}`);
+    const big = (i.used_in || []).filter(r => SET2_WEIGHT_UNITS.includes(i.unit) && Number(r.qty) >= 3);
+    if (big.length) f.push(`الوصفة بتاخد ${unitNum(big[0].qty)} ${i.unit} في "${big[0].product}". يمكن قصدك ${i.unit === 'كيلو' ? 'جرام' : 'مللي'}`);
+    const word = SET2_PACK_WORDS.find(w => String(i.name).includes(w));
+    if (word && [...SET2_WEIGHT_UNITS, ...SET2_SMALL_UNITS].includes(i.unit) && !i.pack_unit) f.push(`الاسم فيه "${word}" والوحدة ${i.unit}. راجع الوحدة`);
+    if (Number(i.stock) < 0) f.push(`الرصيد بالسالب (${unitNum(i.stock)} ${i.unit})${Number(i.came_in) ? '' : '، ومفيش أي حاجة دخلت'}`);
+    const n = set2NormName(i.name);
+    const dups = (all || []).filter(x => x.id !== i.id && n.length >= 3 && set2Lev1(n, set2NormName(x.name)));
+    if (dups.length) f.push(`ممكن تكون نفس: ${dups.map(x => x.name).join('، ')}`);
+    return f;
+}
+
 async function set2RenderRecipes() {
     const box = document.getElementById('set-section-recipes');
     if (!box) return;
-    const ings = set2.data.ingredients || [];
+    const rev = await uiCall('ingredients_review_secure', {});
+    set2.review = (rev && rev.items) || [];
+    const all = set2.review;
+    const isOwner = String(currentUser?.roles?.name || '') === 'owner';
+    const onlyFlags = !!set2.onlyFlags;
+    const rows = all.map(i => ({ ...i, flags: set2IngFlags(i, all) })).filter(i => !onlyFlags || i.flags.length);
+    const flagged = all.filter(i => set2IngFlags(i, all).length).length;
     box.innerHTML = uiCard('الوصفات', `<p class="text-xs font-bold text-slate-600">أصبحت الوصفات داخل كل صنف في <button onclick="switchSettingsSection('menu')" class="text-blue-700 underline font-black">القائمة والوصفات 🍽️</button>: افتح الصنف، وأضف الخامات والكميات، ويمكنك إنشاء خامة جديدة من نفس المكان.</p>`)
-        + uiCard('الخامات', uiTable(ings, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
-            { label: 'عبوة الشراء', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
-            { label: 'التكلفة (من المشتريات)', render: i => formatCurrency(i.cost_per_unit) }, { label: 'الحد الأدنى', key: 'min_stock_alert' },
-            { label: '', render: i => uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray') }], 'لا توجد خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
+        + uiCard('الخامات', `
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-2 text-[11px] font-bold text-amber-900 mb-2 leading-5">
+              الوحدة = اللي الوصفة والمخزن بيتحسبوا بيها (كيلو، لتر، قطعة...). العبوة = اللي بتشتري بيها وجواها كام وحدة (جالون = 2.5 لتر، كرتونة = 24 قطعة).
+              ${flagged ? `<b>⚠️ فيه ${flagged} خامة شكل تعريفها غلط.</b>` : '✅ مفيش ملاحظات.'} ${isOwner ? 'صلّحها من 🔧 تصحيح الوحدة (بيحوّل الوصفات والرصيد والمشتريات معاها)، والمتكرر من 🔗 دمج.' : 'التصحيح والدمج للمالك.'}</div>
+            <label class="flex items-center gap-2 text-xs font-black mb-2"><input type="checkbox" ${onlyFlags ? 'checked' : ''} onchange="set2.onlyFlags = this.checked; set2RenderRecipes()" class="w-4 h-4"> اعرض اللي فيها ملاحظات بس</label>`
+            + uiTable(rows, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
+                { label: 'عبوة الشراء', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
+                { label: 'التكلفة', render: i => `${formatCurrency(i.cost_per_unit)} لل${uiEsc(i.unit)}` },
+                { label: 'الرصيد', render: i => `<span class="${Number(i.stock) < 0 ? 'text-red-600' : ''}">${unitNum(i.stock)}</span>` },
+                { label: 'في وصفات', render: i => (i.used_in || []).length ? `<span title="${uiEsc((i.used_in || []).map(r => r.product + ': ' + unitNum(r.qty) + ' ' + i.unit).join('\n'))}" class="underline decoration-dotted cursor-help">${(i.used_in || []).length} صنف</span>` : '<span class="text-slate-400">-</span>' },
+                { label: 'ملاحظات', render: i => i.flags.length ? `<div class="text-[11px] font-bold text-amber-800 space-y-0.5">${i.flags.map(x => '⚠️ ' + uiEsc(x)).join('<br>')}</div>` : '' },
+                { label: '', render: i => `<div class="flex flex-wrap gap-1">${uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray')}${isOwner ? uiBtn('🔧 تصحيح الوحدة', `set2FixUnit('${i.id}')`, 'amber') + uiBtn('🔗 دمج', `set2MergeIng('${i.id}')`, 'gray') : ''}</div>` }],
+                'لا توجد خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
+}
+
+function set2UnitsList() {
+    const saved = appSet('inventory', 'units', []) || [];
+    const used = (set2.review || set2.data.ingredients || []).map(x => x.unit).filter(Boolean);
+    return [...new Set([...SET2_DEFAULT_UNITS, ...saved, ...used])];
+}
+
+// تصحيح الوحدة: كل الكميات بتتحول معاها (الكمية × المعامل، وسعر الوحدة ÷ المعامل، فالقيمة بالجنيه زي ما هي)
+async function set2FixUnit(id) {
+    const i = (set2.review || []).find(x => x.id === id);
+    if (!i) return;
+    const now = `دلوقتي: الوحدة <b>${uiEsc(i.unit)}</b>${unitPack(i) ? `، والعبوة <b>${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}</b>` : ''}، الرصيد <b>${unitNum(i.stock)} ${uiEsc(i.unit)}</b>، التكلفة <b>${formatCurrency(i.cost_per_unit)}</b> لل${uiEsc(i.unit)}، في <b>${(i.used_in || []).length}</b> وصفة${(i.used_in || []).length ? ` (مثلاً ${uiEsc(i.used_in[0].product)}: ${unitNum(i.used_in[0].qty)} ${uiEsc(i.unit)})` : ''}.`;
+    const v = await uiForm(`🔧 تصحيح وحدة: ${i.name}`, [
+        { type: 'note', html: now },
+        { type: 'note', html: `<b>أمثلة:</b><br>• كانت <b>كيلو</b> وعايزها <b>جرام</b>: الوحدة جرام، والمعامل <b>1000</b>.<br>• العدد صح بس اسم الوحدة غلط (100 "كيلو" هما 100 قطعة): الوحدة قطعة، والمعامل <b>1</b>.<br>• الجالون اتسجل 2500 كيلو بدل 2.5 والاستلام دخل غلط، لكن الوصفات صح: الوحدة كيلو، والمعامل <b>0.001</b>، وشيل علامة "الوصفات"، والعبوة جالون = 2.5.` },
+        { key: 'unit', label: 'الوحدة الصح', type: 'select', options: set2UnitsList().map(u => [u, u]), value: i.unit, addNew: 'وحدة جديدة', required: true },
+        { key: 'factor', label: `كل 1 ${i.unit} قديم = كام من الوحدة الصح؟`, type: 'number', min: 0, value: 1, required: true },
+        { key: 'convert_recipes', label: 'حوّل الوصفات والإضافات', type: 'check', value: true },
+        { key: 'convert_stock', label: 'حوّل الرصيد والمشتريات والاستلامات والتكلفة', type: 'check', value: true },
+        { key: 'pack_unit', label: 'اسم العبوة (اختياري)', value: i.pack_unit || '', list: SET2_PACK_UNITS, placeholder: 'مثلاً جالون' },
+        { key: 'pack_size', label: 'العبوة فيها كام من الوحدة الصح؟', type: 'number', min: 0, value: i.pack_size || '' },
+        { key: 'reason', label: 'السبب', required: true, full: true }],
+        { ok: 'التالي', validate: x => {
+            if (!(Number(x.factor) > 0)) return { key: 'factor', msg: 'المعامل لازم يكون أكبر من صفر' };
+            if (Number(x.factor) !== 1 && !x.convert_recipes && !x.convert_stock) return { key: 'factor', msg: 'اختار هتحوّل إيه' };
+            if (x.pack_unit && !(Number(x.pack_size) > 0)) return { key: 'pack_size', msg: 'اكتب العبوة فيها كام' };
+            if (x.pack_unit && x.pack_unit === x.unit) return { key: 'pack_unit', msg: 'العبوة لازم تختلف عن الوحدة' };
+            return null;
+        } });
+    if (!v) return;
+    const fct = Number(v.factor);
+    const lines = [`الوحدة: ${i.unit} ← ${v.unit}`];
+    if (fct !== 1 && v.convert_stock) lines.push(`الرصيد: ${unitNum(i.stock)} ${i.unit} ← ${unitNum(i.stock * fct)} ${v.unit}`, `التكلفة: ${formatCurrency(i.cost_per_unit)} ← ${formatCurrency(i.cost_per_unit / fct)} لل${v.unit}`);
+    if (fct !== 1 && v.convert_recipes && (i.used_in || []).length) lines.push(`الوصفات: مثلاً ${i.used_in[0].product}: ${unitNum(i.used_in[0].qty)} ← ${unitNum(i.used_in[0].qty * fct)} ${v.unit}`);
+    lines.push(v.pack_unit ? `العبوة: ${v.pack_unit} = ${unitNum(v.pack_size)} ${v.unit}` : 'من غير عبوة');
+    if (!(await uiConfirm('هيحصل كده:\n\n' + lines.join('\n') + '\n\nتنفيذ؟', 'تنفيذ التصحيح'))) return;
+    if (await uiCall('ingredient_fix_unit_secure', { p_data: { ingredient_id: id, unit: v.unit, factor: fct, convert_recipes: !!v.convert_recipes,
+        convert_stock: !!v.convert_stock, pack_unit: v.pack_unit || '', pack_size: v.pack_unit ? Number(v.pack_size) : null, reason: v.reason } }, 'تم التصحيح ✅')) initSettings2();
+}
+
+// دمج خامة متكررة في خامة تانية: كل حاجتها بتتنقل، وهي بتتشال
+async function set2MergeIng(id) {
+    const all = set2.review || [];
+    const i = all.find(x => x.id === id);
+    if (!i) return;
+    const n = set2NormName(i.name);
+    const others = all.filter(x => x.id !== id).sort((a, b) => (set2Lev1(n, set2NormName(b.name)) ? 1 : 0) - (set2Lev1(n, set2NormName(a.name)) ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'ar'));
+    const v = await uiForm(`🔗 دمج: ${i.name}`, [
+        { type: 'note', html: `<b>${uiEsc(i.name)}</b> (${uiEsc(i.unit)}، الرصيد ${unitNum(i.stock)}، في ${(i.used_in || []).length} وصفة) هيتشال، وكل حاجته تتنقل على الخامة اللي هتختارها: الوصفات (لو نفس الصنف فيه الاتنين الكميات بتتجمع)، والرصيد، والحركات، والمشتريات، وأسعار الموردين.` },
+        { key: 'into', label: 'ادمجها في', type: 'select', options: others.map(x => [x.id, `${x.name} (${x.unit})`]), placeholder: 'اختار الخامة اللي هتفضل', required: true },
+        { key: 'factor', label: `كل 1 ${i.unit} من "${i.name}" = كام من وحدة الخامة اللي هتفضل؟ (نفس الوحدة = 1، كيلو ← جرام = 1000)`, type: 'number', min: 0, value: 1, required: true },
+        { key: 'reason', label: 'السبب', value: 'خامة متكررة', required: true, full: true }],
+        { ok: 'التالي', validate: x => Number(x.factor) > 0 ? null : { key: 'factor', msg: 'المعامل لازم يكون أكبر من صفر' } });
+    if (!v) return;
+    const into = all.find(x => x.id === v.into);
+    if (!into) return;
+    if (into.unit !== i.unit && Number(v.factor) === 1 && !(await uiConfirm(`الوحدتين مختلفتين (${i.unit} و ${into.unit}) والمعامل 1. متأكد إن 1 ${i.unit} = 1 ${into.unit}؟`, 'أيوه متأكد'))) return;
+    if (!(await uiConfirm(`"${i.name}" هتتشال، وكل حاجتها تتنقل على "${into.name}".\nالرصيد بعد الدمج: ${unitNum(Number(into.stock) + Number(i.stock) * Number(v.factor))} ${into.unit}\n\nتنفيذ؟`, 'دمج'))) return;
+    if (await uiCall('ingredient_merge_secure', { p_data: { from_id: id, into_id: v.into, factor: Number(v.factor), reason: v.reason } }, 'تم الدمج ✅')) initSettings2();
 }
 
 async function set2RecipeLoad(productId) {
@@ -440,7 +552,9 @@ async function set2EditIngredient(id) {
         { key: 'min', label: 'الحد الأدنى للتنبيه', type: 'number', min: 0, value: i.min_stock_alert ?? appSet('inventory', 'default_min_stock', 5), required: true },
         { type: 'note', html: '📦 <b>العبوة (اختياري):</b> إذا كنت تشتري الخامة بعبوة (جالون، كرتونة، شوال...) فاكتب اسمها وعدد الوحدات داخلها. بعد ذلك في الشراء والاستلام والجرد تكتب بالعبوة ويحسب النظام الوحدات تلقائيًا. مثال: الوحدة لتر، العبوة جالون، وداخلها 3 (أو المكتوب على الجالون).' },
         { key: 'pack_unit', label: 'اسم العبوة', value: i.pack_unit || '', list: SET2_PACK_UNITS, placeholder: 'مثلاً جالون' },
-        { key: 'pack_size', label: 'عدد الوحدات في العبوة', type: 'number', min: 0, value: i.pack_size || '', placeholder: 'مثلاً 3' }];
+        { key: 'pack_size', label: 'العبوة فيها كام من الوحدة؟ (بنفس الوحدة اللي فوق، مش بالجرام)', type: 'number', min: 0, value: i.pack_size || '', placeholder: 'مثلاً 3' }];
+    const rv = id ? (set2.review || []).find(x => x.id === id) : null;
+    if (rv && ((rv.used_in || []).length || Number(rv.came_in) || Number(rv.went_out))) fields.splice(2, 0, { type: 'note', html: '🔒 الخامة دي مستخدمة، فتغيير الوحدة من هنا مش هيحوّل الكميات. لو الوحدة غلط استخدم <b>🔧 تصحيح الوحدة</b> من الجدول.' });
     if (!id) fields.push({ key: 'cost', label: 'تكلفة الوحدة المبدئية', type: 'money', min: 0, value: 0, help: 'تُحسب تلقائيًا لاحقًا من المشتريات' });
     const v = await uiForm(id ? 'تعديل خامة' : 'خامة جديدة', fields, { validate: x => {
         if (x.pack_unit && !(Number(x.pack_size) > 0)) return { key: 'pack_size', msg: 'اكتب عدد الوحدات في العبوة' };
@@ -450,6 +564,9 @@ async function set2EditIngredient(id) {
         return dup ? { key: 'name', msg: 'هذه الخامة موجودة من قبل' } : null;
     } });
     if (!v) return;
+    // عبوة رقمها غريب (جالون = 2500 كيلو): نسأل قبل الحفظ
+    const odd = v.pack_unit ? set2IngFlags({ name: v.name, unit: v.unit, pack_unit: v.pack_unit, pack_size: v.pack_size, used_in: [], stock: 0 }, []) : [];
+    if (odd.length && !(await uiConfirm(`${v.pack_unit} = ${unitNum(v.pack_size)} ${v.unit}\n\n⚠️ ${odd.join('\n⚠️ ')}\n\nمتأكد؟`, 'أيوه متأكد'))) return;
     if (v.unit_new && !saved.includes(v.unit)) {
         try { await serverRpc('app_settings_save_secure', { p_section: 'inventory', p_data: { units: [...saved, v.unit].slice(-40) } }); } catch (err) { console.warn('unit not saved', err); }
         if (typeof loadAppSettings === 'function') loadAppSettings();
