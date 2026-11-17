@@ -438,14 +438,25 @@ async function set2RenderRecipes() {
               الوحدة = اللي الوصفة والمخزن بيتحسبوا بيها (كيلو، لتر، قطعة...). العبوة = اللي بتشتري بيها وجواها كام وحدة (جالون = 2.5 لتر، كرتونة = 24 قطعة).
               ${flagged ? `<b>⚠️ فيه ${flagged} خامة شكل تعريفها غلط.</b>` : '✅ مفيش ملاحظات.'} ${isOwner ? 'صلّحها من 🔧 تصحيح الوحدة (بيحوّل الوصفات والرصيد والمشتريات معاها)، والمتكرر من 🔗 دمج.' : 'التصحيح والدمج للمالك.'}</div>
             <label class="flex items-center gap-2 text-xs font-black mb-2"><input type="checkbox" ${onlyFlags ? 'checked' : ''} onchange="set2.onlyFlags = this.checked; set2RenderRecipes()" class="w-4 h-4"> اعرض اللي فيها ملاحظات بس</label>`
-            + uiTable(rows, [{ label: 'الخامة', key: 'name' }, { label: 'الوحدة', key: 'unit' },
+            + uiTable(rows, [{ label: 'الخامة', render: i => uiEsc(i.name) + (i.is_supply ? ' <span class="text-[10px] font-black bg-teal-100 text-teal-800 rounded px-1.5 py-0.5">🧰 مستلزمات</span>' : '') }, { label: 'الوحدة', key: 'unit' },
                 { label: 'عبوة الشراء', render: i => unitPack(i) ? `${uiEsc(i.pack_unit)} = ${unitNum(i.pack_size)} ${uiEsc(i.unit)}` : '<span class="text-slate-400">-</span>' },
                 { label: 'التكلفة', render: i => `${formatCurrency(i.cost_per_unit)} لل${uiEsc(i.unit)}` },
                 { label: 'الرصيد', render: i => `<span class="${Number(i.stock) < 0 ? 'text-red-600' : ''}">${unitNum(i.stock)}</span>` },
                 { label: 'في وصفات', render: i => (i.used_in || []).length ? `<span title="${uiEsc((i.used_in || []).map(r => r.product + ': ' + unitNum(r.qty) + ' ' + i.unit).join('\n'))}" class="underline decoration-dotted cursor-help">${(i.used_in || []).length} صنف</span>` : '<span class="text-slate-400">-</span>' },
                 { label: 'ملاحظات', render: i => i.flags.length ? `<div class="text-[11px] font-bold text-amber-800 space-y-0.5">${i.flags.map(x => '⚠️ ' + uiEsc(x)).join('<br>')}</div>` : '' },
-                { label: '', render: i => `<div class="flex flex-wrap gap-1">${uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray')}${isOwner ? uiBtn('🔧 تصحيح الوحدة', `set2FixUnit('${i.id}')`, 'amber') + uiBtn('🔗 دمج', `set2MergeIng('${i.id}')`, 'gray') : ''}</div>` }],
+                { label: '', render: i => `<div class="flex flex-wrap gap-1">${uiBtn('تعديل', `set2EditIngredient('${i.id}')`, 'gray')}${isOwner ? uiBtn('🔧 تصحيح الوحدة', `set2FixUnit('${i.id}')`, 'amber') + uiBtn('🔗 دمج', `set2MergeIng('${i.id}')`, 'gray') + uiBtn(i.is_supply ? '🧰 شيلها من المستلزمات' : '🧰 مستلزمات تشغيل', `set2ToggleSupply('${i.id}')`, 'gray') : ''}</div>` }],
                 'لا توجد خامات'), uiBtn('إضافة خامة', 'set2EditIngredient(null)', 'blue'));
+}
+
+// مستلزمات تشغيل (مناديل، جوانتيات...): قيمتها في 1210 مش 1200، وبتتصرف مصروف من المخازن ← صرف مستلزمات
+async function set2ToggleSupply(id) {
+    const i = (set2.review || []).find(x => x.id === id);
+    if (!i) return;
+    const to = !i.is_supply;
+    const val = Math.max(0, Number(i.stock) || 0) * (Number(i.cost_per_unit) || 0);
+    if (!(await uiConfirm(to ? `"${i.name}" تبقى مستلزمات تشغيل؟\n\nقيمتها هتتحسب في "مخزون مستلزمات تشغيل" (1210) مش مخزون الأكل، وتتصرف من المخازن ← 🧰 صرف مستلزمات كمصروف.${val > 0 ? `\nرصيدها الحالي (${formatCurrency(val)}) هيتنقل لـ 1210.` : ''}`
+        : `"${i.name}" ترجع خامة عادية؟${val > 0 ? `\nرصيدها (${formatCurrency(val)}) هيرجع لمخزون 1200.` : ''}`, to ? 'أيوه مستلزمات' : 'ترجع عادية'))) return;
+    if (await uiCall('ingredient_supply_secure', { p_ingredient_id: id, p_is_supply: to }, 'تم ✅')) set2RenderRecipes();
 }
 
 function set2UnitsList() {

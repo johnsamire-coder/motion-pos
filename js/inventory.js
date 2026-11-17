@@ -11,7 +11,7 @@ async function loadInventoryScreen() {
     if (!root) return;
     const [wh, ing] = await Promise.all([
         uiCall('inv_warehouses_secure', {}),
-        _supabase.from('ingredients').select('id, name, unit, pack_unit, pack_size, cost_per_unit').order('name')
+        _supabase.from('ingredients').select('id, name, unit, pack_unit, pack_size, cost_per_unit, is_supply').order('name')
     ]);
     if (!wh) return;
     invState.warehouses = wh.warehouses || [];
@@ -31,10 +31,10 @@ function renderInventoryBody() {
         + mine.map(w => `<option value="${uiEsc(w.id)}" ${w.id === invState.warehouseId ? 'selected' : ''}>${uiEsc(w.name)}${w.branch_name ? ' - ' + uiEsc(w.branch_name) : ''}</option>`).join('')
         + '</select>';
     const tabs = uiTabs('inv', [['stock', 'الأرصدة'], ['buy', '🛒 مطلوب للشراء'], ['ledger', 'دفتر الحركات'], ['waste', 'تسجيل هالك'], ['count', 'جرد (أعمى)'],
-        ['variance', 'المفروض والفعلي'], ['transfers', 'التحويلات']], invState.tab, 'setInventoryTab');
+        ['variance', 'المفروض والفعلي'], ['transfers', 'التحويلات'], ['supplies', '🧰 صرف مستلزمات']], invState.tab, 'setInventoryTab');
     root.innerHTML = `<div class="flex flex-wrap items-center gap-3 mb-2"><span class="text-xs font-black">المخزن:</span>${whSelect}</div>${tabs}<div id="inv-body"></div>`;
     const loaders = { stock: invRenderStock, buy: invRenderBuy, ledger: invRenderLedger, waste: invRenderWaste, count: invRenderCount,
-        variance: invRenderVariance, transfers: invRenderTransfers };
+        variance: invRenderVariance, transfers: invRenderTransfers, supplies: invRenderSupplies };
     (loaders[invState.tab] || invRenderStock)();
 }
 
@@ -312,4 +312,65 @@ function invBuyPrint() {
         <table border="1" cellpadding="6" style="font-size:13px"><tr><th>#</th><th>الخامة</th><th>الوحدة</th><th>الرصيد</th><th>الكمية المطلوبة</th><th>السعر</th><th>ملاحظات</th></tr>
         ${chosen.map((x, i) => `<tr><td>${i + 1}</td><td>${uiEsc(x.name)}</td><td>${uiEsc(x.unit)}</td><td>${x.reason === 'none' ? 'غير موجودة' : uiEsc(Number(x.quantity))}</td>
             <td>${x.want ? uiQtyText(x.want, invIng(x.ingredient_id)).replace(/<[^>]+>/g, '') : ''}</td><td></td><td></td></tr>`).join('')}</table>`, '@page { size: A4; margin: 12mm; } body { font-size: 13px; }');
+}
+
+// ---------------------------------------------------------------- صرف مستلزمات التشغيل (مناديل، جوانتيات، منظفات...)
+// بيتخصم من المخزن ويتسجل مصروف مستلزمات تشغيل (6810). الخامات اللي متعلّمة "مستلزمات" بس (من الإعدادات ← الخامات).
+async function invRenderSupplies() {
+    const body = document.getElementById('inv-body');
+    if (!invState.warehouseId) { body.innerHTML = '<p class="text-xs font-bold text-slate-400">لا يوجد مخزن متاح</p>'; return; }
+    const supplies = invState.ingredients.filter(i => i.is_supply);
+    invState.supplyLines = invState.supplyLines || [];
+    const form = !canDo('inv_waste') ? '' : uiCard('🧰 صرف مستلزمات تشغيل', supplies.length ? `
+        <p class="text-[11px] font-bold text-slate-500 mb-2">اللي اتصرف للاستخدام (مناديل للترابيزات، جوانتيات، منظفات...) بيتخصم من المخزن ويتسجل <b>مصروف مستلزمات تشغيل</b>.</p>
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+            <select id="inv-sup-ing" onchange="uiPairMount('inv-sup-box', 'inv-sup-qty', invIng(this.value), 'use')" class="${uiInputClass()}">${uiOptions(supplies, 'id', i => `${i.name} (${i.unit})`, 'اختر المستلزم')}</select>
+            <span id="inv-sup-box">${uiQtyPair('inv-sup-qty', null, 'use', '')}</span>${uiBtn('إضافة', 'invSupplyAdd()', 'gray')}</div>
+        ${uiTable(invState.supplyLines, [{ label: 'المستلزم', render: l => uiEsc((invIng(l.ingredient_id) || {}).name || '') },
+            { label: 'الكمية', render: l => uiQtyText(l.qty, invIng(l.ingredient_id) || {}) },
+            { label: 'القيمة تقريبًا', render: l => formatCurrency(l.qty * Number((invIng(l.ingredient_id) || {}).cost_per_unit || 0)) },
+            { label: '', render: (l, i) => uiBtn('✕', `invSupplyRemove('${l.ingredient_id}')`, 'gray') }], 'لسه مفيش')}
+        <input id="inv-sup-notes" type="text" placeholder="ملاحظات (مثلاً: وردية الصبح)" class="${uiInputClass()} w-full mt-2">
+        <div class="mt-2">${uiBtn('تسجيل الصرف', 'invSupplySubmit()', 'blue')}</div>`
+        : '<p class="text-xs font-bold text-slate-500">مفيش خامات متعلّمة "مستلزمات تشغيل". علّمها من الإعدادات ← الوصفات والخامات (زرار 🧰).</p>');
+    body.innerHTML = form + uiCard('المستلزمات اللي اتصرفت', `<div class="flex flex-wrap gap-2 mb-2">
+            <input id="inv-sup-from" type="date" value="${uiEsc(invState.supFrom || uiToday().slice(0, 8) + '01')}" class="${uiInputClass()}">
+            <input id="inv-sup-to" type="date" value="${uiEsc(invState.supTo || uiToday())}" class="${uiInputClass()}">${uiBtn('عرض', 'invSupplyLoad()', 'gray')}</div>
+        <div id="inv-sup-list"></div>`);
+    invSupplyLoad();
+}
+
+function invSupplyAdd() {
+    const ing = document.getElementById('inv-sup-ing')?.value;
+    const qty = Number(document.getElementById('inv-sup-qty')?.value);
+    if (!ing || !(qty > 0)) return showToast('اختار المستلزم واكتب الكمية', 'error');
+    const ex = invState.supplyLines.find(l => l.ingredient_id === ing);
+    if (ex) ex.qty += qty; else invState.supplyLines.push({ ingredient_id: ing, qty });
+    invRenderSupplies();
+}
+
+function invSupplyRemove(id) { invState.supplyLines = invState.supplyLines.filter(l => l.ingredient_id !== id); invRenderSupplies(); }
+
+async function invSupplySubmit() {
+    if (!invState.supplyLines.length) return showToast('ضيف مستلزم واحد على الأقل', 'error');
+    const res = await uiCall('inv_supply_use_secure', { p_warehouse_id: invState.warehouseId,
+        p_lines: invState.supplyLines.map(l => ({ ingredient_id: l.ingredient_id, qty: l.qty })),
+        p_notes: document.getElementById('inv-sup-notes')?.value || '' });
+    if (!res) return;
+    showToast(`✅ اتسجل الصرف (${formatCurrency(res.value)} مصروف مستلزمات تشغيل)`);
+    invState.supplyLines = [];
+    invRenderSupplies();
+}
+
+async function invSupplyLoad() {
+    invState.supFrom = document.getElementById('inv-sup-from')?.value; invState.supTo = document.getElementById('inv-sup-to')?.value;
+    const res = await uiCall('inv_supply_uses_secure', { p_warehouse_id: invState.warehouseId, p_from: invState.supFrom || null, p_to: invState.supTo || null });
+    const box = document.getElementById('inv-sup-list');
+    if (!res || !box) return;
+    const total = (res.items || []).reduce((s, x) => s + Number(x.value || 0), 0);
+    box.innerHTML = `<p class="text-xs font-black mb-2">من ${uiEsc(res.from)} لـ ${uiEsc(res.to)}: إجمالي ${formatCurrency(total)}</p>`
+        + uiTable(res.items, [{ label: 'المستلزم', key: 'name' }, { label: 'الكمية', render: x => `${unitNum(x.qty)} ${uiEsc(x.unit)}` }, { label: 'القيمة', render: x => formatCurrency(x.value) }], 'مفيش صرف في الفترة دي')
+        + ((res.moves || []).length ? `<h4 class="font-black text-xs mt-3 mb-1">بالتفصيل</h4>` + uiTable(res.moves, [{ label: 'الوقت', render: x => uiEsc(uiDate(x.at)) },
+            { label: 'المستلزم', key: 'name' }, { label: 'الكمية', render: x => `${unitNum(x.qty)} ${uiEsc(x.unit)}` }, { label: 'القيمة', render: x => formatCurrency(x.value) },
+            { label: 'بواسطة', key: 'by' }, { label: 'ملاحظات', key: 'notes' }]) : '');
 }
