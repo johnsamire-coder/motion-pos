@@ -1,4 +1,4 @@
--- 042_ingredient_units_merge.sql
+-- 043_ingredient_units_merge.sql
 -- Items set up with wrong units / packs (a spice bag "1 gram", a gallon "2500 kg", sugar sticks "100 kg" instead of
 -- 100 pieces) and the same item twice (جوافه / جوافة ...). The owner gets two tools, and the item screen a review:
 --   * ingredient_fix_unit_secure: new unit and pack; "1 old unit = factor new units" converts recipes / extras and/or
@@ -7,7 +7,7 @@
 --   * ingredients_review_secure: every item with its stock, what came in / went out and the recipes using it.
 -- Unit costs and recipe quantities keep 6 decimals now (cost per gram). The unit of an item already used can no longer
 -- be changed by the plain edit (it would not convert anything): settings2_secure copied from 027 with only that check.
--- Rules: begin/commit, preflight (needs 041), version bump to 042, grants loop, rolled-back self-test.
+-- Rules: begin/commit, preflight (needs 042), version bump to 043, grants loop, rolled-back self-test.
 
 begin;
 
@@ -16,8 +16,8 @@ begin
   if length('إكراميات') <> 8 then
     raise exception 'file_encoding_broken: read the file as UTF-8';
   end if;
-  if public.motionpos_version_public() not in ('041', '042') then
-    raise exception 'schema_preflight_failed: run 041 first';
+  if public.motionpos_version_public() not in ('042', '043') then
+    raise exception 'schema_preflight_failed: run 042 first';
   end if;
 end;
 $preflight$;
@@ -361,7 +361,7 @@ begin
       returning id into v_id;
     else
       -- the unit of an item already used (recipes, extras, stock moves) changes only through ingredient_fix_unit_secure,
-      -- which converts every quantity with it (042)
+      -- which converts every quantity with it (043)
       if exists (select 1 from public.ingredients i where i.id = v_id and i.unit is distinct from left(btrim(d->>'unit'), 20))
          and (exists (select 1 from public.recipes r where r.ingredient_id = v_id)
               or exists (select 1 from public.modifiers m where m.ingredient_id = v_id)
@@ -463,7 +463,7 @@ returns text
 language sql
 immutable
 as $$
-  select '042'
+  select '043'
 $$;
 
 do $grants$
@@ -501,17 +501,17 @@ declare
 begin
   begin
     perform set_config('motionpos.sync_apply', 'on', true);
-    insert into public.companies (name) values ('selftest042') returning id into v_co;
-    insert into public.branches (name) values ('selftest042') returning id into v_br;
-    insert into public.warehouses (name) values ('selftest042') returning id into v_wh;
+    insert into public.companies (name) values ('selftest043') returning id into v_co;
+    insert into public.branches (name) values ('selftest043') returning id into v_br;
+    insert into public.warehouses (name) values ('selftest043') returning id into v_wh;
     insert into public.staff (name, company_id, branch_id, is_active, pin_hash, role_id)
-    values ('selftest042', v_co, v_br, true, extensions.crypt('4742', extensions.gen_salt('bf')), (select id from public.roles where name = 'owner' limit 1));
-    v_tok := public.staff_login('4742')->>'session_token';
-    insert into public.categories (name) values ('selftest042') returning id into v_cat;
-    insert into public.products (name, price, category_id) values ('st042 a', 10, v_cat) returning id into v_p1;
-    insert into public.products (name, price, category_id) values ('st042 b', 10, v_cat) returning id into v_p2;
+    values ('selftest043', v_co, v_br, true, extensions.crypt('4743', extensions.gen_salt('bf')), (select id from public.roles where name = 'owner' limit 1));
+    v_tok := public.staff_login('4743')->>'session_token';
+    insert into public.categories (name) values ('selftest043') returning id into v_cat;
+    insert into public.products (name, price, category_id) values ('st043 a', 10, v_cat) returning id into v_p1;
+    insert into public.products (name, price, category_id) values ('st043 b', 10, v_cat) returning id into v_p2;
     -- a gallon set up as "2500 kg": 1 gallon received = 2500 kg at 0.04 (100 a gallon); the recipe uses 0.02 kg (right)
-    insert into public.ingredients (name, unit, pack_unit, pack_size, cost_per_unit) values ('st042 syrup', 'kg', 'gallon', 2500, 0.04) returning id into v_a;
+    insert into public.ingredients (name, unit, pack_unit, pack_size, cost_per_unit) values ('st043 syrup', 'kg', 'gallon', 2500, 0.04) returning id into v_a;
     insert into public.recipes (product_id, ingredient_id, quantity_required) values (v_p1, v_a, 0.02);
     insert into public.stock_movements (warehouse_id, ingredient_id, movement_type, quantity, unit_cost, total_cost)
     values (v_wh, v_a, 'purchase', 2500, 0.04, 100);
@@ -532,7 +532,7 @@ begin
       raise exception 'SELFTEST kg to g';
     end if;
     -- merge a duplicate (in kg) into it: recipe of the same product added, stock added, the duplicate gone
-    insert into public.ingredients (name, unit, cost_per_unit) values ('st042 syrup 2', 'kg', 50) returning id into v_b;
+    insert into public.ingredients (name, unit, cost_per_unit) values ('st043 syrup 2', 'kg', 50) returning id into v_b;
     insert into public.recipes (product_id, ingredient_id, quantity_required) values (v_p1, v_b, 0.01), (v_p2, v_b, 0.005);
     insert into public.warehouse_stock (warehouse_id, ingredient_id, quantity) values (v_wh, v_b, 1);
     v_res := public.ingredient_merge_secure(v_tok, jsonb_build_object('from_id', v_b, 'into_id', v_a, 'factor', 1000, 'reason', 'selftest'));
@@ -545,11 +545,11 @@ begin
       raise exception 'SELFTEST merge values';
     end if;
     -- the plain edit can no longer change the unit of a used item
-    v_res := public.settings2_secure(v_tok, 'save_ingredient', jsonb_build_object('id', v_a, 'name', 'st042 syrup', 'unit', 'kg'));
+    v_res := public.settings2_secure(v_tok, 'save_ingredient', jsonb_build_object('id', v_a, 'name', 'st043 syrup', 'unit', 'kg'));
     if v_res->>'reason' is distinct from 'ingredient_unit_locked' then raise exception 'SELFTEST unit lock %', v_res; end if;
     if jsonb_typeof(public.ingredients_review_secure(v_tok)->'items') <> 'array' then raise exception 'SELFTEST review'; end if;
-    if public.motionpos_version_public() <> '042' then raise exception 'SELFTEST version'; end if;
-    raise notice 'MOTIONPOS-042-SELFTEST-OK';
+    if public.motionpos_version_public() <> '043' then raise exception 'SELFTEST version'; end if;
+    raise notice 'MOTIONPOS-043-SELFTEST-OK';
     raise exception using errcode = 'P0099', message = 'selftest_rollback';
   exception when sqlstate 'P0099' then
     null;
