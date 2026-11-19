@@ -28,10 +28,10 @@ function renderStaffBody() {
     if (!root) return;
     const isOwner = String(currentUser?.roles?.name || '') === 'owner';
     const tabs = [['list', 'الموظفين'], ['attendance', 'الحضور'], ['payroll', 'المرتبات'], ['performance', 'الأداء']];
-    if (isOwner) tabs.push(['perms', 'الصلاحيات'], ['settings', 'إعدادات الشغل']);
+    if (isOwner) tabs.push(['perms', 'الصلاحيات'], ['settings', 'إعدادات الشغل'], ['audit', '🕵️ سجل العمليات']);
     root.innerHTML = uiTabs('stf', tabs, stfState.tab, 'setStaffTab') + '<div id="stf-body"></div>';
     ({ list: stfRenderList, attendance: stfRenderAttendance, payroll: stfRenderPayroll, performance: stfRenderPerformance,
-        perms: stfRenderPerms, settings: stfRenderSettings }[stfState.tab] || stfRenderList)();
+        perms: stfRenderPerms, settings: stfRenderSettings, audit: stfRenderAudit }[stfState.tab] || stfRenderList)();
 }
 
 async function stfRenderList() {
@@ -291,4 +291,79 @@ async function stfSaveSettings() {
     if (!a) return;
     const b = await uiCall('pos_setting_save_secure', { p_key: 'expense_manager_limit', p_value: String(limit) });
     if (b) showToast('تم الحفظ');
+}
+
+// ---------------------------------------------------------------- سجل العمليات (للمالك): مين عمل إيه وإمتى، ومن كام لكام
+const AUDIT_TABLES = { staff_sessions: 'الدخول والخروج', orders: 'الطلبات', order_items: 'أصناف الطلبات', payments: 'المدفوعات', order_splits: 'تقسيم الحساب', hospitality_orders: 'الضيافة',
+    qr_orders: 'طلبات QR', products: 'أصناف المنيو', categories: 'أقسام المنيو', recipes: 'الوصفات', modifiers: 'الإضافات', modifier_groups: 'مجموعات الإضافات',
+    product_modifier_groups: 'ربط الإضافات', ingredients: 'الخامات', discounts: 'الخصومات', cancel_reasons: 'أسباب الإلغاء', tables: 'الطاولات', areas: 'المناطق',
+    branches: 'الفروع', warehouses: 'المخازن', staff: 'الموظفين', roles: 'الأدوار', role_permissions: 'الصلاحيات', app_settings: 'الإعدادات',
+    pos_settings: 'إعدادات الشغل', branch_tax_settings: 'الضرائب', suppliers: 'الموردين', purchase_orders: 'أوامر الشراء', purchase_order_items: 'أصناف أوامر الشراء',
+    goods_receipts: 'الاستلامات', supplier_invoices: 'فواتير الموردين', supplier_payments: 'مدفوعات الموردين', expenses: 'المصروفات', expense_categories: 'بنود المصروفات',
+    expense_recurring: 'المصروفات المتكررة', custody_ledger: 'العهد', customers: 'العملاء', customer_ledger: 'حسابات العملاء', customer_followups: 'متابعات العملاء',
+    customer_feedback: 'الشكاوى', journal_entries: 'القيود', accounts: 'دليل الحسابات', fiscal_periods: 'الفترات', pos_shifts: 'الورديات', pos_cash_moves: 'حركات الدرج',
+    pos_days: 'إغلاق اليوم', waste_logs: 'الهالك', stock_takes: 'الجرد', inv_counts: 'الجرد', inv_transfers: 'التحويلات', staff_attendance: 'الحضور',
+    staff_ledger: 'حسابات الموظفين', payroll_runs: 'المرتبات', payroll_lines: 'سطور المرتبات', tip_payouts: 'الإكراميات', companies: 'الشركة',
+    cash_bank_accounts: 'الخزن والبنوك', payment_method_account_mappings: 'ربط طرق الدفع' };
+const AUDIT_ACTIONS = { insert: ['➕ إضافة', 'text-emerald-700'], update: ['✏️ تعديل', 'text-blue-700'], delete: ['🗑️ حذف', 'text-red-700'] };
+const AUDIT_FIELDS = { name: 'الاسم', name_ar: 'الاسم', price: 'السعر', status: 'الحالة', quantity: 'الكمية', total_amount: 'الإجمالي', unit_price: 'سعر الوحدة',
+    is_available: 'متاح', is_active: 'نشط', amount: 'المبلغ', notes: 'ملاحظات', item_notes: 'ملاحظة', discount_amount: 'الخصم', payment_method: 'طريقة الدفع',
+    role_id: 'الدور', cost_per_unit: 'التكلفة', unit: 'الوحدة', pack_unit: 'العبوة', pack_size: 'حجم العبوة', data: 'الإعدادات', quantity_required: 'كمية الوصفة',
+    pin_hash: 'الرقم السري', table_id: 'الطاولة', waiter_id: 'الويتر', customer_id: 'العميل', closed_at: 'وقت الإغلاق', reason: 'السبب', description: 'الوصف',
+    value: 'القيمة', phone: 'التليفون', monthly_salary: 'المرتب', show_in_menu: 'يظهر في المنيو', category_id: 'القسم', min_stock_alert: 'الحد الأدنى',
+    vat_enabled: 'الضريبة', service_enabled: 'الخدمة', guest_count: 'عدد الضيوف', counted_cash: 'المعدود', difference: 'الفرق', perm: 'الصلاحية', is_supply: 'مستلزمات', reorder_point: 'حد إعادة الطلب', max_stock_level: 'أقصى رصيد' };
+const AUDIT_SKIP = ['id', 'created_at', 'updated_at', 'company_id', 'brand_id', 'branch_id', 'stock_quantity', 'expires_at', 'revoked_at', 'token_hash'];
+
+function stfAuditVal(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    if (v === true) return 'نعم'; if (v === false) return 'لا';
+    if (typeof v === 'object') return JSON.stringify(v).slice(0, 120);
+    const s = String(v);
+    return /^\d{4}-\d{2}-\d{2}T/.test(s) ? uiDate(s) : s.slice(0, 120);
+}
+
+function stfAuditChanges(r) {
+    const ch = r.changes || {};
+    if (r.action === 'update') return Object.entries(ch).map(([k, [a, b]]) => `<div><b>${uiEsc(AUDIT_FIELDS[k] || k)}:</b> <span class="text-red-700 line-through">${uiEsc(stfAuditVal(a))}</span> ← <span class="text-emerald-700">${uiEsc(stfAuditVal(b))}</span></div>`).join('');
+    return Object.entries(ch).filter(([k, v]) => !AUDIT_SKIP.includes(k) && !k.endsWith('_id') && v !== null && v !== '').slice(0, 6)
+        .map(([k, v]) => `<b>${uiEsc(AUDIT_FIELDS[k] || k)}:</b> ${uiEsc(stfAuditVal(v))}`).join(' <span class="text-slate-300">·</span> ');
+}
+
+async function stfRenderAudit(more) {
+    const box = document.getElementById('stf-body');
+    if (!more) {
+        const f = stfState.audit || {};
+        box.innerHTML = uiCard('🕵️ سجل العمليات: مين عمل إيه وإمتى', `
+            <div class="flex flex-wrap gap-2 mb-3">
+                <input id="aud-from" type="date" value="${uiEsc(f.from || uiToday())}" class="${uiInputClass()}">
+                <input id="aud-to" type="date" value="${uiEsc(f.to || uiToday())}" class="${uiInputClass()}">
+                <select id="aud-staff" class="${uiInputClass()}"><option value="">كل الناس</option></select>
+                <select id="aud-table" class="${uiInputClass()}"><option value="">كل الأقسام</option>${Object.entries(AUDIT_TABLES).sort((a, b) => a[1].localeCompare(b[1], 'ar')).map(([k, v]) => `<option value="${k}" ${f.table === k ? 'selected' : ''}>${uiEsc(v)}</option>`).join('')}</select>
+                <select id="aud-action" class="${uiInputClass()}"><option value="">كل العمليات</option>${Object.entries(AUDIT_ACTIONS).map(([k, v]) => `<option value="${k}" ${f.action === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+                <input id="aud-search" type="text" placeholder="بحث (رقم طلب، اسم صنف، مبلغ...)" value="${uiEsc(f.search || '')}" class="${uiInputClass()}">
+                ${uiBtn('عرض', 'stfState.audit = null; stfRenderAudit()', 'blue')}</div>
+            <div id="aud-list"></div>`);
+    }
+    const flt = { from: document.getElementById('aud-from').value, to: document.getElementById('aud-to').value, staff: document.getElementById('aud-staff').value,
+        table: document.getElementById('aud-table').value, action: document.getElementById('aud-action').value, search: document.getElementById('aud-search').value.trim() };
+    const res = await uiCall('audit_log_secure', { p_from: flt.from, p_to: flt.to, p_filters: { staff_id: flt.staff || null, table: flt.table || null,
+        action: flt.action || null, search: flt.search || null, before_id: more ? stfState.auditLast : null } });
+    if (!res) return;
+    const sel = document.getElementById('aud-staff');
+    if (sel && sel.options.length <= 1) (res.staff || []).forEach(s => sel.add(new Option(s.name, s.id, false, s.id === flt.staff)));
+    const rows = res.rows || [];
+    stfState.auditLast = rows.length ? rows[rows.length - 1].id : null;
+    const html = rows.map(r => `<tr class="border-b border-slate-100 text-xs font-bold align-top">
+        <td class="p-2 whitespace-nowrap">${uiEsc(uiDate(r.at))}</td>
+        <td class="p-2">${uiEsc(r.staff || (r.table === 'qr_orders' ? 'زبون (QR)' : 'النظام'))}</td>
+        <td class="p-2">${uiEsc(AUDIT_TABLES[r.table] || r.table)}</td>
+        <td class="p-2 ${AUDIT_ACTIONS[r.action][1]}">${r.table === 'staff_sessions' ? (r.action === 'insert' ? '🔑 دخول' : '🚪 خروج') : AUDIT_ACTIONS[r.action][0]}</td>
+        <td class="p-2">${uiEsc(r.label || '')}</td>
+        <td class="p-2 text-[11px] leading-5">${stfAuditChanges(r)}</td></tr>`).join('');
+    const list = document.getElementById('aud-list');
+    if (!more) list.innerHTML = rows.length ? `<div class="overflow-x-auto"><table class="w-full text-right"><thead><tr class="text-[11px] text-slate-500"><th class="p-2">الوقت</th><th class="p-2">مين</th><th class="p-2">القسم</th><th class="p-2">العملية</th><th class="p-2">على إيه</th><th class="p-2">التفاصيل</th></tr></thead><tbody id="aud-body"></tbody></table></div><div id="aud-more" class="mt-2"></div>` : '<p class="text-center text-slate-400 text-xs font-bold py-6">مفيش عمليات بالفلتر ده</p>';
+    const body = document.getElementById('aud-body');
+    if (body) body.insertAdjacentHTML('beforeend', html);
+    const moreBox = document.getElementById('aud-more');
+    if (moreBox) moreBox.innerHTML = rows.length === 500 ? uiBtn('عرض الأقدم', 'stfRenderAudit(true)', 'gray') : '';
 }
