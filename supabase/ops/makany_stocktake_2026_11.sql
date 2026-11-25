@@ -4,7 +4,7 @@
 --   mode=apply   : the same, then sets the stock exactly like the stocktake screen does (inv_counts + stock_takes +
 --                  'adjustment' stock moves + journal 5300/1200), only for lines marked OK. Other lines are skipped.
 --   since        : optional 'YYYY-MM-DD HH:MI' (Cairo time) when the counting was done; what moved after it is added.
--- Items in the system that are not on the paper are NOT touched.
+-- Items in the system that are not on the paper are NOT touched (except ice: zero, and out of every recipe / extra).
 -- Run: sudo bash /opt/motionpos/repo/supabase/ops/makany_stocktake_2026_11.sh preview   (then: apply)
 \set ON_ERROR_STOP 1
 \pset footer off
@@ -122,7 +122,7 @@ insert into mk_lines values
  (52, 'بن غامق', 100, 'جرام', '{بن غامق,بن تركي غامق}'),
  (53, 'بن سادة', 200, 'جرام', '{بن سادة,بن تركي سادة,بن تركي}'),
  (54, 'شاي سايب', 450, 'جرام', '{شاي سايب,شاي}'),
- (55, 'بن اسبريسو', 9972, 'جرام', '{بن اسبريسو,بن اسبرسو,اسبريسو}'),
+ (55, 'بن اسبريسو', 972, 'جرام', '{بن اسبريسو,بن اسبرسو,اسبريسو}'),
  (56, 'بن بندق', 250, 'جرام', '{بن بندق,بن فرنساوي بندق}'),
  (57, 'جوز هند', 288, 'جرام', '{جوز هند,جوز هند مبشور}'),
  (58, 'زبيب', 50, 'جرام', '{زبيب}'),
@@ -163,7 +163,9 @@ insert into mk_lines values
  (94, 'كوبايات سخن وسط', 43, 'قطعة', '{كوبايات سخن وسط,كوبايات ورق وسط}'),
  (95, 'كوبايات سخن صغير', 33, 'قطعة', '{كوبايات سخن صغير,كوبايات ورق صغير}'),
  -- the water counted on the paper is all in line 1; the purchase item "كرتونه مياه" never goes down with sales
- (96, 'كرتونه مياه (المياه كلها في سطر 1)', 0, 'زجاجة', '{كرتونه مياه}');
+ (96, 'كرتونه مياه (المياه كلها في سطر 1)', 0, 'زجاجة', '{كرتونه مياه}'),
+ -- ice comes from the machine and is not stocked (fix_ice_shisha_tea): its stock goes to zero
+ (97, 'تلج (مش بيتجرد - من الماكينة)', 0, 'قطعة', '{تلج}');
 
 create temp table mk_res (
   n int, label text, paper text, ing_id uuid, item text, item_unit text, qty_item numeric,
@@ -261,6 +263,16 @@ begin
   update mk_res r set status = 'SAME ITEM TWICE', hint = 'also line ' ||
          (select string_agg(o.n::text, ',') from mk_res o where o.ing_id = r.ing_id and o.n <> r.n)
    where r.status like 'OK%' and exists (select 1 from mk_res o where o.ing_id = r.ing_id and o.n <> r.n);
+
+  -- ice: make sure no recipe or extra takes it any more (same as fix_ice_shisha_tea)
+  raise notice 'ice in recipes: %, in extras: %, last sale move: %',
+    (select count(*) from recipes r join ingredients x on x.id = r.ingredient_id where btrim(x.name) = 'تلج'),
+    (select count(*) from modifiers m join ingredients x on x.id = m.ingredient_id where btrim(x.name) = 'تلج'),
+    (select max(m.created_at) from stock_movements m join ingredients x on x.id = m.ingredient_id
+      where btrim(x.name) = 'تلج' and m.movement_type = 'sale');
+  delete from recipes r using ingredients x where x.id = r.ingredient_id and btrim(x.name) = 'تلج';
+  update modifiers m set ingredient_id = null, ingredient_quantity = null
+    from ingredients x where x.id = m.ingredient_id and btrim(x.name) = 'تلج';
 
   if current_setting('motionpos.fix_mode') = 'apply' then
     insert into inv_counts (company_id, warehouse_id, notes)
